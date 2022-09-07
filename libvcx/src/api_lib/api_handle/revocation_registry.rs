@@ -55,7 +55,7 @@ pub async fn publish_revocations(handle: u32, issuer_did: &str) -> VcxResult<()>
     let rev_reg = REV_REG_MAP.get_cloned(handle)?;
     let rev_reg_id = rev_reg.get_rev_reg_id();
     // TODO: Check result
-    anoncreds::publish_local_revocations(get_main_wallet_handle(), &rev_reg_id, issuer_did).await?;
+    anoncreds::publish_local_revocations(get_main_wallet_handle(), get_main_pool_handle()?, &rev_reg_id, issuer_did).await?;
     Ok(())
 }
 
