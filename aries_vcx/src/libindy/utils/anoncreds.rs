@@ -1623,9 +1623,9 @@ pub mod integration_tests {
 
         revoke_credential_local(
             setup.wallet_handle,
-            &setup.institution_did,
             get_temp_dir_path(TAILS_DIR).to_str().unwrap(),
-            &cred_rev_id,
+            &rev_reg_id,
+            &cred_rev_id
         )
             .await
             .unwrap();
