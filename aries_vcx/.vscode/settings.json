@@ -1,4 +1,4 @@
 {
-    // "rust-analyzer.cargo.features": "all"
-    "rust-analyzer.cargo.features": ["wallet_tests"]
+    "rust-analyzer.cargo.features": "all"
+    // "rust-analyzer.cargo.features": ["wallet_tests"]
 }

@@ -31,6 +31,7 @@ pub async fn pack_message(
         return Ok(msg.to_vec());
     }
 
+    // println!("debug!!!! {:?} {:?} {:?} {:?}", wallet_handle, msg, receiver_keys, sender_vk);
     crypto::pack_message(wallet_handle, msg, receiver_keys, sender_vk)
         .await
         .map_err(VcxError::from)
