@@ -20,6 +20,7 @@ general_test = ["test_utils", "tokio/rt", "tokio/macros"]
 fatal_warnings = []
 warnlog_fetched_messages = []
 mysql_test = ["test_utils", "sqlx", "tokio/rt", "tokio/macros"]
+wallet_tests = ["test_utils", "tokio/rt", "tokio/macros"]
 
 [dependencies]
 async-trait = "0.1.53"
