@@ -72,7 +72,7 @@ mod integration_tests {
         //     timing: None,
         // });
 
-        let mut invitation = helper::url_to_invitation("http://192.168.65.3:8200?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiMTZiYjBmNTktNTE5Yi00YjljLWFiYjUtOTkyNWEyODBlYzcwIiwgImxhYmVsIjogIkFyaWVzIENsb3VkIEFnZW50IiwgInJlY2lwaWVudEtleXMiOiBbIkdUUTlnRXl1R3pZQ05WdVpKUWU4ZGlHWUhocW1OUGF5VEhWUnB1Qnoyc0E2Il0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovLzE5Mi4xNjguNjUuMzo4MjAwIn0=");
+        let mut invitation = helper::url_to_invitation("http://d859-69-210-72-126.ngrok.io?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiMzcyNGRjMmQtMjQ0Ni00MDAzLTg3YjEtYTNiMWFkZjhkMzM1IiwgInNlcnZpY2VFbmRwb2ludCI6ICJodHRwOi8vZDg1OS02OS0yMTAtNzItMTI2Lm5ncm9rLmlvIiwgImxhYmVsIjogIkFyaWVzIENsb3VkIEFnZW50IiwgInJlY2lwaWVudEtleXMiOiBbIkFXWjdxU2dzVlBjRzZ2eTV0Q2ljUlM1WjFrSHFTZFROa0NYd3BXVW9iRUc4Il19");
         invitation.service_endpoint = "http://localhost:8200".to_string();
         let invitation = Invitation::Pairwise(invitation);
 
@@ -96,7 +96,7 @@ mod integration_tests {
 
         println!("{:?}", conn.get_state());
 
-        thread::sleep(Duration::from_millis(10000));
+        thread::sleep(Duration::from_millis(5000));
 
         // find response and accept
         conn.find_message_and_update_state(indy_handle, &agency_client)
@@ -104,6 +104,12 @@ mod integration_tests {
             .unwrap();
 
         println!("{:?}", conn.get_state());
+
+        conn.send_generic_message(indy_handle, "hellooooo world").await.unwrap();
+
+        println!("{:?}", conn.to_string().unwrap());
+
+        // todo!()
     }
 
     mod helper {
