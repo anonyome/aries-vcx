@@ -1,7 +1,7 @@
 #[cfg(test)]
 #[cfg(feature = "wallet_tests")]
 mod integration_tests {
-    use std::{thread, time::Duration};
+    use std::{thread, time::Duration, sync::Arc};
 
     use agency_client::{agency_client::AgencyClient, configuration::AgentProvisionConfig};
     use aries_vcx::{
@@ -61,19 +61,12 @@ mod integration_tests {
         };
         let indy_handle = create_and_open_wallet(&config_wallet).await.unwrap();
 
+        let wallet = Arc::new(IndySdkWallet::new(indy_handle)) as Arc<dyn BaseWallet>;
+
         let mut agency_client = AgencyClient::new();
 
-        // let invitation = Invitation::Pairwise(PairwiseInvitation {
-        //     id: MessageId("4c6afcf1-8a06-4bc7-9f9c-fd106f992cca".into()),
-        //     label: "ACApy".into(),
-        //     recipient_keys: ["CUgKAdFFcG4BasPDRBPNta8aaBE1wsZwRoy1LkM6sB7o".into()].to_vec(),
-        //     routing_keys: [].to_vec(),
-        //     service_endpoint: "http://localhost:8200".into(),
-        //     timing: None,
-        // });
-
-        let mut invitation = helper::url_to_invitation("http://d859-69-210-72-126.ngrok.io?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiMzcyNGRjMmQtMjQ0Ni00MDAzLTg3YjEtYTNiMWFkZjhkMzM1IiwgInNlcnZpY2VFbmRwb2ludCI6ICJodHRwOi8vZDg1OS02OS0yMTAtNzItMTI2Lm5ncm9rLmlvIiwgImxhYmVsIjogIkFyaWVzIENsb3VkIEFnZW50IiwgInJlY2lwaWVudEtleXMiOiBbIkFXWjdxU2dzVlBjRzZ2eTV0Q2ljUlM1WjFrSHFTZFROa0NYd3BXVW9iRUc4Il19");
-        invitation.service_endpoint = "http://localhost:8200".to_string();
+        let mut invitation = helper::url_to_invitation("http://fe0d-125-253-16-164.ngrok.io?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiNjkxYTQ4ZTAtZDBlMi00ODU5LWFlM2ItMGMxYTEzNTkxZGUxIiwgInJlY2lwaWVudEtleXMiOiBbIjZhYVZZU2ZmNG94SktqdUhlVThjVEhEb1l6ZjZKQ1B1S05VWnBMeDd3cnBoIl0sICJsYWJlbCI6ICJBcmllcyBDbG91ZCBBZ2VudCIsICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2ZlMGQtMTI1LTI1My0xNi0xNjQubmdyb2suaW8ifQ==");
+        // invitation.service_endpoint = "http://localhost:8200".to_string();
         let invitation = Invitation::Pairwise(invitation);
 
         // connect with some default vcx mediator
@@ -89,27 +82,27 @@ mod integration_tests {
             .unwrap();
 
         // receive and accept invite
-        let mut conn = Connection::create_with_invite("source_id", indy_handle, &agency_client, invitation, true)
+        let mut conn = Connection::create_with_invite("source_id", &wallet, &agency_client, invitation, true)
             .await
             .unwrap();
-        conn.connect(indy_handle, &agency_client).await.unwrap();
+        conn.connect(&wallet, &agency_client).await.unwrap();
 
         println!("{:?}", conn.get_state());
 
         thread::sleep(Duration::from_millis(5000));
 
         // find response and accept
-        conn.find_message_and_update_state(indy_handle, &agency_client)
+        conn.find_message_and_update_state(&wallet, &agency_client)
             .await
             .unwrap();
 
         println!("{:?}", conn.get_state());
 
-        conn.send_generic_message(indy_handle, "hellooooo world").await.unwrap();
+        conn.send_generic_message(&wallet, "hellooooo world, ya ya ya").await.unwrap();
 
         println!("{:?}", conn.to_string().unwrap());
 
-        // todo!()
+        ()
     }
 
     mod helper {

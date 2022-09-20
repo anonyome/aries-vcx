@@ -34,6 +34,8 @@ impl AgencyClient {
     pub fn get_wallet_handle(&self) -> WalletHandle {
         self.wallet_handle
     }
+
+    // TODO - get_wallet -> &Arc<dyn BaseWallet>
     pub fn get_agency_url_full(&self) -> String {
         format!("{}/agency/msg", self.agency_url.clone())
     }

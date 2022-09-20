@@ -123,6 +123,7 @@ pub async fn get_verkey_from_ledger(did: &str) -> VcxResult<String> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "general_test")]
 mod test {
     use crate::libindy::utils::mocks::pool_mocks::{enable_pool_mocks, PoolMocks};
     use crate::utils::devsetup::*;

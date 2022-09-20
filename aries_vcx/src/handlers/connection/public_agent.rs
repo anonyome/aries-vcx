@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures::stream::iter;
 use futures::StreamExt;
 use indy_sys::WalletHandle;
@@ -12,6 +14,7 @@ use crate::messages::a2a::A2AMessage;
 use crate::messages::connection::did::Did;
 use crate::messages::connection::request::Request;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
+use crate::wallet::base_wallet::BaseWallet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicAgent {
@@ -23,18 +26,21 @@ pub struct PublicAgent {
 
 impl PublicAgent {
     pub async fn create(
-        wallet_handle: WalletHandle,
+        wallet: &Arc<dyn BaseWallet>,
         agency_client: &AgencyClient,
         source_id: &str,
         institution_did: &str,
     ) -> VcxResult<Self> {
-        let pairwise_info = PairwiseInfo::create(wallet_handle).await?;
+        let pairwise_info = PairwiseInfo::create(wallet).await?;
         let agent_info = CloudAgentInfo::create(agency_client, &pairwise_info).await?;
         let service = AriesService::create()
             .set_service_endpoint(agency_client.get_agency_url_full())
             .set_recipient_keys(vec![pairwise_info.pw_vk.clone()])
             .set_routing_keys(agent_info.routing_keys(agency_client)?);
-        add_service(wallet_handle, institution_did, &service).await?;
+
+        // TODO!! - ledger service
+        add_service(todo!(), institution_did, &service).await?;
+        
         let institution_did = Did::new(institution_did)?;
         let source_id = String::from(source_id);
         Ok(Self {

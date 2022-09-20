@@ -189,7 +189,7 @@ impl Verifier {
         if !self.progressable_by_message() {
             return Ok(self.get_state());
         }
-        let send_message = connection.send_message_closure(wallet_handle)?;
+        let send_message = connection.send_message_closure(todo!())?;
 
         let messages = connection.get_messages(agency_client).await?;
         if let Some((uid, msg)) = self.find_message_to_handle(messages) {

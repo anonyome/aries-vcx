@@ -1,8 +1,7 @@
 use std::clone::Clone;
 use std::collections::HashMap;
 use std::future::Future;
-
-use indy_sys::WalletHandle;
+use std::sync::Arc;
 
 use crate::did_doc::DidDoc;
 use crate::error::prelude::*;
@@ -21,6 +20,7 @@ use crate::protocols::connection::invitee::states::invited::InvitedState;
 use crate::protocols::connection::invitee::states::requested::RequestedState;
 use crate::protocols::connection::invitee::states::responded::RespondedState;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
+use crate::wallet::base_wallet::BaseWallet;
 
 #[derive(Clone)]
 pub struct SmConnectionInvitee {
@@ -244,7 +244,7 @@ impl SmConnectionInvitee {
     // todo: extract response validation to different function
     async fn _send_ack<F, T>(
         &self,
-        wallet_handle: WalletHandle,
+        wallet: &Arc<dyn BaseWallet>,
         did_doc: &DidDoc,
         request: &Request,
         response: &SignedResponse,
@@ -252,7 +252,7 @@ impl SmConnectionInvitee {
         send_message: F,
     ) -> VcxResult<Response>
     where
-        F: Fn(WalletHandle, String, DidDoc, A2AMessage) -> T,
+        F: Fn(Arc<dyn BaseWallet>, String, DidDoc, A2AMessage) -> T,
         T: Future<Output = VcxResult<()>>,
     {
         let remote_vk: String = did_doc.recipient_keys().get(0).cloned().ok_or(VcxError::from_msg(
@@ -275,7 +275,7 @@ impl SmConnectionInvitee {
         let message = self.build_connection_ack_msg()?.to_a2a_message();
 
         send_message(
-            wallet_handle,
+            Arc::clone(wallet),
             pairwise_info.pw_vk.clone(),
             response.connection.did_doc.clone(),
             message,
@@ -304,13 +304,13 @@ impl SmConnectionInvitee {
 
     pub async fn send_connection_request<F, T>(
         self,
-        wallet_handle: WalletHandle,
+        wallet: &Arc<dyn BaseWallet>,
         routing_keys: Vec<String>,
         service_endpoint: String,
         send_message: F,
     ) -> VcxResult<Self>
     where
-        F: Fn(WalletHandle, String, DidDoc, A2AMessage) -> T,
+        F: Fn(Arc<dyn BaseWallet>, String, DidDoc, A2AMessage) -> T,
         T: Future<Output = VcxResult<()>>,
     {
         let (state, thread_id) = match self.state {
@@ -318,7 +318,7 @@ impl SmConnectionInvitee {
                 let ddo = DidDoc::from(state.invitation.clone());
                 let (request, thread_id) = self.build_connection_request_msg(routing_keys, service_endpoint)?;
                 send_message(
-                    wallet_handle,
+                    Arc::clone(wallet),
                     self.pairwise_info.pw_vk.clone(),
                     ddo,
                     request.to_a2a_message(),
@@ -353,15 +353,15 @@ impl SmConnectionInvitee {
     }
 
     // todo: send ack is validaiting connection response, should be moved to handle_connection_response
-    pub async fn handle_send_ack<F, T>(self, wallet_handle: WalletHandle, send_message: &F) -> VcxResult<Self>
+    pub async fn handle_send_ack<F, T>(self, wallet: &Arc<dyn BaseWallet>, send_message: &F) -> VcxResult<Self>
     where
-        F: Fn(WalletHandle, String, DidDoc, A2AMessage) -> T,
+        F: Fn(Arc<dyn BaseWallet>, String, DidDoc, A2AMessage) -> T,
         T: Future<Output = VcxResult<()>>,
     {
         let state = match self.state {
             InviteeFullState::Responded(ref state) => match self
                 ._send_ack(
-                    wallet_handle,
+                    wallet,
                     &state.did_doc,
                     &state.request,
                     &state.response,
@@ -378,7 +378,7 @@ impl SmConnectionInvitee {
                         .set_thread_id(&self.thread_id)
                         .set_out_time();
                     send_message(
-                        wallet_handle,
+                        Arc::clone(wallet),
                         self.pairwise_info.pw_vk.clone(),
                         state.did_doc.clone(),
                         problem_report.to_a2a_message(),

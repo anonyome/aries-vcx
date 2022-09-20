@@ -1,5 +1,6 @@
+use std::sync::Arc;
+
 use base64;
-use indy_sys::WalletHandle;
 use time;
 
 use crate::did_doc::DidDoc;
@@ -12,6 +13,7 @@ use crate::messages::ack::PleaseAck;
 use crate::messages::thread::Thread;
 use crate::messages::timing::Timing;
 use crate::timing_optional;
+use crate::wallet::base_wallet::BaseWallet;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
 pub struct Response {
@@ -90,7 +92,7 @@ impl Response {
         self
     }
 
-    pub async fn encode(&self, wallet_handle: WalletHandle, key: &str) -> VcxResult<SignedResponse> {
+    pub async fn encode(&self, wallet: &Arc<dyn BaseWallet>, key: &str) -> VcxResult<SignedResponse> {
         let connection_data = json!(self.connection).to_string();
 
         let now: u64 = time::get_time().sec as u64;
@@ -99,7 +101,8 @@ impl Response {
 
         sig_data.extend(connection_data.as_bytes());
 
-        let signature = crypto::sign(wallet_handle, key, &sig_data).await?;
+        let signature = wallet.sign(key, &sig_data).await?;
+        // let signature = crypto::sign(wallet_handle, key, &sig_data).await?;
 
         let sig_data = base64::encode_config(&sig_data, base64::URL_SAFE);
 
