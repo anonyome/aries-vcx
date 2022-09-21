@@ -8,7 +8,7 @@ use crate::{
 
 use super::base_wallet::BaseWallet;
 
-#[allow(dead_code)]
+// #[allow(dead_code)]
 pub struct IndySdkWallet {
     handle: WalletHandle,
 }

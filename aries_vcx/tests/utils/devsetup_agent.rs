@@ -166,10 +166,10 @@ pub mod test_utils {
             let config_agency = provision_cloud_agent(&mut agency_client, wallet_handle, &config_provision_agent)
                 .await
                 .unwrap();
-            let connection = Connection::create("faber", agency_client.get_wallet_handle(), &agency_client, true)
+            let connection = Connection::create("faber", todo!(), &agency_client, true)
                 .await
                 .unwrap();
-            let agent = PublicAgent::create(wallet_handle, &agency_client, "faber", &config_issuer.institution_did)
+            let agent = PublicAgent::create(todo!(), &agency_client, "faber", &config_issuer.institution_did)
                 .await
                 .unwrap();
             let faber = Faber {
@@ -245,11 +245,11 @@ pub mod test_utils {
         pub async fn create_invite(&mut self) -> String {
             self.activate().await.unwrap();
             self.connection
-                .connect(self.wallet_handle, &self.agency_client)
+                .connect(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             self.connection
-                .find_message_and_update_state(self.wallet_handle, &self.agency_client)
+                .find_message_and_update_state(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(
@@ -270,7 +270,7 @@ pub mod test_utils {
         pub async fn update_state(&mut self, expected_state: u32) {
             self.activate().await.unwrap();
             self.connection
-                .find_message_and_update_state(self.wallet_handle, &self.agency_client)
+                .find_message_and_update_state(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -279,7 +279,7 @@ pub mod test_utils {
         pub async fn handle_messages(&mut self) {
             self.activate().await.unwrap();
             self.connection
-                .find_and_handle_message(self.wallet_handle, &self.agency_client)
+                .find_and_handle_message(todo!(), &self.agency_client)
                 .await
                 .unwrap();
         }
@@ -287,7 +287,7 @@ pub mod test_utils {
         pub async fn respond_messages(&mut self, expected_state: u32) {
             self.activate().await.unwrap();
             self.connection
-                .find_and_handle_message(self.wallet_handle, &self.agency_client)
+                .find_and_handle_message(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -295,13 +295,13 @@ pub mod test_utils {
 
         pub async fn ping(&mut self) {
             self.activate().await.unwrap();
-            self.connection.send_ping(self.wallet_handle, None).await.unwrap();
+            self.connection.send_ping(todo!(), None).await.unwrap();
         }
 
         pub async fn discovery_features(&mut self) {
             self.activate().await.unwrap();
             self.connection
-                .send_discovery_query(self.wallet_handle, None, None)
+                .send_discovery_query(todo!(), None, None)
                 .await
                 .unwrap();
         }
@@ -335,11 +335,11 @@ pub mod test_utils {
                 .await
                 .unwrap();
             self.issuer_credential
-                .send_credential_offer(self.connection.send_message_closure(self.wallet_handle).unwrap())
+                .send_credential_offer(self.connection.send_message_closure(todo!()).unwrap())
                 .await
                 .unwrap();
             self.issuer_credential
-                .update_state(self.wallet_handle, &self.agency_client, &self.connection)
+                .update_state(todo!(), &self.agency_client, &self.connection)
                 .await
                 .unwrap();
             assert_eq!(IssuerState::OfferSent, self.issuer_credential.get_state());
@@ -348,7 +348,7 @@ pub mod test_utils {
         pub async fn send_credential(&mut self) {
             self.activate().await.unwrap();
             self.issuer_credential
-                .update_state(self.wallet_handle, &self.agency_client, &self.connection)
+                .update_state(todo!(), &self.agency_client, &self.connection)
                 .await
                 .unwrap();
             assert_eq!(IssuerState::RequestReceived, self.issuer_credential.get_state());
@@ -356,7 +356,7 @@ pub mod test_utils {
             self.issuer_credential
                 .send_credential(
                     self.wallet_handle,
-                    self.connection.send_message_closure(self.wallet_handle).unwrap(),
+                    self.connection.send_message_closure(todo!()).unwrap(),
                 )
                 .await
                 .unwrap();
@@ -373,7 +373,7 @@ pub mod test_utils {
             assert_eq!(VerifierState::PresentationRequestSet, self.verifier.get_state());
 
             self.verifier
-                .send_presentation_request(self.connection.send_message_closure(self.wallet_handle).unwrap())
+                .send_presentation_request(self.connection.send_message_closure(todo!()).unwrap())
                 .await
                 .unwrap();
             self.verifier
@@ -441,7 +441,7 @@ pub mod test_utils {
             let config_agency = provision_cloud_agent(&mut agency_client, wallet_handle, &config_provision_agent)
                 .await
                 .unwrap();
-            let connection = Connection::create("tmp_empoty", agency_client.get_wallet_handle(), &agency_client, true)
+            let connection = Connection::create("tmp_empoty", todo!(), &agency_client, true)
                 .await
                 .unwrap();
             let alice = Alice {
@@ -461,7 +461,7 @@ pub mod test_utils {
             self.activate().await.unwrap();
             self.connection = Connection::create_with_invite(
                 "faber",
-                self.wallet_handle,
+                todo!(),
                 &self.agency_client,
                 serde_json::from_str(invite).unwrap(),
                 true,
@@ -469,11 +469,11 @@ pub mod test_utils {
             .await
             .unwrap();
             self.connection
-                .connect(self.wallet_handle, &self.agency_client)
+                .connect(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             self.connection
-                .find_message_and_update_state(self.wallet_handle, &self.agency_client)
+                .find_message_and_update_state(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(
@@ -485,7 +485,7 @@ pub mod test_utils {
         pub async fn update_state(&mut self, expected_state: u32) {
             self.activate().await.unwrap();
             self.connection
-                .find_message_and_update_state(self.wallet_handle, &self.agency_client)
+                .find_message_and_update_state(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -494,7 +494,7 @@ pub mod test_utils {
         pub async fn handle_messages(&mut self) {
             self.activate().await.unwrap();
             self.connection
-                .find_and_handle_message(self.wallet_handle, &self.agency_client)
+                .find_and_handle_message(todo!(), &self.agency_client)
                 .await
                 .unwrap();
         }
@@ -502,7 +502,7 @@ pub mod test_utils {
         pub async fn respond_messages(&mut self, expected_state: u32) {
             self.activate().await.unwrap();
             self.connection
-                .find_and_handle_message(self.wallet_handle, &self.agency_client)
+                .find_and_handle_message(todo!(), &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -549,7 +549,7 @@ pub mod test_utils {
                 .send_request(
                     self.wallet_handle,
                     pw_did,
-                    self.connection.send_message_closure(self.wallet_handle).unwrap(),
+                    self.connection.send_message_closure(todo!()).unwrap(),
                 )
                 .await
                 .unwrap();
@@ -646,7 +646,7 @@ pub mod test_utils {
             self.prover
                 .send_presentation(
                     self.wallet_handle,
-                    self.connection.send_message_closure(self.wallet_handle).unwrap(),
+                    self.connection.send_message_closure(todo!()).unwrap(),
                 )
                 .await
                 .unwrap();

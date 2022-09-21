@@ -40,25 +40,26 @@ impl OutOfBandReceiver {
         &self,
         connections: &'a Vec<&'a Connection>,
     ) -> VcxResult<Option<&'a Connection>> {
-        trace!("OutOfBandReceiver::connection_exists >>>");
-        for service in &self.oob.services {
-            for connection in connections {
-                match connection.bootstrap_did_doc() {
-                    Some(did_doc) => {
-                        if let ServiceResolvable::Did(did) = service {
-                            if did.to_string() == did_doc.id {
-                                return Ok(Some(connection));
-                            }
-                        };
-                        if did_doc.resolve_service()? == service.resolve().await? {
-                            return Ok(Some(connection));
-                        };
-                    }
-                    None => break,
-                }
-            }
-        }
-        Ok(None)
+        todo!();
+        // trace!("OutOfBandReceiver::connection_exists >>>");
+        // for service in &self.oob.services {
+        //     for connection in connections {
+        //         match connection.bootstrap_did_doc() {
+        //             Some(did_doc) => {
+        //                 if let ServiceResolvable::Did(did) = service {
+        //                     if did.to_string() == did_doc.id {
+        //                         return Ok(Some(connection));
+        //                     }
+        //                 };
+        //                 if did_doc.resolve_service()? == service.resolve().await? {
+        //                     return Ok(Some(connection));
+        //                 };
+        //             }
+        //             None => break,
+        //         }
+        //     }
+        // }
+        // Ok(None)
     }
 
     // TODO: There may be multiple A2AMessages in a single OoB msg
@@ -137,7 +138,7 @@ impl OutOfBandReceiver {
         );
         Connection::create_with_invite(
             &self.oob.id.0,
-            &agency_client.get_wallet_handle().to_base_wallet(),
+            todo!(),
             agency_client,
             Invitation::OutOfBand(self.oob.clone()),
             autohop_enabled,

@@ -205,21 +205,22 @@ impl SmConnectionInvitee {
                     .set_service_endpoint(service_endpoint.to_string())
                     .set_keys(recipient_keys, routing_keys)
                     .set_out_time();
+                let request_id = request.id.0.clone();
                 let (request, thread_id) = match &state.invitation {
                     Invitation::Public(_) => (
                         request
-                            .clone()
                             .set_parent_thread_id(&self.thread_id)
                             .set_thread_id_matching_id(),
-                        request.id.0.clone(),
+                            request_id,
                     ),
-                    Invitation::Pairwise(_) => (request.set_thread_id(&self.thread_id), self.get_thread_id()),
+                    // Invitation::Pairwise(_) => (request.set_thread_id(&self.thread_id), self.get_thread_id()),
+                    // todo - i'm editting this as some agents don't properly set threadId
+                    Invitation::Pairwise(_) => (request.set_thread_id_matching_id(), request_id),
                     Invitation::OutOfBand(invite) => (
                         request
-                            .clone()
                             .set_parent_thread_id(&invite.id.0)
                             .set_thread_id_matching_id(),
-                        request.id.0.clone(),
+                            request_id,
                     ),
                 };
                 Ok((request, thread_id))

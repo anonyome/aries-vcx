@@ -153,7 +153,7 @@ pub mod test_utils {
             .await
             .unwrap();
         issuer
-            .send_credential_offer(connection.send_message_closure(faber.wallet_handle).unwrap())
+            .send_credential_offer(connection.send_message_closure(todo!()).unwrap())
             .await
             .unwrap();
         info!("create_and_send_nonrevocable_cred_offer :: credential offer was sent");
@@ -184,7 +184,7 @@ pub mod test_utils {
             .await
             .unwrap();
         issuer
-            .send_credential_offer(connection.send_message_closure(faber.wallet_handle).unwrap())
+            .send_credential_offer(connection.send_message_closure(todo!()).unwrap())
             .await
             .unwrap();
         info!("create_and_send_cred_offer :: credential offer was sent");
@@ -224,7 +224,7 @@ pub mod test_utils {
             .send_request(
                 alice.wallet_handle,
                 my_pw_did,
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -256,7 +256,7 @@ pub mod test_utils {
             .send_proposal(
                 alice.wallet_handle,
                 proposal,
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -294,7 +294,7 @@ pub mod test_utils {
             .send_proposal(
                 alice.wallet_handle,
                 proposal,
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -330,7 +330,7 @@ pub mod test_utils {
             .await
             .unwrap();
         issuer
-            .send_credential_offer(connection.send_message_closure(faber.wallet_handle).unwrap())
+            .send_credential_offer(connection.send_message_closure(todo!()).unwrap())
             .await
             .unwrap();
         assert_eq!(IssuerState::OfferSent, issuer.get_state());
@@ -364,7 +364,7 @@ pub mod test_utils {
             .await
             .unwrap();
         issuer
-            .send_credential_offer(connection.send_message_closure(faber.wallet_handle).unwrap())
+            .send_credential_offer(connection.send_message_closure(todo!()).unwrap())
             .await
             .unwrap();
         assert_eq!(IssuerState::OfferSent, issuer.get_state());
@@ -384,7 +384,7 @@ pub mod test_utils {
             .send_request(
                 alice.wallet_handle,
                 my_pw_did,
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -402,7 +402,7 @@ pub mod test_utils {
             .decline_offer(
                 alice.wallet_handle,
                 Some("Have a nice day"),
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -435,7 +435,7 @@ pub mod test_utils {
         issuer_credential
             .send_credential(
                 faber.wallet_handle,
-                issuer_to_consumer.send_message_closure(faber.wallet_handle).unwrap(),
+                issuer_to_consumer.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -481,7 +481,7 @@ pub mod test_utils {
             .send_proposal(
                 alice.wallet_handle,
                 proposal_data,
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -511,7 +511,7 @@ pub mod test_utils {
             .send_proposal(
                 alice.wallet_handle,
                 proposal_data,
-                connection.send_message_closure(alice.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
             )
             .await
             .unwrap();
@@ -543,7 +543,7 @@ pub mod test_utils {
             .unwrap();
         verifier.set_request(presentation_request_data, None).unwrap();
         verifier
-            .send_presentation_request(connection.send_message_closure(faber.wallet_handle).unwrap())
+            .send_presentation_request(connection.send_message_closure(todo!()).unwrap())
             .await
             .unwrap();
     }
@@ -559,7 +559,7 @@ pub mod test_utils {
         verifier
             .decline_presentation_proposal(
                 faber.wallet_handle,
-                connection.send_message_closure(faber.wallet_handle).unwrap(),
+                connection.send_message_closure(todo!()).unwrap(),
                 "I don't like Alices",
             )
             .await
@@ -598,7 +598,7 @@ pub mod test_utils {
             .unwrap();
         let mut verifier = Verifier::create_from_request("1".to_string(), &presentation_request_data).unwrap();
         verifier
-            .send_presentation_request(connection.send_message_closure(faber.wallet_handle).unwrap())
+            .send_presentation_request(connection.send_message_closure(todo!()).unwrap())
             .await
             .unwrap();
         thread::sleep(Duration::from_millis(100));
@@ -676,7 +676,7 @@ pub mod test_utils {
             prover
                 .send_presentation(
                     alice.wallet_handle,
-                    connection.send_message_closure(alice.wallet_handle).unwrap(),
+                    connection.send_message_closure(todo!()).unwrap(),
                 )
                 .await
                 .unwrap();
@@ -1004,7 +1004,7 @@ pub mod test_utils {
             .unwrap();
         assert_eq!(conn_requests.len(), 1);
         let mut institution_to_consumer = Connection::create_with_request(
-            faber.wallet_handle,
+            todo!(),
             conn_requests.pop().unwrap(),
             &faber.agent,
             &faber.agency_client,
@@ -1016,7 +1016,7 @@ pub mod test_utils {
             institution_to_consumer.get_state()
         );
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1026,7 +1026,7 @@ pub mod test_utils {
 
         alice.activate().await.unwrap();
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1037,7 +1037,7 @@ pub mod test_utils {
         faber.activate().await.unwrap();
         thread::sleep(Duration::from_millis(100));
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1064,7 +1064,7 @@ pub mod test_utils {
         alice.activate().await.unwrap();
         let mut consumer_to_institution = Connection::create_with_invite(
             "institution",
-            alice.wallet_handle,
+            todo!(),
             &alice.agency_client,
             public_invite,
             true,
@@ -1072,11 +1072,11 @@ pub mod test_utils {
         .await
         .unwrap();
         consumer_to_institution
-            .connect(alice.wallet_handle, &alice.agency_client)
+            .connect(todo!(), &alice.agency_client)
             .await
             .unwrap();
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
 
@@ -1089,11 +1089,11 @@ pub mod test_utils {
         debug!("Institution is going to create connection.");
         faber.activate().await.unwrap();
         let mut institution_to_consumer =
-            Connection::create("consumer", faber.wallet_handle, &faber.agency_client, true)
+            Connection::create("consumer", todo!(), &faber.agency_client, true)
                 .await
                 .unwrap();
         institution_to_consumer
-            .connect(faber.wallet_handle, &faber.agency_client)
+            .connect(todo!(), &faber.agency_client)
             .await
             .unwrap();
         let details = institution_to_consumer.get_invite_details().unwrap();
@@ -1102,7 +1102,7 @@ pub mod test_utils {
         debug!("Consumer is going to accept connection invitation.");
         let mut consumer_to_institution = Connection::create_with_invite(
             "institution",
-            alice.wallet_handle,
+            todo!(),
             &alice.agency_client,
             details.clone(),
             true,
@@ -1111,11 +1111,11 @@ pub mod test_utils {
         .unwrap();
 
         consumer_to_institution
-            .connect(alice.wallet_handle, &alice.agency_client)
+            .connect(todo!(), &alice.agency_client)
             .await
             .unwrap();
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
 
@@ -1125,7 +1125,7 @@ pub mod test_utils {
         faber.activate().await.unwrap();
         thread::sleep(Duration::from_millis(100));
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1137,7 +1137,7 @@ pub mod test_utils {
         debug!("Consumer is going to complete the connection protocol.");
         alice.activate().await.unwrap();
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1150,7 +1150,7 @@ pub mod test_utils {
         faber.activate().await.unwrap();
         thread::sleep(Duration::from_millis(100));
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(

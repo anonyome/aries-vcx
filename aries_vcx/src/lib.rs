@@ -41,9 +41,12 @@ pub mod did_doc;
 pub mod error;
 pub mod global;
 pub mod libindy;
-pub mod wallet;
 pub mod messages;
 pub mod protocols;
+
+pub mod core;
+pub mod wallet;
+pub mod ledger;
 
 #[cfg(test)]
 pub mod test {
