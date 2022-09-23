@@ -10,6 +10,7 @@ use crate::{
 use super::profile::Profile;
 
 #[allow(dead_code)]
+#[derive(Copy, Clone, Debug)]
 pub struct IndySdkProfile {
     pub indy_handle: WalletHandle,
 }

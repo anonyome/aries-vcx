@@ -5,12 +5,11 @@ use crate::configuration::AgencyClientConfig;
 use crate::error::AgencyClientResult;
 use crate::{validation, AgencyClientError, AgencyClientErrorKind};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AgencyClient {
     wallet_handle: WalletHandle,
     pub agency_url: String,
     pub agency_did: String,
-    pub agency_pwdid: String,
     pub agency_vk: String,
     pub agent_pwdid: String,
     pub agent_vk: String,
@@ -154,7 +153,6 @@ impl AgencyClient {
             wallet_handle: WalletHandle(0),
             agency_url: "".to_string(),
             agency_did: "".to_string(),
-            agency_pwdid: "".to_string(),
             agency_vk: "".to_string(),
             agent_pwdid: "".to_string(),
             agent_vk: "".to_string(),
