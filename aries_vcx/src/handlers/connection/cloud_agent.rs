@@ -4,15 +4,14 @@ use std::sync::Arc;
 use agency_client::agency_client::AgencyClient;
 use agency_client::api::downloaded_message::DownloadedMessageEncrypted;
 use agency_client::messages::update_message::UIDsByConn;
-use indyrs::WalletHandle;
+use agency_client::wallet::base_agency_client_wallet::BaseAgencyClientWallet;
 
 use crate::agency_client::MessageStatusCode;
 use crate::error::prelude::*;
 use crate::messages::a2a::A2AMessage;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
 use crate::utils::encryption_envelope::EncryptionEnvelope;
-use crate::wallet::base_wallet::BaseWallet;
-use crate::wallet::indy_wallet::IndySdkWallet;
+use crate::wallet::agency_client_wallet::ToBaseWallet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CloudAgentInfo {
@@ -159,7 +158,7 @@ impl CloudAgentInfo {
             .await?;
         debug!("CloudAgentInfo::get_messages >>> obtained {} messages", messages.len());
         let a2a_messages = self
-            .decrypt_decode_messages(&agency_client.get_wallet_handle().to_base_wallet(), &messages, expect_sender_vk)
+            .decrypt_decode_messages(&agency_client.get_wallet(), &messages, expect_sender_vk)
             .await?;
         _log_messages_optionally(&a2a_messages);
         Ok(a2a_messages)
@@ -185,7 +184,7 @@ impl CloudAgentInfo {
             messages.len()
         );
         let a2a_messages = self
-            .decrypt_decode_messages_noauth(&agency_client.get_wallet_handle().to_base_wallet(), &messages)
+            .decrypt_decode_messages_noauth(&agency_client.get_wallet(), &messages)
             .await?;
         _log_messages_optionally(&a2a_messages);
         Ok(a2a_messages)
@@ -207,14 +206,14 @@ impl CloudAgentInfo {
             format!("Message not found for id: {:?}", msg_id),
         ))?;
         let message = self
-            .decrypt_decode_message(&agency_client.get_wallet_handle().to_base_wallet(), &message, expected_sender_vk)
+            .decrypt_decode_message(&agency_client.get_wallet(), &message, expected_sender_vk)
             .await?;
         Ok(message)
     }
 
     async fn decrypt_decode_messages(
         &self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &Arc<dyn BaseAgencyClientWallet>,
         messages: &Vec<DownloadedMessageEncrypted>,
         expected_sender_vk: &str,
     ) -> VcxResult<HashMap<String, A2AMessage>> {
@@ -231,7 +230,7 @@ impl CloudAgentInfo {
 
     async fn decrypt_decode_messages_noauth(
         &self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &Arc<dyn BaseAgencyClientWallet>,
         messages: &Vec<DownloadedMessageEncrypted>,
     ) -> VcxResult<HashMap<String, A2AMessage>> {
         let mut a2a_messages: HashMap<String, A2AMessage> = HashMap::new();
@@ -246,29 +245,18 @@ impl CloudAgentInfo {
 
     async fn decrypt_decode_message(
         &self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &Arc<dyn BaseAgencyClientWallet>,
         message: &DownloadedMessageEncrypted,
         expected_sender_vk: &str,
     ) -> VcxResult<A2AMessage> {
-        EncryptionEnvelope::auth_unpack(wallet, message.payload()?, expected_sender_vk).await
+        EncryptionEnvelope::auth_unpack(&wallet.to_base_wallet(), message.payload()?, expected_sender_vk).await
     }
 
     async fn decrypt_decode_message_noauth(
         &self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &Arc<dyn BaseAgencyClientWallet>,
         message: &DownloadedMessageEncrypted,
     ) -> VcxResult<A2AMessage> {
-        EncryptionEnvelope::anon_unpack(wallet, message.payload()?).await
-    }
-}
-
-// temporary transform - TODO - delete later
-pub trait ToBaseWallet {
-    fn to_base_wallet(&self) -> Arc<dyn BaseWallet>;
-}
-
-impl ToBaseWallet for WalletHandle {
-    fn to_base_wallet(&self) -> Arc<dyn BaseWallet> {
-        Arc::new(IndySdkWallet::new(*self))
+        EncryptionEnvelope::anon_unpack(&wallet.to_base_wallet(), message.payload()?).await
     }
 }

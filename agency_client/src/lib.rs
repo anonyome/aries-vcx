@@ -32,6 +32,7 @@ pub mod httpclient;
 mod internal;
 pub mod messages;
 pub mod testing;
+pub mod wallet;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MessageStatusCode {

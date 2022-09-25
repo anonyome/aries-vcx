@@ -1,13 +1,15 @@
-use indy::WalletHandle;
+use std::sync::Arc;
+
 use url::Url;
 
 use crate::configuration::AgencyClientConfig;
 use crate::error::AgencyClientResult;
+use crate::wallet::base_agency_client_wallet::{BaseAgencyClientWallet, StubAgencyClientWallet};
 use crate::{validation, AgencyClientError, AgencyClientErrorKind};
 
 #[derive(Clone, Debug)]
 pub struct AgencyClient {
-    wallet_handle: WalletHandle,
+    wallet: Arc<dyn BaseAgencyClientWallet>,
     pub agency_url: String,
     pub agency_did: String,
     pub agency_vk: String,
@@ -30,11 +32,11 @@ where
 }
 
 impl AgencyClient {
-    pub fn get_wallet_handle(&self) -> WalletHandle {
-        self.wallet_handle
-    }
 
-    // TODO - get_wallet -> &Arc<dyn BaseWallet>
+    pub fn get_wallet(&self) -> Arc<dyn BaseAgencyClientWallet> {
+        Arc::clone(&self.wallet)
+    }
+    
     pub fn get_agency_url_full(&self) -> String {
         format!("{}/agency/msg", self.agency_url.clone())
     }
@@ -60,8 +62,8 @@ impl AgencyClient {
         self.my_vk.clone()
     }
 
-    pub fn set_wallet_handle(&mut self, wallet_handle: WalletHandle) {
-        self.wallet_handle = wallet_handle;
+    pub fn set_wallet(&mut self, wallet: Arc<dyn BaseAgencyClientWallet>) {
+        self.wallet = wallet
     }
 
     pub(crate) fn set_agency_url(&mut self, url: &str) {
@@ -150,7 +152,7 @@ impl AgencyClient {
 
     pub fn new() -> Self {
         AgencyClient {
-            wallet_handle: WalletHandle(0),
+            wallet: Arc::new(StubAgencyClientWallet {}),
             agency_url: "".to_string(),
             agency_did: "".to_string(),
             agency_vk: "".to_string(),

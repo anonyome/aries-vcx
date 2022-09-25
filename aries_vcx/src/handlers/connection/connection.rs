@@ -858,7 +858,7 @@ impl Connection {
                         .download_encrypted_messages(agency_client, uids, status_codes, self.pairwise_info())
                         .await?,
                 )
-                .then(|msg| msg.decrypt_noauth(agency_client.get_wallet_handle()))
+                .then(|msg| msg.decrypt_noauth(agency_client.get_wallet()))
                 .filter_map(|res| async { res.ok() })
                 .collect::<Vec<DownloadedMessage>>()
                 .await;
@@ -871,7 +871,7 @@ impl Connection {
                         .download_encrypted_messages(agency_client, uids, status_codes, self.pairwise_info())
                         .await?,
                 )
-                .then(|msg| msg.decrypt_auth(agency_client.get_wallet_handle(), &expected_sender_vk))
+                .then(|msg| msg.decrypt_auth(agency_client.get_wallet(), &expected_sender_vk))
                 .filter_map(|res| async { res.ok() })
                 .collect::<Vec<DownloadedMessage>>()
                 .await;

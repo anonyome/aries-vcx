@@ -37,13 +37,17 @@ impl AgencyClient {
                 format!("Cannot serialize receiver keys: {}", err),
             )
         })?;
-        let message = crypto::pack_message(
-            self.get_wallet_handle(),
-            Some(&my_vk),
-            &receiver_keys,
-            message.as_bytes(),
-        )
-        .await?;
+        let message = self
+            .get_wallet()
+            .pack_message(Some(&my_vk), &receiver_keys, message.as_bytes())
+            .await?;
+        // let message = crypto::pack_message(
+        //     self.get_wallet_handle(),
+        //     Some(&my_vk),
+        //     &receiver_keys,
+        //     message.as_bytes(),
+        // )
+        // .await?;
         self.prepare_forward_message(message, agent_did).await
     }
 
@@ -67,18 +71,23 @@ impl AgencyClient {
                 format!("Cannot serialize receiver keys: {}", err),
             )
         })?;
-        let message = crypto::pack_message(
-            self.get_wallet_handle(),
-            Some(&my_vk),
-            &receiver_keys,
-            message.as_bytes(),
-        )
-        .await?;
+        let message = self
+            .get_wallet()
+            .pack_message(Some(&my_vk), &receiver_keys, message.as_bytes())
+            .await?;
+        // let message = crypto::pack_message(
+        //     self.get_wallet_handle(),
+        //     Some(&my_vk),
+        //     &receiver_keys,
+        //     message.as_bytes(),
+        // )
+        // .await?;
         self.prepare_forward_message(message, agent_did).await
     }
 
     pub async fn parse_message_from_response(&self, response: &Vec<u8>) -> AgencyClientResult<String> {
-        let unpacked_msg = crypto::unpack_message(self.get_wallet_handle(), &response[..]).await?;
+        let unpacked_msg = self.get_wallet().unpack_message(&response[..]).await?;
+        // let unpacked_msg = crypto::unpack_message(self.get_wallet_handle(), &response[..]).await?;
         let message: Value = ::serde_json::from_slice(unpacked_msg.as_slice()).map_err(|err| {
             AgencyClientError::from_msg(
                 AgencyClientErrorKind::InvalidJson,
@@ -154,7 +163,8 @@ impl AgencyClient {
             )
         })?;
 
-        crypto::pack_message(self.get_wallet_handle(), None, &receiver_keys, message.as_bytes()).await
+        self.get_wallet().pack_message(None, &receiver_keys, message.as_bytes()).await
+        // crypto::pack_message(self.get_wallet_handle(), None, &receiver_keys, message.as_bytes()).await
     }
 
     pub async fn prepare_message_for_connection_agent(
@@ -181,13 +191,15 @@ impl AgencyClient {
                 format!("Cannot receiver keys: {}", err),
             )
         })?;
-        let message = crypto::pack_message(
-            self.get_wallet_handle(),
-            Some(pw_vk),
-            &receiver_keys,
-            message.as_bytes(),
-        )
-        .await?;
+
+        let message = self.get_wallet().pack_message(Some(pw_vk), &receiver_keys, message.as_bytes()).await?;
+        // let message = crypto::pack_message(
+        //     self.get_wallet_handle(),
+        //     Some(pw_vk),
+        //     &receiver_keys,
+        //     message.as_bytes(),
+        // )
+        // .await?;
 
         let message = ForwardV2::new(agent_did.to_owned(), message)?;
 

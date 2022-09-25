@@ -2,6 +2,7 @@
 #[cfg(feature = "wallet_tests")]
 mod integration_tests {
     use std::{sync::Arc, thread, time::Duration};
+    use aries_vcx::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
 
     use agency_client::{agency_client::AgencyClient, configuration::AgentProvisionConfig};
     use aries_vcx::messages::a2a::A2AMessage;
@@ -65,7 +66,7 @@ mod integration_tests {
 
         let mut agency_client = AgencyClient::new();
 
-        let invitation = helper::url_to_invitation("https://trinsic.studio/link/?d_m=eyJsYWJlbCI6IkhlbGxvV29ybGQiLCJpbWFnZVVybCI6Imh0dHBzOi8vdHJpbnNpY2FwaWFzc2V0cy5henVyZWVkZ2UubmV0L2ZpbGVzLzc3NTM3ZGU0LWU0YTYtNDUwMS05OTJkLTQ2NGE4MmRiOTFkNl9iYjQwZDUzNC1jNDgyLTQ0YWYtOGQwYS00NmQ5ODQwNzFkZGEucG5nIiwic2VydmljZUVuZHBvaW50IjoiaHR0cHM6Ly9hcGkucG9ydGFsLnN0cmVldGNyZWQuaWQvYWdlbnQva1hmVkhkd2s4MUZKeE40b2lQUHpnaTc2blhUTUY3YzkiLCJyb3V0aW5nS2V5cyI6WyI2cGVLYVV4ZG9yTlVtRVl5Q2JYbXRKWXVhcG1vcDVQUUoyMVh6ZGcxWk1YdCJdLCJyZWNpcGllbnRLZXlzIjpbImY2ZW85RHJGVGtIbmVhOWtMRUZ2cDd2Skhicll1RFNFRW9RN05UdVU4cW0iXSwiQGlkIjoiYWI5NmE3YWItYjg3OC00ZWI1LWEwNjgtMTNlODk3MGRkY2YzIiwiQHR5cGUiOiJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiJ9&orig=https://trinsic.studio/url/cfba1059-6d34-420b-84a4-a6e0d6eec95b");
+        let invitation = helper::url_to_invitation("https://trinsic.studio/link/?d_m=eyJsYWJlbCI6IkhlbGxvV29ybGQiLCJpbWFnZVVybCI6Imh0dHBzOi8vdHJpbnNpY2FwaWFzc2V0cy5henVyZWVkZ2UubmV0L2ZpbGVzLzc3NTM3ZGU0LWU0YTYtNDUwMS05OTJkLTQ2NGE4MmRiOTFkNl9iYjQwZDUzNC1jNDgyLTQ0YWYtOGQwYS00NmQ5ODQwNzFkZGEucG5nIiwic2VydmljZUVuZHBvaW50IjoiaHR0cHM6Ly9hcGkucG9ydGFsLnN0cmVldGNyZWQuaWQvYWdlbnQva1hmVkhkd2s4MUZKeE40b2lQUHpnaTc2blhUTUY3YzkiLCJyb3V0aW5nS2V5cyI6WyI2cGVLYVV4ZG9yTlVtRVl5Q2JYbXRKWXVhcG1vcDVQUUoyMVh6ZGcxWk1YdCJdLCJyZWNpcGllbnRLZXlzIjpbIkFBZ2pzSldSMmlrSjJDWEZoNTZlTExXM2E3OWpFOW1tRFJDY3ZkaldGZzdUIl0sIkBpZCI6IjYxYmIyNGU0LWJiM2MtNGFkNi1hOTkyLTliYzNkYjYyMDI3ZCIsIkB0eXBlIjoiZGlkOnNvdjpCekNic05ZaE1yakhpcVpEVFVBU0hnO3NwZWMvY29ubmVjdGlvbnMvMS4wL2ludml0YXRpb24ifQ%3D%3D&orig=https://trinsic.studio/url/9e0c0f87-89a7-47f1-85f6-386ad0b2bee8");
         // invitation.service_endpoint = "http://localhost:8200".to_string();
         let invitation = Invitation::Pairwise(invitation);
 
@@ -83,7 +84,7 @@ mod integration_tests {
         // receive and accept invite
         // note that trinsic doesn't understand the ACK, so turn it off
         let autohop = false;
-        let mut conn = Connection::create_with_invite("7", &profile, &agency_client, invitation, autohop)
+        let mut conn = Connection::create_with_invite("8", &profile, &agency_client, invitation, autohop)
             .await
             .unwrap();
         conn.connect(&profile, &agency_client).await.unwrap();
@@ -132,11 +133,11 @@ mod integration_tests {
 
         let indy_handle = open_default_indy_handle().await;
         let indy_profile = IndySdkProfile::new(indy_handle);
-        let profile: Arc<dyn Profile> = Arc::new(indy_profile.clone());
+        // let profile: Arc<dyn Profile> = Arc::new(indy_profile.clone());
 
         let mut agency_client = AgencyClient::new();
 
-        agency_client.set_wallet_handle(indy_handle);
+        agency_client.set_wallet(indy_profile.inject_wallet().to_base_agency_client_wallet());
         agency_client.agency_url = "https://ariesvcx.agency.staging.absa.id".to_string();
         agency_client.agency_did = AGENCY_DID.to_string();
         agency_client.agency_vk = AGENCY_VERKEY.to_string();
@@ -189,7 +190,7 @@ mod integration_tests {
         };
         use aries_vcx::{
             core::profile::{indy_profile::IndySdkProfile, profile::Profile},
-            messages::connection::invite::PairwiseInvitation,
+            messages::connection::invite::PairwiseInvitation, wallet::agency_client_wallet::ToBaseAgencyClientWallet,
         };
         use url::Url;
 
@@ -221,7 +222,7 @@ mod integration_tests {
 
             client
                 .provision_cloud_agent(
-                    profile.indy_handle,
+                    profile.inject_wallet().to_base_agency_client_wallet(),
                     &my_did,
                     &my_vk,
                     &provision_config.agency_did,

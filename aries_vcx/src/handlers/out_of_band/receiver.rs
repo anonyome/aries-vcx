@@ -3,7 +3,6 @@ use std::clone::Clone;
 use agency_client::agency_client::AgencyClient;
 
 use crate::error::prelude::*;
-use crate::handlers::connection::cloud_agent::ToBaseWallet;
 use crate::handlers::connection::connection::Connection;
 use crate::handlers::out_of_band::OutOfBandInvitation;
 use crate::messages::a2a::A2AMessage;

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::error::VcxResult;
 
 #[async_trait]
-pub trait BaseWallet : Send + Sync {
+pub trait BaseWallet : std::fmt::Debug + Send + Sync {
 
     // ----- DIDs
 
