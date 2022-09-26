@@ -224,12 +224,14 @@ mod integration_tests {
         let indy_profile = IndySdkProfile::new(indy_handle);
         let profile: Arc<dyn Profile> = Arc::new(indy_profile.clone());
 
+        println!("{:?}", indyrs::anoncreds::prover_get_credentials(indy_handle, None).await.unwrap());
+
         Arc::clone(&profile).inject_anoncreds().prover_create_master_secret(settings::DEFAULT_LINK_SECRET_ALIAS).await.ok();
         global::pool::open_main_pool(&PoolConfig { genesis_path: settings::DEFAULT_GENESIS_PATH.to_string(), pool_name: None, pool_config: None }).await.unwrap();
 
         let agency_client = open_default_agency_client(&profile);
 
-        // clear_connection_messages(&conn, &agency_client).await;
+        clear_connection_messages(&conn, &agency_client).await;
 
         let (msg_id, message) = get_first_connection_msg(&conn, &agency_client).await;
 

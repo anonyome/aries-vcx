@@ -10,6 +10,8 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     // SKIP (scope): libindy_issuer_create_credential_offer
     // SKIP (scoipe): libindy_issuer_create_credential
 
+    // TODO! impl prover_get_credentials or prover_search_credentials like aca-py has
+
     async fn prover_create_proof(
         &self,
         proof_req_json: &str,
