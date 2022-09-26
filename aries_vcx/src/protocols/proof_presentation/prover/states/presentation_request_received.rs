@@ -1,7 +1,7 @@
-use indy_sys::WalletHandle;
+use std::sync::Arc;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
-use crate::libindy::proofs::prover::prover::generate_indy_proof;
 use crate::messages::error::ProblemReport;
 use crate::messages::proof_presentation::presentation::Presentation;
 use crate::messages::proof_presentation::presentation_request::PresentationRequest;
@@ -22,12 +22,12 @@ impl PresentationRequestReceived {
 
     pub async fn build_presentation(
         &self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         credentials: &str,
         self_attested_attrs: &str,
     ) -> VcxResult<String> {
-        generate_indy_proof(
-            wallet_handle,
+        let prover = Arc::clone(profile).inject_prover();
+        prover.generate_indy_proof(
             credentials,
             self_attested_attrs,
             &self.presentation_request.request_presentations_attach.content()?,

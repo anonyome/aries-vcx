@@ -3,8 +3,9 @@ use std::sync::Arc;
 use indyrs::WalletHandle;
 
 use crate::{
+    anoncreds::{base_anoncreds::BaseAnonCreds, indy_anoncreds::IndySdkAnonCreds},
     ledger::{base_ledger::BaseLedger, indy_ledger::IndySdkLedger},
-    wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet},
+    wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet}, prover::{indy_prover::IndySdkProver, base_prover::BaseProver},
 };
 
 use super::profile::Profile;
@@ -30,5 +31,15 @@ impl Profile for IndySdkProfile {
     fn inject_wallet(&self) -> Arc<dyn BaseWallet> {
         // todo - in the future we should lazy eval and avoid creating a new instance each time
         Arc::new(IndySdkWallet::new(self.indy_handle))
+    }
+
+    fn inject_anoncreds(self: Arc<Self>) -> Arc<dyn BaseAnonCreds> {
+        // todo - in the future we should lazy eval and avoid creating a new instance each time
+        Arc::new(IndySdkAnonCreds::new(self))
+    }
+
+    fn inject_prover(self: Arc<Self>) -> Arc<dyn BaseProver> {
+        // todo - in the future we should lazy eval and avoid creating a new instance each time
+        Arc::new(IndySdkProver::new(self))
     }
 }

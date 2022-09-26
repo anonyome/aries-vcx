@@ -47,6 +47,8 @@ pub mod protocols;
 pub mod core;
 pub mod wallet;
 pub mod ledger;
+pub mod anoncreds;
+pub mod prover;
 
 #[cfg(test)]
 pub mod test {

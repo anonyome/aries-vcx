@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-
-use indy_sys::WalletHandle;
+use std::sync::Arc;
 
 use agency_client::agency_client::AgencyClient;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::connection::Connection;
-use crate::libindy::utils::anoncreds;
 use crate::messages::a2a::A2AMessage;
 use crate::messages::proof_presentation::presentation::Presentation;
 use crate::messages::proof_presentation::presentation_proposal::{PresentationPreview, PresentationProposalData};
@@ -48,15 +47,16 @@ impl Prover {
         self.prover_sm.presentation_status()
     }
 
-    pub async fn retrieve_credentials(&self, wallet_handle: WalletHandle) -> VcxResult<String> {
+    pub async fn retrieve_credentials(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
         trace!("Prover::retrieve_credentials >>>");
         let presentation_request = self.presentation_request_data()?;
-        anoncreds::libindy_prover_get_credentials_for_proof_req(wallet_handle, &presentation_request).await
+        let anoncreds = Arc::clone(profile).inject_anoncreds();
+        anoncreds.prover_get_credentials_for_proof_req(&presentation_request).await
     }
 
     pub async fn generate_presentation(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         credentials: String,
         self_attested_attrs: String,
     ) -> VcxResult<()> {
@@ -66,7 +66,7 @@ impl Prover {
             self_attested_attrs
         );
         self.step(
-            wallet_handle,
+            profile,
             ProverMessages::PreparePresentation((credentials, self_attested_attrs)),
             None,
         )
@@ -79,30 +79,30 @@ impl Prover {
         Ok(json!(proof).to_string())
     }
 
-    pub async fn set_presentation(&mut self, wallet_handle: WalletHandle, presentation: Presentation) -> VcxResult<()> {
+    pub async fn set_presentation(&mut self, profile: &Arc<dyn Profile>, presentation: Presentation) -> VcxResult<()> {
         trace!("Prover::set_presentation >>>");
-        self.step(wallet_handle, ProverMessages::SetPresentation(presentation), None)
+        self.step(profile, ProverMessages::SetPresentation(presentation), None)
             .await
     }
 
     pub async fn send_proposal(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         proposal_data: PresentationProposalData,
         send_message: SendClosure,
     ) -> VcxResult<()> {
         trace!("Prover::send_proposal >>>");
         self.step(
-            wallet_handle,
+            profile,
             ProverMessages::PresentationProposalSend(proposal_data),
             Some(send_message),
         )
         .await
     }
 
-    pub async fn send_presentation(&mut self, wallet_handle: WalletHandle, send_message: SendClosure) -> VcxResult<()> {
+    pub async fn send_presentation(&mut self, profile: &Arc<dyn Profile>, send_message: SendClosure) -> VcxResult<()> {
         trace!("Prover::send_presentation >>>");
-        self.step(wallet_handle, ProverMessages::SendPresentation, Some(send_message))
+        self.step(profile, ProverMessages::SendPresentation, Some(send_message))
             .await
     }
 
@@ -116,12 +116,12 @@ impl Prover {
 
     pub async fn handle_message(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         message: ProverMessages,
         send_message: Option<SendClosure>,
     ) -> VcxResult<()> {
         trace!("Prover::handle_message >>> message: {:?}", message);
-        self.step(wallet_handle, message, send_message).await
+        self.step(profile, message, send_message).await
     }
 
     pub fn presentation_request_data(&self) -> VcxResult<String> {
@@ -156,21 +156,21 @@ impl Prover {
 
     pub async fn step(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         message: ProverMessages,
         send_message: Option<SendClosure>,
     ) -> VcxResult<()> {
         self.prover_sm = self
             .prover_sm
             .clone()
-            .step(wallet_handle, message, send_message)
+            .step(profile, message, send_message)
             .await?;
         Ok(())
     }
 
     pub async fn decline_presentation_request(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         send_message: SendClosure,
         reason: Option<String>,
         proposal: Option<String>,
@@ -183,7 +183,7 @@ impl Prover {
         match (reason, proposal) {
             (Some(reason), None) => {
                 self.step(
-                    wallet_handle,
+                    profile,
                     ProverMessages::RejectPresentationRequest(reason),
                     Some(send_message),
                 )
@@ -198,7 +198,7 @@ impl Prover {
                 })?;
 
                 self.step(
-                    wallet_handle,
+                    profile,
                     ProverMessages::ProposePresentation(presentation_preview),
                     Some(send_message),
                 )
@@ -217,7 +217,7 @@ impl Prover {
 
     pub async fn update_state(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         connection: &Connection,
     ) -> VcxResult<ProverState> {
@@ -225,11 +225,11 @@ impl Prover {
         if !self.progressable_by_message() {
             return Ok(self.get_state());
         }
-        let send_message = connection.send_message_closure(todo!())?;
+        let send_message = connection.send_message_closure(profile)?;
 
         let messages = connection.get_messages(agency_client).await?;
         if let Some((uid, msg)) = self.find_message_to_handle(messages) {
-            self.step(wallet_handle, msg.into(), Some(send_message)).await?;
+            self.step(profile, msg.into(), Some(send_message)).await?;
             connection.update_message_status(&uid, agency_client).await?;
         }
         Ok(self.get_state())

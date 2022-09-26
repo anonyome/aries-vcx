@@ -1,12 +1,8 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use indy_sys::WalletHandle;
-
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
-use crate::libindy::utils::anoncreds::{
-    self, get_cred_def_json, libindy_prover_create_credential_req, libindy_prover_delete_credential,
-    libindy_prover_store_credential,
-};
 use crate::messages::a2a::{A2AMessage, MessageId};
 use crate::messages::ack::Ack;
 use crate::messages::error::ProblemReport;
@@ -158,7 +154,7 @@ impl HolderSM {
 
     pub async fn handle_message(
         self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         cim: CredentialIssuanceAction,
         send_message: Option<SendClosure>,
     ) -> VcxResult<HolderSM> {
@@ -196,7 +192,7 @@ impl HolderSM {
             },
             HolderFullState::OfferReceived(state_data) => match cim {
                 CredentialIssuanceAction::CredentialRequestSend(my_pw_did) => {
-                    let request = _make_credential_request(wallet_handle, my_pw_did, &state_data.offer).await;
+                    let request = _make_credential_request(profile, my_pw_did, &state_data.offer).await;
                     match request {
                         Ok((cred_request, req_meta, cred_def_json)) => {
                             let cred_request = cred_request.set_thread_id(&thread_id);
@@ -246,7 +242,7 @@ impl HolderSM {
             HolderFullState::RequestSent(state_data) => match cim {
                 CredentialIssuanceAction::Credential(credential) => {
                     let result = _store_credential(
-                        wallet_handle,
+                        profile,
                         &credential,
                         &state_data.req_meta,
                         &state_data.cred_def_json,
@@ -393,17 +389,17 @@ impl HolderSM {
         Ok(self.thread_id.clone())
     }
 
-    pub async fn is_revokable(&self, wallet_handle: WalletHandle) -> VcxResult<bool> {
+    pub async fn is_revokable(&self, profile: &Arc<dyn Profile>) -> VcxResult<bool> {
         match self.state {
             HolderFullState::Initial(ref state) => state.is_revokable(),
-            HolderFullState::ProposalSent(ref state) => state.is_revokable(wallet_handle).await,
-            HolderFullState::OfferReceived(ref state) => state.is_revokable(wallet_handle).await,
+            HolderFullState::ProposalSent(ref state) => state.is_revokable(profile).await,
+            HolderFullState::OfferReceived(ref state) => state.is_revokable(profile).await,
             HolderFullState::RequestSent(ref state) => state.is_revokable(),
             HolderFullState::Finished(ref state) => state.is_revokable(),
         }
     }
 
-    pub async fn delete_credential(&self, wallet_handle: WalletHandle) -> VcxResult<()> {
+    pub async fn delete_credential(&self, profile: &Arc<dyn Profile>) -> VcxResult<()> {
         trace!("Holder::delete_credential");
 
         match self.state {
@@ -412,7 +408,7 @@ impl HolderSM {
                     VcxErrorKind::InvalidState,
                     "Cannot get credential: credential id not found",
                 ))?;
-                _delete_credential(wallet_handle, &cred_id).await
+                _delete_credential(profile, &cred_id).await
             }
             _ => Err(VcxError::from_msg(
                 VcxErrorKind::NotReady,
@@ -462,7 +458,7 @@ fn _parse_rev_reg_id_from_credential(credential: &str) -> VcxResult<Option<Strin
 }
 
 async fn _store_credential(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     credential: &Credential,
     req_meta: &str,
     cred_def_json: &str,
@@ -474,17 +470,18 @@ async fn _store_credential(
         cred_def_json
     );
 
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
+
     let credential_json = credential.credentials_attach.content()?;
     let rev_reg_id = _parse_rev_reg_id_from_credential(&credential_json)?;
     let rev_reg_def_json = if let Some(rev_reg_id) = rev_reg_id {
-        let (_, json) = anoncreds::get_rev_reg_def_json(&rev_reg_id).await?;
+        let (_, json) = anoncreds.get_rev_reg_def_json(&rev_reg_id).await?;
         Some(json)
     } else {
         None
     };
 
-    let cred_id = libindy_prover_store_credential(
-        wallet_handle,
+    let cred_id = anoncreds.prover_store_credential(
         None,
         req_meta,
         &credential_json,
@@ -495,28 +492,31 @@ async fn _store_credential(
     Ok((cred_id, rev_reg_def_json))
 }
 
-async fn _delete_credential(wallet_handle: WalletHandle, cred_id: &str) -> VcxResult<()> {
+async fn _delete_credential(profile: &Arc<dyn Profile>, cred_id: &str) -> VcxResult<()> {
     trace!("Holder::_delete_credential >>> cred_id: {}", cred_id);
 
-    libindy_prover_delete_credential(wallet_handle, cred_id).await
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
+    anoncreds.prover_delete_credential(cred_id).await
 }
 
 pub async fn create_credential_request(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     cred_def_id: &str,
     prover_did: &str,
     cred_offer: &str,
 ) -> VcxResult<(String, String, String, String)> {
-    let (cred_def_id, cred_def_json) = get_cred_def_json(wallet_handle, cred_def_id).await?;
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
+    let (cred_def_id, cred_def_json) = anoncreds.get_cred_def_json(cred_def_id).await?;
 
-    libindy_prover_create_credential_req(wallet_handle, prover_did, cred_offer, &cred_def_json)
+    anoncreds
+        .prover_create_credential_req(prover_did, cred_offer, &cred_def_json)
         .await
         .map_err(|err| err.extend("Cannot create credential request"))
         .map(|(s1, s2)| (s1, s2, cred_def_id, cred_def_json))
 }
 
 async fn _make_credential_request(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     my_pw_did: String,
     offer: &CredentialOffer,
 ) -> VcxResult<(CredentialRequest, String, String)> {
@@ -530,7 +530,7 @@ async fn _make_credential_request(
     trace!("Parsed cred offer attachment: {}", cred_offer);
     let cred_def_id = parse_cred_def_id_from_cred_offer(&cred_offer)?;
     let (req, req_meta, _cred_def_id, cred_def_json) =
-        create_credential_request(wallet_handle, &cred_def_id, &my_pw_did, &cred_offer).await?;
+        create_credential_request(profile, &cred_def_id, &my_pw_did, &cred_offer).await?;
     trace!("Created cred def json: {}", cred_def_json);
     let credential_request_msg = build_credential_request_msg(req)?;
     Ok((credential_request_msg, req_meta, cred_def_json))
