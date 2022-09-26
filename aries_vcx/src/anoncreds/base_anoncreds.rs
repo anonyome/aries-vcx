@@ -50,7 +50,10 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()>;
 
-    // TODO (unsure): libindy_prover_create_master_secret
+    async fn prover_create_master_secret(
+        &self,
+        master_secret_id: &str,
+    ) -> VcxResult<String>;
 
     // SKIP (internal): libindy_issuer_create_schema
     // SKIP (internal): libindy_issuer_revoke_credential

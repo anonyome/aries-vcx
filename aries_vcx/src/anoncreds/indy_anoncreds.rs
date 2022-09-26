@@ -76,6 +76,13 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         libindy_anoncreds::libindy_prover_store_credential(self.profile.indy_handle, cred_id, cred_req_meta, cred_json, cred_def_json, rev_reg_def_json).await
     }
 
+    async fn prover_create_master_secret(
+        &self,
+        master_secret_id: &str,
+    ) -> VcxResult<String> {
+        libindy_anoncreds::libindy_prover_create_master_secret(self.profile.indy_handle, master_secret_id).await
+    }
+
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()> {
         libindy_anoncreds::libindy_prover_delete_credential(self.profile.indy_handle, cred_id).await
     }

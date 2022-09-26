@@ -39,7 +39,7 @@ impl OutOfBandReceiver {
         &self,
         connections: &'a Vec<&'a Connection>,
     ) -> VcxResult<Option<&'a Connection>> {
-        todo!();
+        todo!()
         // trace!("OutOfBandReceiver::connection_exists >>>");
         // for service in &self.oob.services {
         //     for connection in connections {

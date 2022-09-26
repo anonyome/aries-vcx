@@ -305,15 +305,15 @@ pub async fn libindy_prover_create_credential_req(
     }
 
     let master_secret_name = settings::DEFAULT_LINK_SECRET_ALIAS;
-    anoncreds::prover_create_credential_req(
+    let x = anoncreds::prover_create_credential_req(
         wallet_handle,
         prover_did,
         credential_offer_json,
         credential_def_json,
         master_secret_name,
     )
-    .await
-    .map_err(VcxError::from)
+    .await;
+    x.map_err(VcxError::from)
 }
 
 pub async fn libindy_prover_create_revocation_state(
