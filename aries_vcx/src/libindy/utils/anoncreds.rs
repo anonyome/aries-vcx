@@ -218,6 +218,10 @@ async fn close_search_handle(search_handle: i32) -> VcxResult<()> {
         .map_err(VcxError::from)
 }
 
+pub async fn libindy_prover_get_credentials(wallet_handle: WalletHandle, filter_json: Option<&str>) -> VcxResult<String> {
+    Ok(anoncreds::prover_get_credentials(wallet_handle, filter_json).await?)
+}
+
 pub async fn libindy_prover_get_credentials_for_proof_req(
     wallet_handle: WalletHandle,
     proof_req: &str,

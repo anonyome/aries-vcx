@@ -42,6 +42,10 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         .await
     }
 
+    async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String> {
+        libindy_anoncreds::libindy_prover_get_credentials(self.profile.indy_handle, filter_json).await
+    }
+
     async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String> {
         libindy_anoncreds::libindy_prover_get_credentials_for_proof_req(self.profile.indy_handle, proof_req).await
     }
