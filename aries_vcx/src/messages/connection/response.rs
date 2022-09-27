@@ -102,7 +102,6 @@ impl Response {
         sig_data.extend(connection_data.as_bytes());
 
         let signature = wallet.sign(key, &sig_data).await?;
-        // let signature = crypto::sign(wallet_handle, key, &sig_data).await?;
 
         let sig_data = base64::encode_config(&sig_data, base64::URL_SAFE);
 

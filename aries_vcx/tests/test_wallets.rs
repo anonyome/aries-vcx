@@ -175,7 +175,6 @@ mod integration_tests {
         return (conn, indy_handle, indy_profile, profile, agency_client);
     }
 
-
     #[tokio::test]
     async fn clear_messages() {
         let (conn, _, _, _, agency_client) = setup_with_existing_conn().await;
@@ -215,7 +214,7 @@ mod integration_tests {
             conn.update_message_status(msg_id, &agency_client).await.unwrap();
         }
 
-        println!("Cleared {:?} messages",len);
+        println!("Cleared {:?} messages", len);
     }
 
     async fn get_first_connection_msg(conn: &Connection, agency_client: &AgencyClient) -> (String, A2AMessage) {
@@ -370,6 +369,8 @@ mod integration_tests {
 
         println!("{:?}", prover);
         println!("{:?}", prover.presentation_status());
+
+        conn.update_message_status(&msg_id, &agency_client).await.unwrap();
 
         ()
     }

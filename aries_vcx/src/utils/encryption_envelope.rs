@@ -59,7 +59,6 @@ impl EncryptionEnvelope {
         );
 
         wallet.pack_message(pw_verkey, &receiver_keys, message.as_bytes()).await
-        // crypto::pack_message(wallet, pw_verkey, &receiver_keys, message.as_bytes()).await
     }
 
     async fn wrap_into_forward_messages(
@@ -95,7 +94,6 @@ impl EncryptionEnvelope {
         let receiver_keys = json!(vec![routing_key]).to_string();
 
         wallet.pack_message(None, &receiver_keys, message.as_bytes()).await
-        // crypto::pack_message(wallet, None, &receiver_keys, message.as_bytes()).await
     }
 
     async fn _unpack_a2a_message(wallet: &Arc<dyn BaseWallet>, payload: Vec<u8>) -> VcxResult<(String, Option<String>)> {
@@ -105,7 +103,6 @@ impl EncryptionEnvelope {
         );
 
         let unpacked_msg = wallet.unpack_message(&payload).await?;
-        // let unpacked_msg = crypto::unpack_message(wallet, &payload).await?;
 
         let msg_value: serde_json::Value = serde_json::from_slice(unpacked_msg.as_slice()).map_err(|err| {
             VcxError::from_msg(

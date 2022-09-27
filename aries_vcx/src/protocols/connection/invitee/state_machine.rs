@@ -213,9 +213,7 @@ impl SmConnectionInvitee {
                             .set_thread_id_matching_id(),
                             request_id,
                     ),
-                    // Invitation::Pairwise(_) => (request.set_thread_id(&self.thread_id), self.get_thread_id()),
-                    // todo - i'm editting this as some agents don't properly set threadId
-                    Invitation::Pairwise(_) => (request.set_thread_id_matching_id(), request_id),
+                    Invitation::Pairwise(_) => (request.set_thread_id(&self.thread_id), self.get_thread_id()),
                     Invitation::OutOfBand(invite) => (
                         request
                             .set_parent_thread_id(&invite.id.0)
