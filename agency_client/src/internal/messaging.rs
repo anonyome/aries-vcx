@@ -41,13 +41,7 @@ impl AgencyClient {
             .get_wallet()
             .pack_message(Some(&my_vk), &receiver_keys, message.as_bytes())
             .await?;
-        // let message = crypto::pack_message(
-        //     self.get_wallet_handle(),
-        //     Some(&my_vk),
-        //     &receiver_keys,
-        //     message.as_bytes(),
-        // )
-        // .await?;
+
         self.prepare_forward_message(message, agent_did).await
     }
 
@@ -75,13 +69,7 @@ impl AgencyClient {
             .get_wallet()
             .pack_message(Some(&my_vk), &receiver_keys, message.as_bytes())
             .await?;
-        // let message = crypto::pack_message(
-        //     self.get_wallet_handle(),
-        //     Some(&my_vk),
-        //     &receiver_keys,
-        //     message.as_bytes(),
-        // )
-        // .await?;
+
         self.prepare_forward_message(message, agent_did).await
     }
 
@@ -164,7 +152,6 @@ impl AgencyClient {
         })?;
 
         self.get_wallet().pack_message(None, &receiver_keys, message.as_bytes()).await
-        // crypto::pack_message(self.get_wallet_handle(), None, &receiver_keys, message.as_bytes()).await
     }
 
     pub async fn prepare_message_for_connection_agent(
@@ -193,13 +180,6 @@ impl AgencyClient {
         })?;
 
         let message = self.get_wallet().pack_message(Some(pw_vk), &receiver_keys, message.as_bytes()).await?;
-        // let message = crypto::pack_message(
-        //     self.get_wallet_handle(),
-        //     Some(pw_vk),
-        //     &receiver_keys,
-        //     message.as_bytes(),
-        // )
-        // .await?;
 
         let message = ForwardV2::new(agent_did.to_owned(), message)?;
 

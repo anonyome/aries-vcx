@@ -18,7 +18,6 @@ impl EncryptionEnvelope {
         );
 
         let unpacked_msg = wallet.unpack_message(&payload).await?;
-        // let unpacked_msg = crypto::unpack_message(wallet_handle, &payload).await?;
 
         let msg_value: ::serde_json::Value = ::serde_json::from_slice(unpacked_msg.as_slice()).map_err(|err| {
             AgencyClientError::from_msg(
