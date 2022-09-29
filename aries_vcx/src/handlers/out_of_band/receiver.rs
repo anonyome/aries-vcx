@@ -35,31 +35,39 @@ impl OutOfBandReceiver {
         self.oob.id.0.clone()
     }
 
-    pub async fn connection_exists<'a>(
+    pub async fn connection_exists(
         &self,
-        connections: &'a Vec<&'a Connection>,
-    ) -> VcxResult<Option<&'a Connection>> {
+        connections: Vec<&Connection>,
+    ) -> VcxResult<Option<&Connection>> {
+        todo!();
         todo!()
-        // trace!("OutOfBandReceiver::connection_exists >>>");
-        // for service in &self.oob.services {
-        //     for connection in connections {
-        //         match connection.bootstrap_did_doc() {
-        //             Some(did_doc) => {
-        //                 if let ServiceResolvable::Did(did) = service {
-        //                     if did.to_string() == did_doc.id {
-        //                         return Ok(Some(connection));
-        //                     }
-        //                 };
-        //                 if did_doc.resolve_service()? == service.resolve().await? {
-        //                     return Ok(Some(connection));
-        //                 };
-        //             }
-        //             None => break,
-        //         }
-        //     }
-        // }
-        // Ok(None)
     }
+
+    // pub async fn connection_exists<'a>(
+    //     &self,
+    //     connections: &'a Vec<&'a Connection>,
+    // ) -> VcxResult<Option<&'a Connection>> {
+    //     todo!()
+    //     // trace!("OutOfBandReceiver::connection_exists >>>");
+    //     // for service in &self.oob.services {
+    //     //     for connection in connections {
+    //     //         match connection.bootstrap_did_doc() {
+    //     //             Some(did_doc) => {
+    //     //                 if let ServiceResolvable::Did(did) = service {
+    //     //                     if did.to_string() == did_doc.id {
+    //     //                         return Ok(Some(connection));
+    //     //                     }
+    //     //                 };
+    //     //                 if did_doc.resolve_service()? == service.resolve().await? {
+    //     //                     return Ok(Some(connection));
+    //     //                 };
+    //     //             }
+    //     //             None => break,
+    //     //         }
+    //     //     }
+    //     // }
+    //     // Ok(None)
+    // }
 
     // TODO: There may be multiple A2AMessages in a single OoB msg
     pub fn extract_a2a_message(&self) -> VcxResult<Option<A2AMessage>> {

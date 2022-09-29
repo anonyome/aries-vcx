@@ -20,7 +20,7 @@ general_test = ["test_utils", "tokio/rt", "tokio/macros"]
 fatal_warnings = []
 warnlog_fetched_messages = []
 mysql_test = ["test_utils", "sqlx", "tokio/rt", "tokio/macros"]
-wallet_tests = ["test_utils", "tokio/rt", "tokio/macros"]
+temp_gm_tests = ["test_utils", "tokio/rt", "tokio/macros"]
 
 [dependencies]
 async-trait = "0.1.53"
@@ -43,6 +43,9 @@ openssl = { version = "0.10.35", features = ["vendored"] }
 num-traits = "0.2.0"
 indy = { git = "https://gitlab.com/mirgee/vdr-tools.git", rev = "cdb8d56ec5d77abc6b6dce9ca31cbd3fb469037d" }
 indy-sys = { git = "https://gitlab.com/mirgee/vdr-tools.git", rev = "cdb8d56ec5d77abc6b6dce9ca31cbd3fb469037d" }
+# indy alternatives ----
+indy-vdr = "0.3.4"
+# ----------------------
 futures = "0.3.15"
 libloading = "0.5.0"
 uuid = {version = "0.8", default-features = false, features = ["v4"]}

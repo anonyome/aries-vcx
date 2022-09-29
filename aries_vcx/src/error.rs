@@ -43,6 +43,8 @@ pub enum VcxErrorKind {
     AlreadyInitialized,
     #[fail(display = "Action is not supported")]
     ActionNotSupported,
+    #[fail(display = "Invalid parameter in indy_vdr")]
+    InvalidIndyVdrInput,
 
     // Connection
     #[fail(display = "Could not create connection")]
@@ -366,6 +368,16 @@ impl<T> From<sync::PoisonError<T>> for VcxError {
     }
 }
 
+// Back up serialization error conversion
+impl From<serde_json::Error> for VcxError {
+    fn from(err: serde_json::Error) -> Self {
+        VcxError::from_msg(
+            VcxErrorKind::SerializationError,
+            format!("A serialization error occurred: {:?}", err),
+        )
+    }
+}
+
 impl From<Context<VcxErrorKind>> for VcxError {
     fn from(inner: Context<VcxErrorKind>) -> VcxError {
         VcxError { inner }
@@ -515,6 +527,7 @@ impl From<VcxErrorKind> for u32 {
             VcxErrorKind::CreatePublicAgent => error::CREATE_PUBLIC_AGENT.code_num,
             VcxErrorKind::CreateOutOfBand => error::CREATE_OUT_OF_BAND.code_num,
             VcxErrorKind::CreateAgent => error::CREATE_AGENT.code_num,
+            VcxErrorKind::InvalidIndyVdrInput => error::INDY_VDR_INPUT_INPUT.code_num,
         }
     }
 }

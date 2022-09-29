@@ -1,16 +1,25 @@
 #[cfg(test)]
-#[cfg(feature = "wallet_tests")]
+#[cfg(feature = "temp_gm_tests")]
 mod integration_tests {
+    use aries_vcx::did_doc::service_aries::AriesService;
     use aries_vcx::handlers::issuance::holder::Holder;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
+    use aries_vcx::ledger::base_ledger::BaseLedger;
+    use aries_vcx::ledger::indy_vdr_ledger::{IndyVdrLedger, IndyVdrLedgerPool};
     use aries_vcx::libindy::utils::pool::PoolConfig;
+    use aries_vcx::libindy::utils::signus;
+    use aries_vcx::messages::connection::did::Did;
     use aries_vcx::messages::issuance::credential::Credential;
     use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
     use aries_vcx::messages::proof_presentation::presentation_ack::PresentationAck;
     use aries_vcx::messages::proof_presentation::presentation_request::PresentationRequest;
     use aries_vcx::protocols::issuance::actions::CredentialIssuanceAction;
+    use aries_vcx::utils::json;
     use aries_vcx::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
+    use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
+    use indy_vdr::pool::{PoolBuilder, PoolRunner, PoolTransactions};
     use std::collections::HashMap;
+    use std::time::{SystemTime, UNIX_EPOCH};
     use std::{sync::Arc, thread, time::Duration};
 
     use agency_client::agency_client::AgencyClient;
@@ -89,7 +98,7 @@ mod integration_tests {
 
         let agency_client = open_default_agency_client(&profile);
 
-        let invitation = helper::url_to_invitation("http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiZmI5ZWM5YmMtMmM1Mi00ZDgxLWJhNmEtY2MxOTU4MzFhNWIxIiwgInJlY2lwaWVudEtleXMiOiBbIkE1QVl3Nk5WVUJpM3NEVEQ5Q3ZmUkhKQ29iOFB0Qkg3YVllRjlVWTk1aHZDIl0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2Nsb3VkYWdlbnQuZ211bGhlYXJuZS5kaS10ZWFtLmRldi5zdWRvcGxhdGZvcm0uY29tOjgyMDAiLCAibGFiZWwiOiAiZ211bGhlYXJuZSJ9");
+        let invitation = helper::url_to_invitation("http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiMTEyMjk0MzQtYmQyMC00NTlmLWJjYTMtNTE5ZGM5MmEyYTNlIiwgInJlY2lwaWVudEtleXMiOiBbIjZ2enZnY1NQSmpYc3JaMkg0M0RrdGoxWmdVMlhFc0JwWENjbkNUOWRrQ29wIl0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2Nsb3VkYWdlbnQuZ211bGhlYXJuZS5kaS10ZWFtLmRldi5zdWRvcGxhdGZvcm0uY29tOjgyMDAiLCAibGFiZWwiOiAiZ211bGhlYXJuZSJ9");
         // invitation.service_endpoint = "http://localhost:8200".to_string();
         let invitation = Invitation::Pairwise(invitation);
 
@@ -149,7 +158,7 @@ mod integration_tests {
     }
 
     async fn setup_with_existing_conn() -> (Connection, WalletHandle, IndySdkProfile, Arc<dyn Profile>, AgencyClient) {
-        let conn_ser = "{\"version\":\"1.0\",\"data\":{\"pw_did\":\"3eACR14SizUPywULrydBzq\",\"pw_vk\":\"2SUeN3GHWZVnoRtBrxm691aEj3girWtZQqfgnwse1NKf\",\"agent_did\":\"DQEjA6wm3WkJLpZ8SFP7np\",\"agent_vk\":\"7m1VN5LA5LSA6mJzHViPPHc8S6DwesapTv8LYUgo1NM7\"},\"state\":{\"Invitee\":{\"Completed\":{\"did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"did:sov:Ni9cSfBEwpCxZgAYAit4iE\",\"publicKey\":[{\"id\":\"did:sov:Ni9cSfBEwpCxZgAYAit4iE#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"did:sov:Ni9cSfBEwpCxZgAYAit4iE\",\"publicKeyBase58\":\"CqHAb5ucwo9bsJN66J1P4KjvTdXqt5JEw6fMhwvz626k\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"did:sov:Ni9cSfBEwpCxZgAYAit4iE#1\"}],\"service\":[{\"id\":\"did:sov:Ni9cSfBEwpCxZgAYAit4iE;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"CqHAb5ucwo9bsJN66J1P4KjvTdXqt5JEw6fMhwvz626k\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"bootstrap_did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"fb9ec9bc-2c52-4d81-ba6a-cc195831a5b1\",\"publicKey\":[{\"id\":\"fb9ec9bc-2c52-4d81-ba6a-cc195831a5b1#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"fb9ec9bc-2c52-4d81-ba6a-cc195831a5b1\",\"publicKeyBase58\":\"A5AYw6NVUBi3sDTD9CvfRHJCob8PtBH7aYeF9UY95hvC\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"fb9ec9bc-2c52-4d81-ba6a-cc195831a5b1#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"A5AYw6NVUBi3sDTD9CvfRHJCob8PtBH7aYeF9UY95hvC\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"protocols\":null}}},\"source_id\":\"3\",\"thread_id\":\"acf3ec1a-39e0-481a-92c7-b126c3aa123e\"}";
+        let conn_ser = "{\"version\":\"1.0\",\"data\":{\"pw_did\":\"Uk6fmsatY8iaZhWGpp4iVY\",\"pw_vk\":\"G81kb2BKBayv1vvuR8tiNEKAhiXjrcyWm5n4r9maaxEL\",\"agent_did\":\"EGvkDRtVTBSdvXwKUSN8bE\",\"agent_vk\":\"8Edu8rv2P1fr1pmZq9BJ7UzME4MmMUmZGByb4ZWLGoxK\"},\"state\":{\"Invitee\":{\"Completed\":{\"did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ\",\"publicKey\":[{\"id\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ\",\"publicKeyBase58\":\"81UBYKZVudDwDPBiadgpU9AD7EoUZxz4mxJxVELF7AEJ\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ#1\"}],\"service\":[{\"id\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"81UBYKZVudDwDPBiadgpU9AD7EoUZxz4mxJxVELF7AEJ\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"bootstrap_did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"11229434-bd20-459f-bca3-519dc92a2a3e\",\"publicKey\":[{\"id\":\"11229434-bd20-459f-bca3-519dc92a2a3e#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"11229434-bd20-459f-bca3-519dc92a2a3e\",\"publicKeyBase58\":\"6vzvgcSPJjXsrZ2H43Dktj1ZgU2XEsBpXCcnCT9dkCop\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"11229434-bd20-459f-bca3-519dc92a2a3e#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"6vzvgcSPJjXsrZ2H43Dktj1ZgU2XEsBpXCcnCT9dkCop\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"protocols\":null}}},\"source_id\":\"3\",\"thread_id\":\"11229434-bd20-459f-bca3-519dc92a2a3e\"}" ;
 
         let conn: Connection = Connection::from_string(conn_ser).unwrap();
 
@@ -170,6 +179,18 @@ mod integration_tests {
             pool_config: None,
         })
         .await
+        .unwrap();
+
+        let precise_time: u64 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        const DAY_SECS: u64 = 60 * 60 * 24;
+
+        aries_vcx::utils::author_agreement::set_txn_author_agreement(
+            None,
+            Some("1.0".to_string()),
+            Some("2f630f02cb1e88d1169db7b4dd0e45943ac1530630d737be5499c8f01c2695b1".to_string()),
+            "for_session".to_string(),
+            (precise_time / DAY_SECS) * DAY_SECS,
+        )
         .unwrap();
 
         return (conn, indy_handle, indy_profile, profile, agency_client);
@@ -371,6 +392,91 @@ mod integration_tests {
         println!("{:?}", prover.presentation_status());
 
         conn.update_message_status(&msg_id, &agency_client).await.unwrap();
+
+        ()
+    }
+
+    #[tokio::test]
+    async fn test_ledger_fetch() {
+        // ----------- try with indyvdr
+        let (_ack, indy_handle, _, _, _) = setup_with_existing_conn().await;
+        let indy_profile = IndySdkProfile::new(indy_handle);
+        let profile: Arc<dyn Profile> = Arc::new(indy_profile); // just for the wallet
+
+        // let pool_runner = PoolRunner::new(config, merkle_tree, networker_factory, None);
+        let config = IndyVdrPoolConfig::default();
+        let txns = PoolTransactions::from_json_file(
+            "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn",
+        )
+        .unwrap();
+
+        let runner = PoolBuilder::from(config)
+            .transactions(txns)
+            .unwrap()
+            .into_runner()
+            .unwrap();
+        let indy_vdr_pool = IndyVdrLedgerPool::new(runner);
+        let ledger = IndyVdrLedger::new(profile, indy_vdr_pool);
+
+        let x = ledger.get_nym("D6EMVkDnBmuMCtZGwjgR9A").await.unwrap();
+
+        println!("VDR NYM: {}\n\n\n", x);
+
+        let y = ledger
+            .get_cred_def("D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction")
+            .await
+            .unwrap();
+
+        println!("VDR CRED DEF: {}\n\n\n", y);
+
+        // ----------- try with indy
+
+        println!(
+            "INDY NYM: {}\n\n\n",
+            aries_vcx::libindy::utils::ledger::get_nym("D6EMVkDnBmuMCtZGwjgR9A")
+                .await
+                .unwrap()
+        );
+
+        println!(
+            "INDY CRED DEF: {}\n\n\n",
+            aries_vcx::libindy::utils::ledger::libindy_get_cred_def(
+                indy_handle,
+                "D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction"
+            )
+            .await
+            .unwrap()
+        );
+
+        // let (pub_did, pub_verkey) =
+        //     signus::create_and_store_my_did(indy_handle, Some("877995173D444D629EB7CA91B5B9D32A"), None)
+        //         .await
+        //         .unwrap();
+        let pub_did = "D6EMVkDnBmuMCtZGwjgR9A";
+        let pub_verkey = signus::get_verkey_from_wallet(indy_handle, pub_did).await.unwrap();
+        // let x = ledger
+        //     .add_service(
+        //         &pub_did,
+        //         &AriesService {
+        //             id: "idk".to_string(),
+        //             type_: "idk".to_string(),
+        //             priority: 0,
+        //             recipient_keys: vec![pub_verkey],
+        //             routing_keys: vec![],
+        //             service_endpoint: "http://hello.world".to_string(),
+        //         },
+        //     )
+        //     .await
+        //     .unwrap();
+
+        // x;
+
+        // println!("ya ya {:?}", aries_vcx::libindy::utils::ledger::get_service(&Did::new("D6EMVkDnBmuMCtZGwjgR9A").unwrap()).await.unwrap());
+
+        println!("service; {:?}", ledger
+            .get_service(&Did::new("D6EMVkDnBmuMCtZGwjgR9A").unwrap())
+            .await
+            .unwrap());
 
         ()
     }

@@ -454,6 +454,10 @@ pub static CREATE_AGENT: Error = Error {
     code_num: 1113,
     message: "Error creating agent in agency",
 };
+pub static INDY_VDR_INPUT_INPUT: Error = Error {
+    code_num: 1114,
+    message: "Input to IndyVdr was invalid",
+};
 
 lazy_static! {
     static ref ERROR_C_MESSAGES: HashMap<u32, CString> = {
