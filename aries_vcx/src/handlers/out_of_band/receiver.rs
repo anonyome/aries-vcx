@@ -35,13 +35,12 @@ impl OutOfBandReceiver {
         self.oob.id.0.clone()
     }
 
-    pub async fn connection_exists(
-        &self,
-        connections: Vec<&Connection>,
-    ) -> VcxResult<Option<&Connection>> {
-        todo!();
-        todo!()
-    }
+    // pub async fn connection_exists(
+    //     &self,
+    //     connections: Vec<&Connection>,
+    // ) -> VcxResult<Option<&Connection>> {
+    //     todo!()
+    // }
 
     // pub async fn connection_exists<'a>(
     //     &self,

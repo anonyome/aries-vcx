@@ -163,7 +163,7 @@ impl Holder {
         }
         let send_message = connection.send_message_closure(profile)?;
 
-        let messages = connection.get_messages(agency_client).await?;
+        let messages = connection.get_messages(profile, agency_client).await?;
         if let Some((uid, msg)) = self.find_message_to_handle(messages) {
             self.step(profile, msg.into(), Some(send_message)).await?;
             connection.update_message_status(&uid, agency_client).await?;
@@ -174,18 +174,22 @@ impl Holder {
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils {
+    use std::sync::Arc;
+
     use agency_client::agency_client::AgencyClient;
 
+    use crate::core::profile::profile::Profile;
     use crate::error::prelude::*;
     use crate::handlers::connection::connection::Connection;
     use crate::messages::a2a::A2AMessage;
 
     pub async fn get_credential_offer_messages(
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         connection: &Connection,
     ) -> VcxResult<String> {
         let credential_offers: Vec<A2AMessage> = connection
-            .get_messages(agency_client)
+            .get_messages(profile, agency_client)
             .await?
             .into_iter()
             .filter_map(|(_, a2a_message)| match a2a_message {

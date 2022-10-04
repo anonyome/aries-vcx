@@ -18,6 +18,7 @@ mod integration_tests {
     use aries_vcx::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
     use indy_vdr::pool::{PoolBuilder, PoolRunner, PoolTransactions};
+    use serde_json::Value;
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{sync::Arc, thread, time::Duration};
@@ -98,7 +99,7 @@ mod integration_tests {
 
         let agency_client = open_default_agency_client(&profile);
 
-        let invitation = helper::url_to_invitation("http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiMTEyMjk0MzQtYmQyMC00NTlmLWJjYTMtNTE5ZGM5MmEyYTNlIiwgInJlY2lwaWVudEtleXMiOiBbIjZ2enZnY1NQSmpYc3JaMkg0M0RrdGoxWmdVMlhFc0JwWENjbkNUOWRrQ29wIl0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2Nsb3VkYWdlbnQuZ211bGhlYXJuZS5kaS10ZWFtLmRldi5zdWRvcGxhdGZvcm0uY29tOjgyMDAiLCAibGFiZWwiOiAiZ211bGhlYXJuZSJ9");
+        let invitation = helper::url_to_invitation("https://trinsic.studio/link/?d_m=eyJsYWJlbCI6IkhlbGxvV29ybGQiLCJpbWFnZVVybCI6Imh0dHBzOi8vdHJpbnNpY2FwaWFzc2V0cy5henVyZWVkZ2UubmV0L2ZpbGVzLzc3NTM3ZGU0LWU0YTYtNDUwMS05OTJkLTQ2NGE4MmRiOTFkNl9iYjQwZDUzNC1jNDgyLTQ0YWYtOGQwYS00NmQ5ODQwNzFkZGEucG5nIiwic2VydmljZUVuZHBvaW50IjoiaHR0cHM6Ly9hcGkucG9ydGFsLnN0cmVldGNyZWQuaWQvYWdlbnQva1hmVkhkd2s4MUZKeE40b2lQUHpnaTc2blhUTUY3YzkiLCJyb3V0aW5nS2V5cyI6WyI2cGVLYVV4ZG9yTlVtRVl5Q2JYbXRKWXVhcG1vcDVQUUoyMVh6ZGcxWk1YdCJdLCJyZWNpcGllbnRLZXlzIjpbImpIaEJpQ1huaU1OZTJTQVlZWkE0NjZNNWVvTTUzc1I0RnhRMWROaEcycloiXSwiQGlkIjoiNmI2Yzk1OWItYmRiOC00ZmFjLWE4YjEtMDgzNjkyZGQ4NzE1IiwiQHR5cGUiOiJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiJ9&orig=https://trinsic.studio/url/3c7ba9ea-265b-4e27-8490-5b27ba029817");
         // invitation.service_endpoint = "http://localhost:8200".to_string();
         let invitation = Invitation::Pairwise(invitation);
 
@@ -111,12 +112,12 @@ mod integration_tests {
         // };
         // provision_cloud_agent(&mut agency_client, &indy_profile, &config_provision_agent).await;
 
-        println!("agency client; {:?}", agency_client);
+        // println!("agency client; {:?}", agency_client);
 
         // receive and accept invite
 
-        let autohop = true; // note that trinsic doesn't understand the ACK, so turn it off when using trinisc
-        let mut conn = Connection::create_with_invite("3", &profile, &agency_client, invitation, autohop)
+        let autohop = false; // note that trinsic doesn't understand the ACK, so turn it off when using trinisc
+        let mut conn = Connection::create_with_invite("69", &profile, &agency_client, invitation, autohop)
             .await
             .unwrap();
         conn.connect(&profile, &agency_client).await.unwrap();
@@ -158,7 +159,10 @@ mod integration_tests {
     }
 
     async fn setup_with_existing_conn() -> (Connection, WalletHandle, IndySdkProfile, Arc<dyn Profile>, AgencyClient) {
-        let conn_ser = "{\"version\":\"1.0\",\"data\":{\"pw_did\":\"Uk6fmsatY8iaZhWGpp4iVY\",\"pw_vk\":\"G81kb2BKBayv1vvuR8tiNEKAhiXjrcyWm5n4r9maaxEL\",\"agent_did\":\"EGvkDRtVTBSdvXwKUSN8bE\",\"agent_vk\":\"8Edu8rv2P1fr1pmZq9BJ7UzME4MmMUmZGByb4ZWLGoxK\"},\"state\":{\"Invitee\":{\"Completed\":{\"did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ\",\"publicKey\":[{\"id\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ\",\"publicKeyBase58\":\"81UBYKZVudDwDPBiadgpU9AD7EoUZxz4mxJxVELF7AEJ\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ#1\"}],\"service\":[{\"id\":\"did:sov:DrmWxj5BwxYfB6MxVFNuhQ;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"81UBYKZVudDwDPBiadgpU9AD7EoUZxz4mxJxVELF7AEJ\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"bootstrap_did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"11229434-bd20-459f-bca3-519dc92a2a3e\",\"publicKey\":[{\"id\":\"11229434-bd20-459f-bca3-519dc92a2a3e#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"11229434-bd20-459f-bca3-519dc92a2a3e\",\"publicKeyBase58\":\"6vzvgcSPJjXsrZ2H43Dktj1ZgU2XEsBpXCcnCT9dkCop\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"11229434-bd20-459f-bca3-519dc92a2a3e#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"6vzvgcSPJjXsrZ2H43Dktj1ZgU2XEsBpXCcnCT9dkCop\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"protocols\":null}}},\"source_id\":\"3\",\"thread_id\":\"11229434-bd20-459f-bca3-519dc92a2a3e\"}" ;
+        // aca (VCX3)
+        let conn_ser = "{\"version\":\"1.0\",\"data\":{\"pw_did\":\"X3GT27sVUJi1ExA3FeMLaH\",\"pw_vk\":\"HNbUW7fGRCi3ndrrpJoiLjmjTobuq61ZbEFU9JZw2jt6\",\"agent_did\":\"B43YpHkw3eivvrtCP9MYQ3\",\"agent_vk\":\"6UnAmMw2eMyo31YyxChkayqSNGPTwXAC2ThA76aRxA9z\"},\"state\":{\"Invitee\":{\"Completed\":{\"did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"did:sov:VNN8vJ3ESb366gX9X1gAGF\",\"publicKey\":[{\"id\":\"did:sov:VNN8vJ3ESb366gX9X1gAGF#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"did:sov:VNN8vJ3ESb366gX9X1gAGF\",\"publicKeyBase58\":\"GTnDMjRozw9eb29xWXN7FGqdmDKCQK2XwZEtTqB1DTh6\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"did:sov:VNN8vJ3ESb366gX9X1gAGF#1\"}],\"service\":[{\"id\":\"did:sov:VNN8vJ3ESb366gX9X1gAGF;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"GTnDMjRozw9eb29xWXN7FGqdmDKCQK2XwZEtTqB1DTh6\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"bootstrap_did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"5b287509-8132-4090-ad8f-a96db3399122\",\"publicKey\":[{\"id\":\"5b287509-8132-4090-ad8f-a96db3399122#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"5b287509-8132-4090-ad8f-a96db3399122\",\"publicKeyBase58\":\"Hp7nhx2xU7kcR9SeL4f8gEDfMxM8fCbVSBJDDia9opWA\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"5b287509-8132-4090-ad8f-a96db3399122#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"Hp7nhx2xU7kcR9SeL4f8gEDfMxM8fCbVSBJDDia9opWA\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200\"}]},\"protocols\":null}}},\"source_id\":\"3\",\"thread_id\":\"5b287509-8132-4090-ad8f-a96db3399122\"}";
+        // trin (69)
+        // let conn_ser = "{\"version\":\"1.0\",\"data\":{\"pw_did\":\"ThFAd68nv6qFcQVhm2LZEp\",\"pw_vk\":\"FYr43xb7eDfhJ8KYgur4BiaDUbF5a7hB1yeFD5Dp48j6\",\"agent_did\":\"VHJzeRk9iufdVcHC4kQSH3\",\"agent_vk\":\"GR2SYM4VGDSnuexUqDRkQHrzJCGnTMK16nx9nsjW6EQK\"},\"state\":{\"Invitee\":{\"Responded\":{\"response\":{\"@id\":\"9c936654-255b-4bba-8838-476a5034f7b9\",\"~thread\":{\"thid\":\"a137601f-bcf6-48bf-ad2f-fd4afd315978\",\"sender_order\":0,\"received_orders\":{}},\"connection~sig\":{\"@type\":\"did:sov:BzCbsNYhMrjHiqZDTUASHg/signature/1.0/ed25519Sha512_single\",\"signature\":\"B2_QxoAfcMo6Dh6-CUbsnA624sokPzsrN3qYWCLSp1fNPH0_yOLe4_w7lAeHYiVZVV-Gii0lP4UMfjN7YcvyDw==\",\"sig_data\":\"i0w2YwAAAAB7IkRJRCI6IlRTV1FOUHM5SlFaU21MY3VGc3JqVlQiLCJESUREb2MiOnsiQGNvbnRleHQiOiJodHRwczovL3czaWQub3JnL2RpZC92MSIsImlkIjoiVFNXUU5QczlKUVpTbUxjdUZzcmpWVCIsInB1YmxpY0tleSI6W3siaWQiOiJUU1dRTlBzOUpRWlNtTGN1RnNyalZUI2tleXMtMSIsInR5cGUiOiJFZDI1NTE5VmVyaWZpY2F0aW9uS2V5MjAxOCIsImNvbnRyb2xsZXIiOiJUU1dRTlBzOUpRWlNtTGN1RnNyalZUIiwicHVibGljS2V5QmFzZTU4IjoiRlFwQkpyZW5OOTlWTFNSWmYxZ0VMUzN1dWY0WjMxM0VkWVR0alFnNVZmYlgifV0sInNlcnZpY2UiOlt7ImlkIjoiVFNXUU5QczlKUVpTbUxjdUZzcmpWVDtpbmR5IiwidHlwZSI6IkluZHlBZ2VudCIsInJlY2lwaWVudEtleXMiOlsiRlFwQkpyZW5OOTlWTFNSWmYxZ0VMUzN1dWY0WjMxM0VkWVR0alFnNVZmYlgiXSwicm91dGluZ0tleXMiOlsiNnBlS2FVeGRvck5VbUVZeUNiWG10Sll1YXBtb3A1UFFKMjFYemRnMVpNWHQiXSwic2VydmljZUVuZHBvaW50IjoiaHR0cHM6Ly9hcGkucG9ydGFsLnN0cmVldGNyZWQuaWQvYWdlbnQva1hmVkhkd2s4MUZKeE40b2lQUHpnaTc2blhUTUY3YzkifV19fQ==\",\"signer\":\"jHhBiCXniMNe2SAYYZA466M5eoM53sR4FxQ1dNhG2rZ\"}},\"request\":{\"@id\":\"a137601f-bcf6-48bf-ad2f-fd4afd315978\",\"label\":\"69\",\"connection\":{\"DID\":\"ThFAd68nv6qFcQVhm2LZEp\",\"DIDDoc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"ThFAd68nv6qFcQVhm2LZEp\",\"publicKey\":[{\"id\":\"ThFAd68nv6qFcQVhm2LZEp#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"ThFAd68nv6qFcQVhm2LZEp\",\"publicKeyBase58\":\"FYr43xb7eDfhJ8KYgur4BiaDUbF5a7hB1yeFD5Dp48j6\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"ThFAd68nv6qFcQVhm2LZEp#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"FYr43xb7eDfhJ8KYgur4BiaDUbF5a7hB1yeFD5Dp48j6\"],\"routingKeys\":[\"GR2SYM4VGDSnuexUqDRkQHrzJCGnTMK16nx9nsjW6EQK\",\"Hezce2UWMZ3wUhVkh2LfKSs8nDzWwzs2Win7EzNN3YaR\"],\"serviceEndpoint\":\"https://ariesvcx.agency.staging.absa.id/agency/msg\"}]}},\"~thread\":{\"thid\":\"a137601f-bcf6-48bf-ad2f-fd4afd315978\",\"pthid\":\"6b6c959b-bdb8-4fac-a8b1-083692dd8715\",\"sender_order\":0,\"received_orders\":{}},\"~timing\":{\"out_time\":\"2022-09-30T01:55:17.700Z\"}},\"did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"6b6c959b-bdb8-4fac-a8b1-083692dd8715\",\"publicKey\":[{\"id\":\"6b6c959b-bdb8-4fac-a8b1-083692dd8715#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"6b6c959b-bdb8-4fac-a8b1-083692dd8715\",\"publicKeyBase58\":\"jHhBiCXniMNe2SAYYZA466M5eoM53sR4FxQ1dNhG2rZ\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"6b6c959b-bdb8-4fac-a8b1-083692dd8715#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"jHhBiCXniMNe2SAYYZA466M5eoM53sR4FxQ1dNhG2rZ\"],\"routingKeys\":[\"6peKaUxdorNUmEYyCbXmtJYuapmop5PQJ21Xzdg1ZMXt\"],\"serviceEndpoint\":\"https://api.portal.streetcred.id/agent/kXfVHdwk81FJxN4oiPPzgi76nXTMF7c9\"}]}}}},\"source_id\":\"69\",\"thread_id\":\"a137601f-bcf6-48bf-ad2f-fd4afd315978\"}";
 
         let conn: Connection = Connection::from_string(conn_ser).unwrap();
 
@@ -204,11 +208,14 @@ mod integration_tests {
 
     #[tokio::test]
     async fn restore_connection() {
-        let (conn, _, _, _, agency_client) = setup_with_existing_conn().await;
+        let (conn, _, _, profile, agency_client) = setup_with_existing_conn().await;
 
         println!("agency client; {:?}", agency_client);
 
-        println!("conn info; {}", conn.get_connection_info(&agency_client).unwrap());
+        println!(
+            "conn info; {}",
+            conn.get_connection_info(&profile, &agency_client).unwrap()
+        );
 
         // conn.send_generic_message(&profile, "hellloooooooooooooooooooooooooo")
         //     .await
@@ -238,8 +245,13 @@ mod integration_tests {
         println!("Cleared {:?} messages", len);
     }
 
-    async fn get_first_connection_msg(conn: &Connection, agency_client: &AgencyClient) -> (String, A2AMessage) {
-        let msgs = conn.get_messages(&agency_client).await.unwrap();
+    async fn get_first_connection_msg(
+        conn: &Connection,
+        profile: &Arc<dyn Profile>,
+        agency_client: &AgencyClient,
+    ) -> (String, A2AMessage) {
+        // let msgs = conn.get_messages(profile, &agency_client).await.unwrap();
+        let msgs = conn.get_messages_noauth(&agency_client).await.unwrap();
         let msgs = msgs.iter().collect::<Vec<(&String, &A2AMessage)>>();
 
         let x = msgs.first().expect("no msgs").to_owned();
@@ -260,7 +272,7 @@ mod integration_tests {
 
         // clear_connection_messages(&conn, &agency_client).await;
 
-        let (msg_id, message) = get_first_connection_msg(&conn, &agency_client).await;
+        let (msg_id, message) = get_first_connection_msg(&conn, &profile, &agency_client).await;
 
         println!("MESSAGE!: {:?}", message);
 
@@ -288,7 +300,7 @@ mod integration_tests {
         println!("sleeping for 10secs");
         thread::sleep(Duration::from_millis(10_000));
 
-        let (msg_id, message) = get_first_connection_msg(&conn, &agency_client).await;
+        let (msg_id, message) = get_first_connection_msg(&conn, &profile, &agency_client).await;
         println!("MESSAGE!: {:?}", message);
 
         let issaunce_msg: Credential = match message {
@@ -328,7 +340,7 @@ mod integration_tests {
                 .unwrap()
         );
 
-        let (msg_id, message) = get_first_connection_msg(&conn, &agency_client).await;
+        let (msg_id, message) = get_first_connection_msg(&conn, &profile, &agency_client).await;
 
         let pres_req: PresentationRequest = match message {
             A2AMessage::PresentationRequest(m) => m.to_owned(),
@@ -336,8 +348,6 @@ mod integration_tests {
         };
 
         let mut prover = Prover::create_from_request("1", pres_req).unwrap();
-
-        println!("prover; {:?}", prover);
 
         conn.update_message_status(&msg_id, &agency_client).await.unwrap();
 
@@ -349,8 +359,36 @@ mod integration_tests {
         let mut use_credentials = serde_json::json!({});
 
         for (referent, credentials) in credentials["attrs"].as_object().unwrap().iter() {
+            let cred_rev_reg_id = credentials[0]
+                .get("cred_info")
+                .and_then(|v| v.get("rev_reg_id"))
+                .and_then(|v| v.as_str())
+                .unwrap();
+
+            let (_, rev_reg_def_json) = Arc::clone(&profile)
+                .inject_anoncreds()
+                .get_rev_reg_def_json(cred_rev_reg_id)
+                .await
+                .unwrap();
+
+            let rev_reg_def: Value = serde_json::from_str(&rev_reg_def_json).unwrap();
+
+            let tails_location = rev_reg_def
+                .get("value")
+                .and_then(|value| value.get("tailsLocation"))
+                .and_then(Value::as_str)
+                .unwrap();
+            let tails_hash = rev_reg_def
+                .get("value")
+                .and_then(|value| value.get("tailsHash"))
+                .and_then(Value::as_str)
+                .unwrap();
+
+            let tails_file = helper::download_tails(tails_hash, tails_location).await;
+
             use_credentials["attrs"][referent] = serde_json::json!({
-                "credential": credentials[0]
+                "credential": credentials[0],
+                "tails_file": tails_file
             })
         }
 
@@ -366,12 +404,10 @@ mod integration_tests {
             .await
             .unwrap();
 
-        println!("{:?}", prover.presentation_status());
-
         println!("sleeping for 20secs for ACK - GO VERIFY IT!");
         thread::sleep(Duration::from_millis(20_000));
 
-        let (msg_id, message) = get_first_connection_msg(&conn, &agency_client).await;
+        let (msg_id, message) = get_first_connection_msg(&conn, &profile, &agency_client).await;
         println!("MESSAGE!: {:?}", message);
 
         let pres_ack: PresentationAck = match message {
@@ -448,10 +484,6 @@ mod integration_tests {
             .unwrap()
         );
 
-        // let (pub_did, pub_verkey) =
-        //     signus::create_and_store_my_did(indy_handle, Some("877995173D444D629EB7CA91B5B9D32A"), None)
-        //         .await
-        //         .unwrap();
         let pub_did = "D6EMVkDnBmuMCtZGwjgR9A";
         let pub_verkey = signus::get_verkey_from_wallet(indy_handle, pub_did).await.unwrap();
         // let x = ledger
@@ -469,19 +501,23 @@ mod integration_tests {
         //     .await
         //     .unwrap();
 
-        // x;
-
-        // println!("ya ya {:?}", aries_vcx::libindy::utils::ledger::get_service(&Did::new("D6EMVkDnBmuMCtZGwjgR9A").unwrap()).await.unwrap());
-
-        println!("service; {:?}", ledger
-            .get_service(&Did::new("D6EMVkDnBmuMCtZGwjgR9A").unwrap())
-            .await
-            .unwrap());
+        println!(
+            "service; {:?}",
+            ledger
+                .get_service(&Did::new("D6EMVkDnBmuMCtZGwjgR9A").unwrap())
+                .await
+                .unwrap()
+        );
 
         ()
     }
 
     mod helper {
+
+        use std::{
+            fs::{self, File},
+            path::Path, io::Write,
+        };
 
         use agency_client::{
             agency_client::AgencyClient,
@@ -534,6 +570,33 @@ mod integration_tests {
             let config = client.get_config().unwrap();
 
             config
+        }
+
+        pub async fn download_tails(hash: &str, tails_location: &str) -> String {
+            let file_path = format!(
+                "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/tails/{}",
+                hash
+            );
+
+            let path = Path::new(&file_path);
+
+            let parent_dir = path.parent().unwrap().to_str().unwrap().to_string();
+
+            if path.exists() {
+                return parent_dir;
+            }
+
+            let mut tails_file = File::create(path).unwrap();
+
+            let x = reqwest::get(tails_location).await.unwrap();
+
+            let bs = x.bytes().await.unwrap();
+
+            tails_file.write(&bs).unwrap();
+
+            tails_file.flush().unwrap();
+
+            file_path
         }
     }
 }

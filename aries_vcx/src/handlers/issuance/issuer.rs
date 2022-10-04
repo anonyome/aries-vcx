@@ -213,7 +213,7 @@ impl Issuer {
         }
         let send_message = connection.send_message_closure(todo!())?;
 
-        let messages = connection.get_messages(agency_client).await?;
+        let messages = connection.get_messages(todo!(), agency_client).await?;
         if let Some((uid, msg)) = self.find_message_to_handle(messages) {
             self.step(wallet_handle, msg.into(), Some(send_message)).await?;
             connection.update_message_status(&uid, agency_client).await?;
@@ -236,7 +236,7 @@ pub mod test_utils {
         connection: &Connection,
     ) -> VcxResult<String> {
         let credential_proposals: Vec<CredentialProposal> = connection
-            .get_messages(agency_client)
+            .get_messages(todo!(), agency_client)
             .await?
             .into_iter()
             .filter_map(|(_, message)| match message {

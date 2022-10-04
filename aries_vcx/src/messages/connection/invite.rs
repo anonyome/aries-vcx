@@ -1,12 +1,13 @@
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 use futures::executor::block_on;
 
+use crate::core::profile::profile::Profile;
 use crate::did_doc::service_aries::AriesService;
 use crate::did_doc::DidDoc;
 use crate::error::prelude::*;
 use crate::handlers::out_of_band::OutOfBandInvitation;
-use crate::libindy::utils::ledger;
 use crate::messages::a2a::{A2AMessage, MessageId};
 use crate::messages::connection::did::Did;
 use crate::messages::timing::Timing;
@@ -21,14 +22,16 @@ pub enum Invitation {
     OutOfBand(OutOfBandInvitation),
 }
 
-// TODO: Make into TryFrom
-impl From<Invitation> for DidDoc {
-    fn from(invitation: Invitation) -> DidDoc {
+impl Invitation {
+    // TODO: Make into Result
+    pub fn resolve_did_doc(&self, profile: &Arc<dyn Profile>) -> DidDoc {
+        let ledger = Arc::clone(profile).inject_ledger();
+
         let mut did_doc: DidDoc = DidDoc::default();
-        let (service_endpoint, recipient_keys, routing_keys) = match invitation {
+        let (service_endpoint, recipient_keys, routing_keys) = match self {
             Invitation::Public(invitation) => {
                 did_doc.set_id(invitation.did.to_string());
-                let service = block_on(ledger::get_service(&invitation.did)).unwrap_or_else(|err| {
+                let service = block_on(ledger.get_service(&invitation.did)).unwrap_or_else(|err| {
                     error!("Failed to obtain service definition from the ledger: {}", err);
                     AriesService::default()
                 });
@@ -38,8 +41,8 @@ impl From<Invitation> for DidDoc {
                 did_doc.set_id(invitation.id.0.clone());
                 (
                     invitation.service_endpoint.clone(),
-                    invitation.recipient_keys,
-                    invitation.routing_keys,
+                    invitation.recipient_keys.clone(),
+                    invitation.routing_keys.clone(),
                 )
             }
             Invitation::OutOfBand(invitation) => {
