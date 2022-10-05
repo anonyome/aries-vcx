@@ -80,6 +80,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     // SKIP (internal): build_cred_def_request
     // SKIP (scope): publish_cred_def
 
+    // with cache
     async fn get_cred_def_json(&self, cred_def_id: &str) -> VcxResult<(String, String)>;
 
     // SKIP (scope): generate_rev_reg
@@ -100,6 +101,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     // SKIP (scope): get_rev_reg
 
+    // with no cache
     async fn get_cred_def(&self, issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)>;
 
     // SKIP (internal): is_cred_def_on_ledger

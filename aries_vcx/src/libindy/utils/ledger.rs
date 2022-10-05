@@ -15,11 +15,12 @@ use crate::libindy::utils::signus::create_and_store_my_did;
 use crate::messages::connection::did::Did;
 use crate::utils;
 use crate::utils::constants::rev_def_json;
-use crate::utils::constants::REV_REG_DELTA_JSON;
-use crate::utils::constants::REV_REG_ID;
-use crate::utils::constants::REV_REG_JSON;
-use crate::utils::constants::SUBMIT_SCHEMA_RESPONSE;
+use crate::utils::constants::{
+    CRED_DEF_REQ, REVOC_REG_TYPE, REV_REG_DELTA_JSON, REV_REG_ID, REV_REG_JSON, SCHEMA_TXN, SUBMIT_SCHEMA_RESPONSE,
+};
 use crate::utils::random::generate_random_did;
+
+use super::anoncreds::RevocationRegistryDefinition;
 
 pub async fn multisign_request(wallet_handle: WalletHandle, did: &str, request: &str) -> VcxResult<String> {
     ledger::multi_sign_request(wallet_handle, did, request)
@@ -554,8 +555,7 @@ async fn build_get_txn_request(submitter_did: Option<&str>, seq_no: i32) -> VcxR
     let request = ledger::build_get_txn_request(submitter_did, None, seq_no)
         .await
         .map_err(VcxError::from)?;
-    let request = append_txn_author_agreement_to_request(&request).await?;
-    Ok(request)
+    append_txn_author_agreement_to_request(&request).await
 }
 
 pub async fn get_ledger_txn(
@@ -577,6 +577,120 @@ pub async fn get_ledger_txn(
     Ok(res)
 }
 
+// ---- publish schema
+// public for usage in libvcx
+pub async fn build_schema_request(schema: &str) -> VcxResult<String> {
+    trace!("build_schema_request >>> schema: {}", schema);
+
+    if settings::indy_mocks_enabled() {
+        return Ok(SCHEMA_TXN.to_string());
+    }
+
+    let submitter_did = settings::get_config_value(settings::CONFIG_INSTITUTION_DID).unwrap();
+
+    let request = libindy_build_schema_request(&submitter_did, schema).await?;
+    append_txn_author_agreement_to_request(&request).await
+}
+
+pub async fn publish_schema(wallet_handle: WalletHandle, schema: &str) -> VcxResult<String> {
+    trace!("publish_schema >>> schema: {}", schema);
+
+    if settings::indy_mocks_enabled() {
+        return Ok("".to_string());
+    }
+
+    let request = build_schema_request(schema).await?;
+    publish_txn_on_ledger(wallet_handle, &request).await
+}
+
+// ----- publish cred def
+async fn build_cred_def_request(issuer_did: &str, cred_def_json: &str) -> VcxResult<String> {
+    if settings::indy_mocks_enabled() {
+        return Ok(CRED_DEF_REQ.to_string());
+    }
+
+    let cred_def_req = libindy_build_create_credential_def_txn(issuer_did, cred_def_json).await?;
+    append_txn_author_agreement_to_request(&cred_def_req).await
+}
+
+pub async fn publish_cred_def(wallet_handle: WalletHandle, issuer_did: &str, cred_def_json: &str) -> VcxResult<String> {
+    trace!(
+        "publish_cred_def >>> issuer_did: {}, cred_def_json: {}",
+        issuer_did,
+        cred_def_json
+    );
+    if settings::indy_mocks_enabled() {
+        debug!("publish_cred_def >>> mocked success");
+        return Ok("".to_string());
+    }
+    let cred_def_req = build_cred_def_request(issuer_did, cred_def_json).await?;
+    publish_txn_on_ledger(wallet_handle, &cred_def_req).await
+}
+
+// ---- publish revocation registry definition
+async fn build_rev_reg_request(issuer_did: &str, rev_reg_def_json: &str) -> VcxResult<String> {
+    if settings::indy_mocks_enabled() {
+        debug!("build_rev_reg_request >>> returning mocked value");
+        return Ok("".to_string());
+    }
+
+    let rev_reg_def_req = libindy_build_revoc_reg_def_request(issuer_did, rev_reg_def_json).await?;
+    append_txn_author_agreement_to_request(&rev_reg_def_req).await
+}
+
+pub async fn publish_rev_reg_def(
+    wallet_handle: WalletHandle,
+    issuer_did: &str,
+    rev_reg_def: &RevocationRegistryDefinition,
+) -> VcxResult<String> {
+    trace!("publish_rev_reg_def >>> issuer_did: {}, rev_reg_def: ...", issuer_did);
+    if settings::indy_mocks_enabled() {
+        debug!("publish_rev_reg_def >>> mocked success");
+        return Ok("".to_string());
+    }
+
+    let rev_reg_def_json = serde_json::to_string(&rev_reg_def).map_err(|err| {
+        VcxError::from_msg(
+            VcxErrorKind::SerializationError,
+            format!("Failed to serialize rev_reg_def: {:?}, error: {:?}", rev_reg_def, err),
+        )
+    })?;
+    let rev_reg_def_req = build_rev_reg_request(issuer_did, &rev_reg_def_json).await?;
+    publish_txn_on_ledger(wallet_handle, &rev_reg_def_req).await
+}
+
+// ---- publish revocation registry delta
+async fn build_rev_reg_delta_request(
+    issuer_did: &str,
+    rev_reg_id: &str,
+    rev_reg_entry_json: &str,
+) -> VcxResult<String> {
+    trace!(
+        "build_rev_reg_delta_request >>> issuer_did: {}, rev_reg_id: {}, rev_reg_entry_json: {}",
+        issuer_did,
+        rev_reg_id,
+        rev_reg_entry_json
+    );
+    let request =
+        libindy_build_revoc_reg_entry_request(issuer_did, rev_reg_id, REVOC_REG_TYPE, rev_reg_entry_json).await?;
+    append_txn_author_agreement_to_request(&request).await
+}
+
+pub async fn publish_rev_reg_delta(
+    wallet_handle: WalletHandle,
+    issuer_did: &str,
+    rev_reg_id: &str,
+    rev_reg_entry_json: &str,
+) -> VcxResult<String> {
+    trace!(
+        "publish_rev_reg_delta >>> issuer_did: {}, rev_reg_id: {}, rev_reg_entry_json: {}",
+        issuer_did,
+        rev_reg_id,
+        rev_reg_entry_json
+    );
+    let request = build_rev_reg_delta_request(issuer_did, rev_reg_id, rev_reg_entry_json).await?;
+    publish_txn_on_ledger(wallet_handle, &request).await
+}
 
 #[cfg(test)]
 #[cfg(feature = "general_test")]

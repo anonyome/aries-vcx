@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::libindy::utils::ledger as libindy_ledger;
 use async_trait::async_trait;
+use indy_credx::types::RevocationRegistryId;
 use indy_vdr::common::error::VdrError;
 use indy_vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId};
 use indy_vdr::utils::did::DidValue;
@@ -305,7 +306,15 @@ impl BaseLedger for IndyVdrLedger {
     async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String> {
         // TODO try from cache first
 
-        let request = self._build_get_cred_def_request(None, cred_def_id).await?;
+        let fetched_cred_def = self.get_cred_def_no_cache(None, cred_def_id).await?;
+
+        // TODO - store cache
+
+        Ok(fetched_cred_def)
+    }
+
+    async fn get_cred_def_no_cache(&self, submitter_did: Option<&str>, cred_def_id: &str) -> VcxResult<String> {
+        let request = self._build_get_cred_def_request(submitter_did, cred_def_id).await?;
 
         let response = self._submit_request(request).await?;
 
@@ -343,11 +352,6 @@ impl BaseLedger for IndyVdrLedger {
         Ok(cred_def_json)
     }
 
-    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
-        todo!()
-        // libindy_ledger::get_rev_reg_def_json(rev_reg_id).await.map(|(id,json)| json)
-    }
-
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
         let request = self._build_get_attr_request(None, &did.to_string(), "service").await?;
 
@@ -376,6 +380,87 @@ impl BaseLedger for IndyVdrLedger {
 
         self._sign_and_submit_request(did, request).await
     }
+
+    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
+        let id = RevocationRegistryId::from_str(rev_reg_id)?;
+        let request = self.request_builder()?.build_get_revoc_reg_def_request(None, &id)?;
+        let res = self._submit_request(request).await?;
+
+        let mut data = self.get_response_json_data_field(&res)?;
+
+        data["ver"] = Value::String("1.0".to_string());
+
+        Ok(serde_json::to_string(&data)?)
+    }
+
+    async fn get_rev_reg_delta_json(
+        &self,
+        rev_reg_id: &str,
+        from: Option<u64>,
+        to: Option<u64>,
+    ) -> VcxResult<(String, String, u64)> {
+        let revoc_reg_def_id = RevocationRegistryId::from_str(rev_reg_id)?;
+
+        let from = from.map(|x| x as i64);
+        let current_time = current_epoch_time();
+        let to = to.map_or(current_time, |x| x as i64);
+
+        let request = self
+            .request_builder()?
+            .build_get_revoc_reg_delta_request(None, &revoc_reg_def_id, from, to)?;
+        let res = self._submit_request(request).await?;
+
+        let res_data = self.get_response_json_data_field(&res)?;
+        let response_value = (&res_data).try_get_index("value")?;
+
+        let empty_json_list = json!([]);
+
+        let mut delta_value = json!({
+            "accum": response_value.try_get_index("accum_to")?.try_get_index("value")?.try_get_index("accum")?,
+            "issued": if let Some(v) = response_value.get("issued") { v } else { &empty_json_list },
+            "revoked": if let Some(v) = response_value.get("revoked") { v } else { &empty_json_list }
+        });
+
+        if let Some(accum_from) = response_value.get("accum_from") {
+            let prev_accum = accum_from.try_get_index("value")?.try_get_index("accum")?;
+            delta_value["prev_accum"] = prev_accum.to_owned();
+        }
+
+        let reg_delta = json!({"ver": "1.0", "value": delta_value});
+
+        let delta_timestamp = response_value
+            .try_get_index("accum_to")?
+            .try_get_index("txnTime")?
+            .as_u64()
+            .ok_or(VcxError::from_msg(
+                VcxErrorKind::InvalidJson,
+                "Error parsing accum_to.txnTime value as u64",
+            ))?;
+
+        let response_reg_def_id = (&res_data)
+            .try_get_index("revocRegDefId")?
+            .as_str()
+            .ok_or(VcxError::from_msg(
+                VcxErrorKind::InvalidJson,
+                "Erroring parsing revocRegDefId value as string",
+            ))?;
+        if response_reg_def_id != rev_reg_id {
+            return Err(VcxError::from_msg(
+                VcxErrorKind::InvalidRevocationDetails,
+                "ID of revocation registry response does not match requested ID",
+            ));
+        }
+
+        Ok((
+            rev_reg_id.to_string(),
+            serde_json::to_string(&reg_delta)?,
+            delta_timestamp,
+        ))
+    }
+}
+
+fn current_epoch_time() -> i64 {
+    time::get_time().sec
 }
 
 impl From<VdrError> for VcxError {

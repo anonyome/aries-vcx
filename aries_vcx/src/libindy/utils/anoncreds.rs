@@ -10,8 +10,8 @@ use crate::libindy::utils::ledger;
 use crate::libindy::utils::LibindyMock;
 use crate::utils;
 use crate::utils::constants::{
-    rev_def_json, CRED_DEF_ID, CRED_DEF_JSON, CRED_DEF_REQ, REVOC_REG_TYPE, REV_REG_DELTA_JSON, REV_REG_ID,
-    REV_REG_JSON, SCHEMA_ID, SCHEMA_JSON, SCHEMA_TXN,
+    rev_def_json, CRED_DEF_ID, CRED_DEF_JSON, REV_REG_DELTA_JSON, REV_REG_ID,
+    REV_REG_JSON, SCHEMA_ID, SCHEMA_JSON,
 };
 use crate::utils::constants::{
     ATTRS, LIBINDY_CRED_OFFER, PROOF_REQUESTED_PREDICATES, REQUESTED_ATTRIBUTES, REV_STATE_JSON,
@@ -458,22 +458,6 @@ pub async fn create_schema(name: &str, version: &str, data: &str) -> VcxResult<(
     Ok((id, create_schema))
 }
 
-pub async fn build_schema_request(schema: &str) -> VcxResult<String> {
-    trace!("build_schema_request >>> schema: {}", schema);
-
-    if settings::indy_mocks_enabled() {
-        return Ok(SCHEMA_TXN.to_string());
-    }
-
-    let submitter_did = settings::get_config_value(settings::CONFIG_INSTITUTION_DID).unwrap();
-
-    let request = ledger::libindy_build_schema_request(&submitter_did, schema).await?;
-
-    let request = ledger::append_txn_author_agreement_to_request(&request).await?;
-
-    Ok(request)
-}
-
 pub async fn publish_schema(wallet_handle: WalletHandle, schema: &str) -> VcxResult<()> {
     trace!("publish_schema >>> schema: {}", schema);
 
@@ -481,12 +465,8 @@ pub async fn publish_schema(wallet_handle: WalletHandle, schema: &str) -> VcxRes
         return Ok(());
     }
 
-    let request = build_schema_request(schema).await?;
-
-    let response = ledger::publish_txn_on_ledger(wallet_handle, &request).await?;
-
+    let response = ledger::publish_schema(wallet_handle, schema).await?;
     _check_schema_response(&response)?;
-
     Ok(())
 }
 
@@ -497,9 +477,7 @@ pub async fn get_schema_json(wallet_handle: WalletHandle, schema_id: &str) -> Vc
     }
 
     let submitter_did = crate::utils::random::generate_random_did();
-
     let schema_json = ledger::libindy_get_schema(wallet_handle, &submitter_did, schema_id).await?;
-
     Ok((schema_id.to_string(), schema_json))
 }
 
@@ -528,18 +506,6 @@ pub async fn generate_cred_def(
     libindy_create_and_store_credential_def(wallet_handle, issuer_did, schema_json, tag, sig_type, &config_json).await
 }
 
-pub async fn build_cred_def_request(issuer_did: &str, cred_def_json: &str) -> VcxResult<String> {
-    if settings::indy_mocks_enabled() {
-        return Ok(CRED_DEF_REQ.to_string());
-    }
-
-    let cred_def_req = ledger::libindy_build_create_credential_def_txn(issuer_did, cred_def_json).await?;
-
-    let cred_def_req = ledger::append_txn_author_agreement_to_request(&cred_def_req).await?;
-
-    Ok(cred_def_req)
-}
-
 pub async fn publish_cred_def(wallet_handle: WalletHandle, issuer_did: &str, cred_def_json: &str) -> VcxResult<()> {
     trace!(
         "publish_cred_def >>> issuer_did: {}, cred_def_json: {}",
@@ -550,8 +516,7 @@ pub async fn publish_cred_def(wallet_handle: WalletHandle, issuer_did: &str, cre
         debug!("publish_cred_def >>> mocked success");
         return Ok(());
     }
-    let cred_def_req = build_cred_def_request(issuer_did, cred_def_json).await?;
-    ledger::publish_txn_on_ledger(wallet_handle, &cred_def_req).await?;
+    let _ = ledger::publish_cred_def(wallet_handle, issuer_did, cred_def_json).await?;
     Ok(())
 }
 
@@ -607,17 +572,6 @@ pub async fn generate_rev_reg(
     Ok((rev_reg_id, rev_reg_def, rev_reg_entry_json))
 }
 
-pub async fn build_rev_reg_request(issuer_did: &str, rev_reg_def_json: &str) -> VcxResult<String> {
-    if settings::indy_mocks_enabled() {
-        debug!("build_rev_reg_request >>> returning mocked value");
-        return Ok("".to_string());
-    }
-
-    let rev_reg_def_req = ledger::libindy_build_revoc_reg_def_request(issuer_did, rev_reg_def_json).await?;
-    let rev_reg_def_req = ledger::append_txn_author_agreement_to_request(&rev_reg_def_req).await?;
-    Ok(rev_reg_def_req)
-}
-
 pub async fn publish_rev_reg_def(
     wallet_handle: WalletHandle,
     issuer_did: &str,
@@ -629,14 +583,7 @@ pub async fn publish_rev_reg_def(
         return Ok(());
     }
 
-    let rev_reg_def_json = serde_json::to_string(&rev_reg_def).map_err(|err| {
-        VcxError::from_msg(
-            VcxErrorKind::SerializationError,
-            format!("Failed to serialize rev_reg_def: {:?}, error: {:?}", rev_reg_def, err),
-        )
-    })?;
-    let rev_reg_def_req = build_rev_reg_request(issuer_did, &rev_reg_def_json).await?;
-    ledger::publish_txn_on_ledger(wallet_handle, &rev_reg_def_req).await?;
+    let _ = ledger::publish_rev_reg_def(wallet_handle, issuer_did, rev_reg_def).await?;
     Ok(())
 }
 
@@ -647,24 +594,6 @@ pub async fn get_rev_reg_def_json(rev_reg_id: &str) -> VcxResult<(String, String
     }
 
     ledger::get_rev_reg_def_json(rev_reg_id).await
-}
-
-pub async fn build_rev_reg_delta_request(
-    issuer_did: &str,
-    rev_reg_id: &str,
-    rev_reg_entry_json: &str,
-) -> VcxResult<String> {
-    trace!(
-        "build_rev_reg_delta_request >>> issuer_did: {}, rev_reg_id: {}, rev_reg_entry_json: {}",
-        issuer_did,
-        rev_reg_id,
-        rev_reg_entry_json
-    );
-    let request =
-        ledger::libindy_build_revoc_reg_entry_request(issuer_did, rev_reg_id, REVOC_REG_TYPE, rev_reg_entry_json)
-            .await?;
-    let request = ledger::append_txn_author_agreement_to_request(&request).await?;
-    Ok(request)
 }
 
 pub async fn publish_rev_reg_delta(
@@ -679,8 +608,7 @@ pub async fn publish_rev_reg_delta(
         rev_reg_id,
         rev_reg_entry_json
     );
-    let request = build_rev_reg_delta_request(issuer_did, rev_reg_id, rev_reg_entry_json).await?;
-    ledger::publish_txn_on_ledger(wallet_handle, &request).await
+    ledger::publish_rev_reg_delta(wallet_handle, issuer_did, rev_reg_id, rev_reg_entry_json).await
 }
 
 pub async fn get_rev_reg_delta_json(

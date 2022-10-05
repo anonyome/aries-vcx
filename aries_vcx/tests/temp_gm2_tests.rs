@@ -98,7 +98,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_ledger_fetch() {
         // ----------- try with indyvdr
-        let (_ack, indy_handle, _, _, _) = setup_with_existing_conn().await;
+        let (_, indy_handle, _, _, _) = setup_with_existing_conn().await;
         let indy_profile = IndySdkProfile::new(indy_handle);
         let profile: Arc<dyn Profile> = Arc::new(indy_profile); // just for the wallet
 
@@ -154,6 +154,45 @@ mod integration_tests {
         );
 
         ()
+    }
+
+    #[tokio::test]
+    async fn compare_vdr_to_sdk_fns_temp() {
+        let (_, indy_handle, _, _, _) = setup_with_existing_conn().await;
+        let indy_profile = IndySdkProfile::new(indy_handle);
+        let profile: Arc<dyn Profile> = Arc::new(indy_profile); // just for the wallet
+        
+        let config = IndyVdrPoolConfig::default();
+        let txns = PoolTransactions::from_json_file(
+            "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn",
+        )
+        .unwrap();
+        
+        let runner = PoolBuilder::from(config)
+        .transactions(txns)
+        .unwrap()
+        .into_runner()
+        .unwrap();
+        let indy_vdr_pool = IndyVdrLedgerPool::new(runner);
+        let vdr_ledger = IndyVdrLedger::new(profile.clone(), indy_vdr_pool);
+        let credx_anoncreds = IndyCredxAnonCreds::new(Arc::clone(&profile));
+
+        let indy_sdk_ledger = profile.clone().inject_ledger();
+        let indy_sdk_anoncreds = profile.clone().inject_anoncreds();
+        
+        let rev_id = "D6EMVkDnBmuMCtZGwjgR9A:4:D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction:CL_ACCUM:ec86da86-b4ce-45f6-afeb-d0c2e71e36b3";
+
+        let cred_def_id = "D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction";
+        
+        // println!("vdr; {}\n", vdr_ledger.get_rev_reg_def_json(rev_id).await.unwrap());
+        // println!("indy; {}", indy_sdk_ledger.get_rev_reg_def_json(rev_id).await.unwrap());
+
+        // println!("vdr; {:?}\n", vdr_ledger.get_rev_reg_delta_json(rev_id, None, None).await.unwrap());
+        // println!("indy; {:?}", indy_sdk_ledger.get_rev_reg_delta_json(rev_id, None, None).await.unwrap());
+
+        println!("vdr; {}\n", credx_anoncreds.get_cred_def(None, cred_def_id).await.unwrap().1);
+        println!("indy; {}", indy_sdk_anoncreds.get_cred_def(None, cred_def_id).await.unwrap().1);
+
     }
 
     #[tokio::test]

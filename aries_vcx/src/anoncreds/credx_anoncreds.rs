@@ -118,17 +118,15 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             .get_cred_def(cred_def_id)
             .await?;
 
-            Ok((cred_def_id.to_string(), cred_def_json))
+        Ok((cred_def_id.to_string(), cred_def_json))
     }
 
     async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<(String, String)> {
-        let submitter_did = crate::utils::random::generate_random_did();
-
-        let ledger = Arc::clone(&self.profile).inject_ledger();
-
-        // ledger.rev
-        // let x = ledger
-        todo!()
+        let rev_reg_def_json = Arc::clone(&self.profile)
+            .inject_ledger()
+            .get_rev_reg_def_json(rev_reg_id)
+            .await?;
+        Ok((rev_reg_id.to_string(), rev_reg_def_json))
     }
 
     async fn get_rev_reg_delta_json(
@@ -137,10 +135,18 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         from: Option<u64>,
         to: Option<u64>,
     ) -> VcxResult<(String, String, u64)> {
-        todo!()
+        Arc::clone(&self.profile)
+            .inject_ledger()
+            .get_rev_reg_delta_json(rev_reg_id, from, to)
+            .await
     }
 
     async fn get_cred_def(&self, issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)> {
-        todo!()
+        let cred_def_json = Arc::clone(&self.profile)
+            .inject_ledger()
+            .get_cred_def_no_cache(issuer_did, cred_def_id)
+            .await?;
+
+        Ok((cred_def_id.to_string(), cred_def_json))
     }
 }

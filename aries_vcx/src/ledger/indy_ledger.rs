@@ -79,8 +79,8 @@ impl BaseLedger for IndySdkLedger {
         libindy_ledger::libindy_get_cred_def(self.profile.indy_handle, cred_def_id).await
     }
 
-    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
-        libindy_ledger::get_rev_reg_def_json(rev_reg_id).await.map(|(id,json)| json)
+    async fn get_cred_def_no_cache(&self, submitter_did: Option<&str>, cred_def_id: &str) -> VcxResult<String> {
+        libindy_ledger::get_cred_def_no_cache(submitter_did, cred_def_id).await.map(|(_id, json)| json)
     }
 
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
@@ -89,5 +89,18 @@ impl BaseLedger for IndySdkLedger {
 
     async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String> {
         libindy_ledger::add_service(self.profile.indy_handle, did, service).await
+    }    
+    
+    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
+        libindy_ledger::get_rev_reg_def_json(rev_reg_id).await.map(|(_,json)| json)
+    }
+
+    async fn get_rev_reg_delta_json(
+        &self,
+        rev_reg_id: &str,
+        from: Option<u64>,
+        to: Option<u64>,
+    ) -> VcxResult<(String, String, u64)> {
+        libindy_ledger::get_rev_reg_delta_json(rev_reg_id, from, to).await
     }
 }

@@ -76,7 +76,7 @@ pub async fn prepare_schema_for_endorser(
     );
 
     let (schema_id, schema) = anoncreds::create_schema(&name, &version, &data).await?;
-    let schema_request = anoncreds::build_schema_request(&schema).await?;
+    let schema_request = ledger::build_schema_request(&schema).await?;
     let schema_request = ledger::set_endorser(get_main_wallet_handle(), &schema_request, &endorser).await?;
 
     debug!("prepared schema for endorser with id: {}", schema_id);
