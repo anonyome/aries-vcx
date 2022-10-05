@@ -37,6 +37,8 @@ pub trait BaseLedger: Send + Sync {
 
     async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String>;
 
+    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String>;
+
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService>;
 
     async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String>;

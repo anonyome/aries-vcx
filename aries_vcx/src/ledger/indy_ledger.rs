@@ -79,6 +79,10 @@ impl BaseLedger for IndySdkLedger {
         libindy_ledger::libindy_get_cred_def(self.profile.indy_handle, cred_def_id).await
     }
 
+    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
+        libindy_ledger::get_rev_reg_def_json(rev_reg_id).await.map(|(id,json)| json)
+    }
+
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
         libindy_ledger::get_service(did).await
     }

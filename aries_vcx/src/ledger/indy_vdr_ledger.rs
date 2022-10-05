@@ -343,6 +343,11 @@ impl BaseLedger for IndyVdrLedger {
         Ok(cred_def_json)
     }
 
+    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
+        todo!()
+        // libindy_ledger::get_rev_reg_def_json(rev_reg_id).await.map(|(id,json)| json)
+    }
+
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
         let request = self._build_get_attr_request(None, &did.to_string(), "service").await?;
 

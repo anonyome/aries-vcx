@@ -1,15 +1,12 @@
-use indy::future::TryFutureExt;
-use indy::{anoncreds, blob_storage, ledger};
+use indy::{anoncreds, blob_storage};
 use indy_sys::WalletHandle;
 use serde_json;
 use serde_json::{map::Map, Value};
-use time;
 
 use crate::error::prelude::*;
 use crate::global::settings;
 use crate::libindy::utils::cache::{clear_rev_reg_delta_cache, get_rev_reg_delta_cache, set_rev_reg_delta_cache};
-use crate::libindy::utils::ledger::publish_txn_on_ledger;
-use crate::libindy::utils::ledger::*;
+use crate::libindy::utils::ledger;
 use crate::libindy::utils::LibindyMock;
 use crate::utils;
 use crate::utils::constants::{
@@ -218,7 +215,10 @@ async fn close_search_handle(search_handle: i32) -> VcxResult<()> {
         .map_err(VcxError::from)
 }
 
-pub async fn libindy_prover_get_credentials(wallet_handle: WalletHandle, filter_json: Option<&str>) -> VcxResult<String> {
+pub async fn libindy_prover_get_credentials(
+    wallet_handle: WalletHandle,
+    filter_json: Option<&str>,
+) -> VcxResult<String> {
     Ok(anoncreds::prover_get_credentials(wallet_handle, filter_json).await?)
 }
 
@@ -444,84 +444,6 @@ pub async fn libindy_issuer_merge_revocation_registry_deltas(old_delta: &str, ne
         .map_err(VcxError::from)
 }
 
-pub async fn libindy_build_revoc_reg_def_request(submitter_did: &str, rev_reg_def_json: &str) -> VcxResult<String> {
-    if settings::indy_mocks_enabled() {
-        return Ok("".to_string());
-    }
-
-    ledger::build_revoc_reg_def_request(submitter_did, rev_reg_def_json)
-        .await
-        .map_err(VcxError::from)
-}
-
-pub async fn libindy_build_revoc_reg_entry_request(
-    submitter_did: &str,
-    rev_reg_id: &str,
-    rev_def_type: &str,
-    value: &str,
-) -> VcxResult<String> {
-    if settings::indy_mocks_enabled() {
-        return Ok("".to_string());
-    }
-
-    ledger::build_revoc_reg_entry_request(submitter_did, rev_reg_id, rev_def_type, value)
-        .await
-        .map_err(VcxError::from)
-}
-
-pub async fn libindy_build_get_revoc_reg_def_request(submitter_did: &str, rev_reg_id: &str) -> VcxResult<String> {
-    ledger::build_get_revoc_reg_def_request(Some(submitter_did), rev_reg_id)
-        .await
-        .map_err(VcxError::from)
-}
-
-pub async fn libindy_parse_get_revoc_reg_def_response(rev_reg_def_json: &str) -> VcxResult<(String, String)> {
-    ledger::parse_get_revoc_reg_def_response(rev_reg_def_json)
-        .await
-        .map_err(VcxError::from)
-}
-
-pub async fn libindy_build_get_revoc_reg_delta_request(
-    submitter_did: &str,
-    rev_reg_id: &str,
-    from: i64,
-    to: i64,
-) -> VcxResult<String> {
-    ledger::build_get_revoc_reg_delta_request(Some(submitter_did), rev_reg_id, from, to)
-        .await
-        .map_err(VcxError::from)
-}
-
-async fn libindy_build_get_revoc_reg_request(
-    submitter_did: &str,
-    rev_reg_id: &str,
-    timestamp: u64,
-) -> VcxResult<String> {
-    ledger::build_get_revoc_reg_request(Some(submitter_did), rev_reg_id, timestamp as i64)
-        .await
-        .map_err(VcxError::from)
-}
-
-async fn libindy_parse_get_revoc_reg_response(get_cred_def_resp: &str) -> VcxResult<(String, String, u64)> {
-    ledger::parse_get_revoc_reg_response(get_cred_def_resp)
-        .await
-        .map_err(VcxError::from)
-}
-
-async fn libindy_parse_get_cred_def_response(get_rev_reg_resp: &str) -> VcxResult<(String, String)> {
-    ledger::parse_get_cred_def_response(get_rev_reg_resp)
-        .await
-        .map_err(VcxError::from)
-}
-
-pub async fn libindy_parse_get_revoc_reg_delta_response(
-    get_rev_reg_delta_response: &str,
-) -> VcxResult<(String, String, u64)> {
-    ledger::parse_get_revoc_reg_delta_response(get_rev_reg_delta_response)
-        .await
-        .map_err(VcxError::from)
-}
-
 pub async fn create_schema(name: &str, version: &str, data: &str) -> VcxResult<(String, String)> {
     trace!("create_schema >>> name: {}, version: {}, data: {}", name, version, data);
 
@@ -545,9 +467,9 @@ pub async fn build_schema_request(schema: &str) -> VcxResult<String> {
 
     let submitter_did = settings::get_config_value(settings::CONFIG_INSTITUTION_DID).unwrap();
 
-    let request = libindy_build_schema_request(&submitter_did, schema).await?;
+    let request = ledger::libindy_build_schema_request(&submitter_did, schema).await?;
 
-    let request = append_txn_author_agreement_to_request(&request).await?;
+    let request = ledger::append_txn_author_agreement_to_request(&request).await?;
 
     Ok(request)
 }
@@ -561,7 +483,7 @@ pub async fn publish_schema(wallet_handle: WalletHandle, schema: &str) -> VcxRes
 
     let request = build_schema_request(schema).await?;
 
-    let response = publish_txn_on_ledger(wallet_handle, &request).await?;
+    let response = ledger::publish_txn_on_ledger(wallet_handle, &request).await?;
 
     _check_schema_response(&response)?;
 
@@ -576,7 +498,7 @@ pub async fn get_schema_json(wallet_handle: WalletHandle, schema_id: &str) -> Vc
 
     let submitter_did = crate::utils::random::generate_random_did();
 
-    let schema_json = libindy_get_schema(wallet_handle, &submitter_did, schema_id).await?;
+    let schema_json = ledger::libindy_get_schema(wallet_handle, &submitter_did, schema_id).await?;
 
     Ok((schema_id.to_string(), schema_json))
 }
@@ -611,9 +533,9 @@ pub async fn build_cred_def_request(issuer_did: &str, cred_def_json: &str) -> Vc
         return Ok(CRED_DEF_REQ.to_string());
     }
 
-    let cred_def_req = libindy_build_create_credential_def_txn(issuer_did, cred_def_json).await?;
+    let cred_def_req = ledger::libindy_build_create_credential_def_txn(issuer_did, cred_def_json).await?;
 
-    let cred_def_req = append_txn_author_agreement_to_request(&cred_def_req).await?;
+    let cred_def_req = ledger::append_txn_author_agreement_to_request(&cred_def_req).await?;
 
     Ok(cred_def_req)
 }
@@ -629,7 +551,7 @@ pub async fn publish_cred_def(wallet_handle: WalletHandle, issuer_did: &str, cre
         return Ok(());
     }
     let cred_def_req = build_cred_def_request(issuer_did, cred_def_json).await?;
-    publish_txn_on_ledger(wallet_handle, &cred_def_req).await?;
+    ledger::publish_txn_on_ledger(wallet_handle, &cred_def_req).await?;
     Ok(())
 }
 
@@ -639,7 +561,7 @@ pub async fn get_cred_def_json(wallet_handle: WalletHandle, cred_def_id: &str) -
         return Ok((CRED_DEF_ID.to_string(), CRED_DEF_JSON.to_string()));
     }
 
-    let cred_def_json = libindy_get_cred_def(wallet_handle, cred_def_id).await?;
+    let cred_def_json = ledger::libindy_get_cred_def(wallet_handle, cred_def_id).await?;
 
     Ok((cred_def_id.to_string(), cred_def_json))
 }
@@ -691,8 +613,8 @@ pub async fn build_rev_reg_request(issuer_did: &str, rev_reg_def_json: &str) -> 
         return Ok("".to_string());
     }
 
-    let rev_reg_def_req = libindy_build_revoc_reg_def_request(issuer_did, rev_reg_def_json).await?;
-    let rev_reg_def_req = append_txn_author_agreement_to_request(&rev_reg_def_req).await?;
+    let rev_reg_def_req = ledger::libindy_build_revoc_reg_def_request(issuer_did, rev_reg_def_json).await?;
+    let rev_reg_def_req = ledger::append_txn_author_agreement_to_request(&rev_reg_def_req).await?;
     Ok(rev_reg_def_req)
 }
 
@@ -714,7 +636,7 @@ pub async fn publish_rev_reg_def(
         )
     })?;
     let rev_reg_def_req = build_rev_reg_request(issuer_did, &rev_reg_def_json).await?;
-    publish_txn_on_ledger(wallet_handle, &rev_reg_def_req).await?;
+    ledger::publish_txn_on_ledger(wallet_handle, &rev_reg_def_req).await?;
     Ok(())
 }
 
@@ -724,12 +646,7 @@ pub async fn get_rev_reg_def_json(rev_reg_id: &str) -> VcxResult<(String, String
         return Ok((REV_REG_ID.to_string(), rev_def_json()));
     }
 
-    let submitter_did = crate::utils::random::generate_random_did();
-
-    libindy_build_get_revoc_reg_def_request(&submitter_did, rev_reg_id)
-        .and_then(|req| async move { libindy_submit_request(&req).await })
-        .and_then(|response| async move { libindy_parse_get_revoc_reg_def_response(&response).await })
-        .await
+    ledger::get_rev_reg_def_json(rev_reg_id).await
 }
 
 pub async fn build_rev_reg_delta_request(
@@ -744,8 +661,9 @@ pub async fn build_rev_reg_delta_request(
         rev_reg_entry_json
     );
     let request =
-        libindy_build_revoc_reg_entry_request(issuer_did, rev_reg_id, REVOC_REG_TYPE, rev_reg_entry_json).await?;
-    let request = append_txn_author_agreement_to_request(&request).await?;
+        ledger::libindy_build_revoc_reg_entry_request(issuer_did, rev_reg_id, REVOC_REG_TYPE, rev_reg_entry_json)
+            .await?;
+    let request = ledger::append_txn_author_agreement_to_request(&request).await?;
     Ok(request)
 }
 
@@ -762,7 +680,7 @@ pub async fn publish_rev_reg_delta(
         rev_reg_entry_json
     );
     let request = build_rev_reg_delta_request(issuer_did, rev_reg_id, rev_reg_entry_json).await?;
-    publish_txn_on_ledger(wallet_handle, &request).await
+    ledger::publish_txn_on_ledger(wallet_handle, &request).await
 }
 
 pub async fn get_rev_reg_delta_json(
@@ -781,19 +699,7 @@ pub async fn get_rev_reg_delta_json(
         return Ok((REV_REG_ID.to_string(), REV_REG_DELTA_JSON.to_string(), 1));
     }
 
-    let submitter_did = crate::utils::random::generate_random_did();
-
-    let from: i64 = if let Some(_from) = from { _from as i64 } else { -1 };
-    let to = if let Some(_to) = to {
-        _to as i64
-    } else {
-        time::get_time().sec
-    };
-
-    libindy_build_get_revoc_reg_delta_request(&submitter_did, rev_reg_id, from, to)
-        .and_then(|req| async move { libindy_submit_request(&req).await })
-        .and_then(|response| async move { libindy_parse_get_revoc_reg_delta_response(&response).await })
-        .await
+    ledger::get_rev_reg_delta_json(rev_reg_id, from, to).await
 }
 
 pub async fn get_rev_reg(rev_reg_id: &str, timestamp: u64) -> VcxResult<(String, String, u64)> {
@@ -801,22 +707,14 @@ pub async fn get_rev_reg(rev_reg_id: &str, timestamp: u64) -> VcxResult<(String,
         return Ok((REV_REG_ID.to_string(), REV_REG_JSON.to_string(), 1));
     }
 
-    let submitter_did = crate::utils::random::generate_random_did();
-
-    libindy_build_get_revoc_reg_request(&submitter_did, rev_reg_id, timestamp)
-        .and_then(|req| async move { libindy_submit_request(&req).await })
-        .and_then(|response| async move { libindy_parse_get_revoc_reg_response(&response).await })
-        .await
+    ledger::get_rev_reg(rev_reg_id, timestamp).await
 }
 
 pub async fn get_cred_def(issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)> {
     if settings::indy_mocks_enabled() {
         return Err(VcxError::from(VcxErrorKind::LibndyError(309)));
     }
-    libindy_build_get_cred_def_request(issuer_did, cred_def_id)
-        .and_then(|req| async move { libindy_submit_request(&req).await })
-        .and_then(|response| async move { libindy_parse_get_cred_def_response(&response).await })
-        .await
+    ledger::get_cred_def_no_cache(issuer_did, cred_def_id).await
 }
 
 pub async fn is_cred_def_on_ledger(issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<bool> {
@@ -880,23 +778,6 @@ pub async fn libindy_to_unqualified(entity: &str) -> VcxResult<String> {
     anoncreds::to_unqualified(entity).await.map_err(VcxError::from)
 }
 
-async fn libindy_build_get_txn_request(submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
-    ledger::build_get_txn_request(submitter_did, None, seq_no)
-        .await
-        .map_err(VcxError::from)
-}
-
-pub async fn build_get_txn_request(submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
-    trace!(
-        "build_get_txn_request >>> submitter_did: {:?}, seq_no: {}",
-        submitter_did,
-        seq_no
-    );
-    let request = libindy_build_get_txn_request(submitter_did, seq_no).await?;
-    let request = append_txn_author_agreement_to_request(&request).await?;
-    Ok(request)
-}
-
 pub async fn get_ledger_txn(
     wallet_handle: WalletHandle,
     submitter_did: Option<&str>,
@@ -907,25 +788,20 @@ pub async fn get_ledger_txn(
         submitter_did,
         seq_no
     );
-    let req = build_get_txn_request(submitter_did, seq_no).await?;
-    let res = if let Some(submitter_did) = submitter_did {
-        libindy_sign_and_submit_request(wallet_handle, submitter_did, &req).await?
-    } else {
-        libindy_submit_request(&req).await?
-    };
+    let res = ledger::get_ledger_txn(wallet_handle, submitter_did, seq_no).await?;
     _check_response(&res)?;
     Ok(res)
 }
 
 fn _check_schema_response(response: &str) -> VcxResult<()> {
     // TODO: saved backwardcampatibilyty but actually we can better handle response
-    match parse_response(response)? {
-        Response::Reply(_) => Ok(()),
-        Response::Reject(reject) => Err(VcxError::from_msg(
+    match ledger::parse_response(response)? {
+        ledger::Response::Reply(_) => Ok(()),
+        ledger::Response::Reject(reject) => Err(VcxError::from_msg(
             VcxErrorKind::DuplicationSchema,
             format!("{:?}", reject),
         )),
-        Response::ReqNACK(reqnack) => Err(VcxError::from_msg(
+        ledger::Response::ReqNACK(reqnack) => Err(VcxError::from_msg(
             VcxErrorKind::UnknownSchemaRejection,
             format!("{:?}", reqnack),
         )),
@@ -933,9 +809,9 @@ fn _check_schema_response(response: &str) -> VcxResult<()> {
 }
 
 fn _check_response(response: &str) -> VcxResult<()> {
-    match parse_response(response)? {
-        Response::Reply(_) => Ok(()),
-        Response::Reject(res) | Response::ReqNACK(res) => Err(VcxError::from_msg(
+    match ledger::parse_response(response)? {
+        ledger::Response::Reply(_) => Ok(()),
+        ledger::Response::Reject(res) | ledger::Response::ReqNACK(res) => Err(VcxError::from_msg(
             VcxErrorKind::InvalidLedgerResponse,
             format!("{:?}", res),
         )),
@@ -976,16 +852,16 @@ pub mod test_utils {
 
     pub async fn create_schema_req(schema_json: &str) -> String {
         let institution_did = settings::get_config_value(settings::CONFIG_INSTITUTION_DID).unwrap();
-        let request = libindy_build_schema_request(&institution_did, schema_json)
+        let request = ledger::libindy_build_schema_request(&institution_did, schema_json)
             .await
             .unwrap();
-        append_txn_author_agreement_to_request(&request).await.unwrap()
+        ledger::append_txn_author_agreement_to_request(&request).await.unwrap()
     }
 
     pub async fn create_and_write_test_schema(wallet_handle: WalletHandle, attr_list: &str) -> (String, String) {
         let (schema_id, schema_json) = create_schema(attr_list).await;
         let req = create_schema_req(&schema_json).await;
-        publish_txn_on_ledger(wallet_handle, &req).await.unwrap();
+        ledger::publish_txn_on_ledger(wallet_handle, &req).await.unwrap();
         thread::sleep(Duration::from_millis(1000));
         (schema_id, schema_json)
     }

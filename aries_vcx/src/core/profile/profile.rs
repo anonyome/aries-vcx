@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{ledger::base_ledger::BaseLedger, wallet::base_wallet::BaseWallet, anoncreds::base_anoncreds::BaseAnonCreds, prover::base_prover::BaseProver};
 
-pub trait Profile : Send + Sync {
+pub trait Profile : std::fmt::Debug + Send + Sync {
 
     fn inject_ledger(self: Arc<Self>) -> Arc<dyn BaseLedger>;
 

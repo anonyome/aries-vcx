@@ -14,6 +14,10 @@ use crate::libindy::utils::mocks::pool_mocks::PoolMocks;
 use crate::libindy::utils::signus::create_and_store_my_did;
 use crate::messages::connection::did::Did;
 use crate::utils;
+use crate::utils::constants::rev_def_json;
+use crate::utils::constants::REV_REG_DELTA_JSON;
+use crate::utils::constants::REV_REG_ID;
+use crate::utils::constants::REV_REG_JSON;
 use crate::utils::constants::SUBMIT_SCHEMA_RESPONSE;
 use crate::utils::random::generate_random_did;
 
@@ -387,6 +391,192 @@ fn get_data_from_response(resp: &str) -> VcxResult<serde_json::Value> {
     serde_json::from_str(resp["result"]["data"].as_str().unwrap_or("{}"))
         .map_err(|err| VcxError::from_msg(VcxErrorKind::InvalidLedgerResponse, format!("{:?}", err)))
 }
+
+pub async fn libindy_build_revoc_reg_def_request(submitter_did: &str, rev_reg_def_json: &str) -> VcxResult<String> {
+    if settings::indy_mocks_enabled() {
+        return Ok("".to_string());
+    }
+
+    ledger::build_revoc_reg_def_request(submitter_did, rev_reg_def_json)
+        .await
+        .map_err(VcxError::from)
+}
+
+pub async fn libindy_build_revoc_reg_entry_request(
+    submitter_did: &str,
+    rev_reg_id: &str,
+    rev_def_type: &str,
+    value: &str,
+) -> VcxResult<String> {
+    if settings::indy_mocks_enabled() {
+        return Ok("".to_string());
+    }
+
+    ledger::build_revoc_reg_entry_request(submitter_did, rev_reg_id, rev_def_type, value)
+        .await
+        .map_err(VcxError::from)
+}
+
+// ----- ger revocation registry definition
+
+async fn libindy_build_get_revoc_reg_def_request(submitter_did: &str, rev_reg_id: &str) -> VcxResult<String> {
+    ledger::build_get_revoc_reg_def_request(Some(submitter_did), rev_reg_id)
+        .await
+        .map_err(VcxError::from)
+}
+
+async fn libindy_parse_get_revoc_reg_def_response(rev_reg_def_json: &str) -> VcxResult<(String, String)> {
+    ledger::parse_get_revoc_reg_def_response(rev_reg_def_json)
+        .await
+        .map_err(VcxError::from)
+}
+
+pub async fn get_rev_reg_def_json(rev_reg_id: &str) -> VcxResult<(String, String)> {
+    if settings::indy_mocks_enabled() {
+        debug!("get_rev_reg_def_json >>> returning mocked value");
+        return Ok((REV_REG_ID.to_string(), rev_def_json()));
+    }
+
+    let submitter_did = crate::utils::random::generate_random_did();
+
+    libindy_build_get_revoc_reg_def_request(&submitter_did, rev_reg_id)
+        .and_then(|req| async move { libindy_submit_request(&req).await })
+        .and_then(|response| async move { libindy_parse_get_revoc_reg_def_response(&response).await })
+        .await
+}
+
+// ---- get revocation registry delta
+async fn libindy_build_get_revoc_reg_delta_request(
+    submitter_did: &str,
+    rev_reg_id: &str,
+    from: i64,
+    to: i64,
+) -> VcxResult<String> {
+    ledger::build_get_revoc_reg_delta_request(Some(submitter_did), rev_reg_id, from, to)
+        .await
+        .map_err(VcxError::from)
+}
+
+async fn libindy_parse_get_revoc_reg_delta_response(
+    get_rev_reg_delta_response: &str,
+) -> VcxResult<(String, String, u64)> {
+    ledger::parse_get_revoc_reg_delta_response(get_rev_reg_delta_response)
+        .await
+        .map_err(VcxError::from)
+}
+
+pub async fn get_rev_reg_delta_json(
+    rev_reg_id: &str,
+    from: Option<u64>,
+    to: Option<u64>,
+) -> VcxResult<(String, String, u64)> {
+    trace!(
+        "get_rev_reg_delta_json >>> rev_reg_id: {}, from: {:?}, to: {:?}",
+        rev_reg_id,
+        from,
+        to
+    );
+    if settings::indy_mocks_enabled() {
+        debug!("get_rev_reg_delta_json >>> returning mocked value");
+        return Ok((REV_REG_ID.to_string(), REV_REG_DELTA_JSON.to_string(), 1));
+    }
+
+    let submitter_did = crate::utils::random::generate_random_did();
+
+    let from: i64 = if let Some(_from) = from { _from as i64 } else { -1 };
+    let to = if let Some(_to) = to {
+        _to as i64
+    } else {
+        time::get_time().sec
+    };
+
+    libindy_build_get_revoc_reg_delta_request(&submitter_did, rev_reg_id, from, to)
+        .and_then(|req| async move { libindy_submit_request(&req).await })
+        .and_then(|response| async move { libindy_parse_get_revoc_reg_delta_response(&response).await })
+        .await
+}
+
+// ----- get revocation registry
+async fn libindy_build_get_revoc_reg_request(
+    submitter_did: &str,
+    rev_reg_id: &str,
+    timestamp: u64,
+) -> VcxResult<String> {
+    ledger::build_get_revoc_reg_request(Some(submitter_did), rev_reg_id, timestamp as i64)
+        .await
+        .map_err(VcxError::from)
+}
+
+async fn libindy_parse_get_revoc_reg_response(get_cred_def_resp: &str) -> VcxResult<(String, String, u64)> {
+    ledger::parse_get_revoc_reg_response(get_cred_def_resp)
+        .await
+        .map_err(VcxError::from)
+}
+
+pub async fn get_rev_reg(rev_reg_id: &str, timestamp: u64) -> VcxResult<(String, String, u64)> {
+    if settings::indy_mocks_enabled() {
+        return Ok((REV_REG_ID.to_string(), REV_REG_JSON.to_string(), 1));
+    }
+
+    let submitter_did = crate::utils::random::generate_random_did();
+
+    libindy_build_get_revoc_reg_request(&submitter_did, rev_reg_id, timestamp)
+        .and_then(|req| async move { libindy_submit_request(&req).await })
+        .and_then(|response| async move { libindy_parse_get_revoc_reg_response(&response).await })
+        .await
+}
+
+// ----- get cred def (no cache)
+
+async fn libindy_parse_get_cred_def_response(get_rev_reg_resp: &str) -> VcxResult<(String, String)> {
+    ledger::parse_get_cred_def_response(get_rev_reg_resp)
+        .await
+        .map_err(VcxError::from)
+}
+
+pub async fn get_cred_def_no_cache(issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)> {
+    if settings::indy_mocks_enabled() {
+        return Err(VcxError::from(VcxErrorKind::LibndyError(309)));
+    }
+    libindy_build_get_cred_def_request(issuer_did, cred_def_id)
+        .and_then(|req| async move { libindy_submit_request(&req).await })
+        .and_then(|response| async move { libindy_parse_get_cred_def_response(&response).await })
+        .await
+}
+
+// ----- get ledger txn
+async fn build_get_txn_request(submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
+    trace!(
+        "build_get_txn_request >>> submitter_did: {:?}, seq_no: {}",
+        submitter_did,
+        seq_no
+    );
+    let request = ledger::build_get_txn_request(submitter_did, None, seq_no)
+        .await
+        .map_err(VcxError::from)?;
+    let request = append_txn_author_agreement_to_request(&request).await?;
+    Ok(request)
+}
+
+pub async fn get_ledger_txn(
+    wallet_handle: WalletHandle,
+    submitter_did: Option<&str>,
+    seq_no: i32,
+) -> VcxResult<String> {
+    trace!(
+        "get_ledger_txn >>> submitter_did: {:?}, seq_no: {}",
+        submitter_did,
+        seq_no
+    );
+    let req = build_get_txn_request(submitter_did, seq_no).await?;
+    let res = if let Some(submitter_did) = submitter_did {
+        libindy_sign_and_submit_request(wallet_handle, submitter_did, &req).await?
+    } else {
+        libindy_submit_request(&req).await?
+    };
+    Ok(res)
+}
+
 
 #[cfg(test)]
 #[cfg(feature = "general_test")]
