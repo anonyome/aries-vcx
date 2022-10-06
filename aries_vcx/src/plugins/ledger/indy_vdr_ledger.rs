@@ -2,7 +2,6 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::libindy::utils::ledger as libindy_ledger;
 use async_trait::async_trait;
 use indy_credx::types::RevocationRegistryId;
 use indy_vdr::common::error::VdrError;
@@ -11,8 +10,6 @@ use indy_vdr::utils::did::DidValue;
 use serde_json::Value;
 use tokio::sync::oneshot;
 use vdr::ledger::requests::author_agreement::{GetTxnAuthorAgreementData, TxnAuthrAgrmtAcceptanceData};
-use vdr::ledger::requests::cred_def::CredentialDefinition;
-use vdr::ledger::requests::schema::Schema;
 use vdr::ledger::RequestBuilder;
 use vdr::pool::{PoolRunner, PreparedRequest, ProtocolVersion, RequestResult};
 use vdr::utils::{Qualifiable, ValidationError};
@@ -22,7 +19,6 @@ use crate::did_doc::service_aries::AriesService;
 use crate::error::VcxResult;
 use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
-use crate::libindy::utils::ledger::Response;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 
@@ -220,64 +216,11 @@ impl BaseLedger for IndyVdrLedger {
         self._submit_request(request).await
     }
 
-    async fn build_schema_request(&self, submitter_did: &str, data: &str) -> VcxResult<String> {
-        let identifier = DidValue::from_str(submitter_did)?;
-        let schema: Schema = serde_json::from_str(data)?;
-        let prepared_request = self.request_builder()?.build_schema_request(&identifier, schema)?;
-
-        return Ok(serde_json::to_string(&prepared_request.req_json)?);
-    }
-
-    async fn build_create_credential_def_txn(
-        &self,
-        submitter_did: &str,
-        credential_def_json: &str,
-    ) -> VcxResult<String> {
-        let identifier = DidValue::from_str(submitter_did)?;
-        let cred_def: CredentialDefinition = serde_json::from_str(credential_def_json)?;
-        let prepared_request = self.request_builder()?.build_cred_def_request(&identifier, cred_def)?;
-
-        return Ok(serde_json::to_string(&prepared_request.req_json)?);
-    }
-
-    async fn append_txn_author_agreement_to_request(&self, request_json: &str) -> VcxResult<String> {
-        let request = PreparedRequest::from_request_json(request_json)?;
-        let request = self._append_txn_author_agreement_to_request(request).await?;
-
-        return Ok(serde_json::to_string(&request.req_json)?);
-    }
-
-    async fn build_nym_request(
-        &self,
-        submitter_did: &str,
-        target_did: &str,
-        verkey: Option<&str>,
-        data: Option<&str>,
-        role: Option<&str>,
-    ) -> VcxResult<String> {
-        let identifier = DidValue::from_str(submitter_did)?;
-        let dest = DidValue::from_str(target_did)?;
-        let prepared_request = self.request_builder()?.build_nym_request(
-            &identifier,
-            &dest,
-            verkey.map(String::from),
-            data.map(String::from),
-            role.map(String::from),
-        )?;
-
-        return Ok(serde_json::to_string(&prepared_request.req_json)?);
-    }
-
     async fn get_nym(&self, did: &str) -> VcxResult<String> {
         let dest = DidValue::from_str(did)?;
         let request = self.request_builder()?.build_get_nym_request(None, &dest)?;
 
         self._submit_request(request).await
-    }
-
-    fn parse_response(&self, response: &str) -> VcxResult<Response> {
-        // sharing a libindy_ledger resource as this is a simply deserialization
-        libindy_ledger::parse_response(response)
     }
 
     async fn get_schema(&self, submitter_did: &str, schema_id: &str) -> VcxResult<String> {
@@ -296,11 +239,6 @@ impl BaseLedger for IndyVdrLedger {
 
         // TODO - process the response?
         Ok(response)
-    }
-
-    async fn build_get_cred_def_request(&self, submitter_did: Option<&str>, cred_def_id: &str) -> VcxResult<String> {
-        let prepared_request = self._build_get_cred_def_request(submitter_did, cred_def_id).await?;
-        return Ok(serde_json::to_string(&prepared_request.req_json)?);
     }
 
     async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String> {
@@ -457,6 +395,59 @@ impl BaseLedger for IndyVdrLedger {
             delta_timestamp,
         ))
     }
+
+    // async fn build_schema_request(&self, submitter_did: &str, data: &str) -> VcxResult<String> {
+    //     let identifier = DidValue::from_str(submitter_did)?;
+    //     let schema: Schema = serde_json::from_str(data)?;
+    //     let prepared_request = self.request_builder()?.build_schema_request(&identifier, schema)?;
+
+    //     return Ok(serde_json::to_string(&prepared_request.req_json)?);
+    // }
+
+    // async fn build_create_credential_def_txn(
+    //     &self,
+    //     submitter_did: &str,
+    //     credential_def_json: &str,
+    // ) -> VcxResult<String> {
+    //     let identifier = DidValue::from_str(submitter_did)?;
+    //     let cred_def: CredentialDefinition = serde_json::from_str(credential_def_json)?;
+    //     let prepared_request = self.request_builder()?.build_cred_def_request(&identifier, cred_def)?;
+
+    //     return Ok(serde_json::to_string(&prepared_request.req_json)?);
+    // }
+
+    // async fn append_txn_author_agreement_to_request(&self, request_json: &str) -> VcxResult<String> {
+    //     let request = PreparedRequest::from_request_json(request_json)?;
+    //     let request = self._append_txn_author_agreement_to_request(request).await?;
+
+    //     return Ok(serde_json::to_string(&request.req_json)?);
+    // }
+
+    // async fn build_nym_request(
+    //     &self,
+    //     submitter_did: &str,
+    //     target_did: &str,
+    //     verkey: Option<&str>,
+    //     data: Option<&str>,
+    //     role: Option<&str>,
+    // ) -> VcxResult<String> {
+    //     let identifier = DidValue::from_str(submitter_did)?;
+    //     let dest = DidValue::from_str(target_did)?;
+    //     let prepared_request = self.request_builder()?.build_nym_request(
+    //         &identifier,
+    //         &dest,
+    //         verkey.map(String::from),
+    //         data.map(String::from),
+    //         role.map(String::from),
+    //     )?;
+
+    //     return Ok(serde_json::to_string(&prepared_request.req_json)?);
+    // }
+
+    // fn parse_response(&self, response: &str) -> VcxResult<Response> {
+    //     // sharing a libindy_ledger resource as this is a simply deserialization
+    //     libindy_ledger::parse_response(response)
+    // }
 }
 
 fn current_epoch_time() -> i64 {
