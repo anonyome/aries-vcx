@@ -1,19 +1,23 @@
+use indy_vdr as vdr;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use indy_credx::types::RevocationRegistryId;
-use indy_vdr::common::error::VdrError;
-use indy_vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId};
-use indy_vdr::utils::did::DidValue;
 use serde_json::Value;
 use tokio::sync::oneshot;
+use vdr::common::error::VdrError;
+use vdr::config::PoolConfig as IndyVdrPoolConfig;
+use vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId};
 use vdr::ledger::requests::author_agreement::{GetTxnAuthorAgreementData, TxnAuthrAgrmtAcceptanceData};
 use vdr::ledger::RequestBuilder;
+use vdr::pool::{PoolBuilder, PoolTransactions};
 use vdr::pool::{PoolRunner, PreparedRequest, ProtocolVersion, RequestResult};
+use vdr::utils::did::DidValue;
 use vdr::utils::{Qualifiable, ValidationError};
 
+use crate::core::profile::modular_wallet_profile::LedgerPoolConfig;
 use crate::core::profile::profile::Profile;
 use crate::did_doc::service_aries::AriesService;
 use crate::error::VcxResult;
@@ -22,8 +26,6 @@ use crate::global::settings;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 
-use indy_vdr as vdr;
-
 use super::base_ledger::BaseLedger;
 
 pub struct IndyVdrLedgerPool {
@@ -31,18 +33,36 @@ pub struct IndyVdrLedgerPool {
 }
 
 impl IndyVdrLedgerPool {
-    pub fn new(runner: PoolRunner) -> Self {
+    pub fn new_from_runner(runner: PoolRunner) -> Self {
         IndyVdrLedgerPool { runner }
+    }
+
+    pub fn new(config: LedgerPoolConfig) -> VcxResult<Self> {
+        let vdr_config = IndyVdrPoolConfig::default();
+        let txns = PoolTransactions::from_json_file(config.genesis_file_path)?;
+
+        let runner = PoolBuilder::from(vdr_config)
+            .transactions(txns)
+            .unwrap()
+            .into_runner()?;
+
+        Ok(IndyVdrLedgerPool { runner })
+    }
+}
+
+impl std::fmt::Debug for IndyVdrLedgerPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndyVdrLedgerPool").field("runner", &"PoolRunner").finish()
     }
 }
 
 pub struct IndyVdrLedger {
     profile: Arc<dyn Profile>,
-    pool: IndyVdrLedgerPool,
+    pool: Arc<IndyVdrLedgerPool>,
 }
 
 impl IndyVdrLedger {
-    pub fn new(profile: Arc<dyn Profile>, pool: IndyVdrLedgerPool) -> Self {
+    pub fn new(profile: Arc<dyn Profile>, pool: Arc<IndyVdrLedgerPool>) -> Self {
         IndyVdrLedger { profile, pool }
     }
 

@@ -6,7 +6,7 @@ use crate::core::profile::indy_profile::IndySdkProfile;
 
 use crate::libindy::utils::ledger as libindy_ledger;
 use crate::{
-    did_doc::service_aries::AriesService, error::VcxResult, libindy::utils::ledger::Response,
+    did_doc::service_aries::AriesService, error::VcxResult,
     messages::connection::did::Did,
 };
 
