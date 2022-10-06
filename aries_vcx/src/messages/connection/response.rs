@@ -13,7 +13,7 @@ use crate::messages::ack::PleaseAck;
 use crate::messages::thread::Thread;
 use crate::messages::timing::Timing;
 use crate::timing_optional;
-use crate::wallet::base_wallet::BaseWallet;
+use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
 pub struct Response {

@@ -35,7 +35,7 @@ use crate::protocols::trustping::build_ping_response;
 use crate::protocols::SendClosure;
 use crate::utils::send_message;
 use crate::utils::serialization::SerializableObjectWithState;
-use crate::wallet::base_wallet::BaseWallet;
+use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Clone, PartialEq)]
 pub struct Connection {

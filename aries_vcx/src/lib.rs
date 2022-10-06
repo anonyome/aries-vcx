@@ -45,11 +45,7 @@ pub mod messages;
 pub mod protocols;
 
 pub mod core;
-pub mod wallet;
-pub mod ledger;
-pub mod anoncreds;
-pub mod prover;
-
+pub mod plugins;
 #[cfg(test)]
 pub mod test {
     pub fn source_id() -> String {

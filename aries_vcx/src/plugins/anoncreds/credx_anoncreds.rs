@@ -92,7 +92,11 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     async fn prover_create_master_secret(&self, master_secret_id: &str) -> VcxResult<String> {
-        let _ = credx::prover::create_master_secret().unwrap();
+        let wallet = self.profile.inject_wallet();
+
+        // wallet.get_wallet_record(xtype, id, options_json)
+
+        let secret = credx::prover::create_master_secret().unwrap();
 
         // todo - store in wallet
         return Ok(master_secret_id.to_string());

@@ -6,7 +6,7 @@ use crate::error::VcxResult;
 use crate::messages::discovery::disclose::{Disclose, ProtocolDescriptor};
 use crate::messages::discovery::query::Query;
 use crate::utils::send_message;
-use crate::wallet::base_wallet::BaseWallet;
+use crate::plugins::wallet::base_wallet::BaseWallet;
 
 pub async fn send_discovery_query(
     wallet: &Arc<dyn BaseWallet>,

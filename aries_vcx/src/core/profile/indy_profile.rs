@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use indyrs::WalletHandle;
 
-use crate::{
+use crate::plugins::{
     anoncreds::{base_anoncreds::BaseAnonCreds, indy_anoncreds::IndySdkAnonCreds},
     ledger::{base_ledger::BaseLedger, indy_ledger::IndySdkLedger},
     wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet}, prover::{indy_prover::IndySdkProver, base_prover::BaseProver},

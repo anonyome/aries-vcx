@@ -6,7 +6,7 @@ use crate::did_doc::DidDoc;
 use crate::error::VcxResult;
 use crate::messages::a2a::A2AMessage;
 use crate::utils::encryption_envelope::EncryptionEnvelope;
-use crate::wallet::base_wallet::BaseWallet;
+use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[macro_use]
 pub mod version_constants;

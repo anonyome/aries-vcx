@@ -11,7 +11,7 @@ use crate::error::prelude::*;
 use crate::messages::a2a::A2AMessage;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
 use crate::utils::encryption_envelope::EncryptionEnvelope;
-use crate::wallet::agency_client_wallet::ToBaseWallet;
+use crate::plugins::wallet::agency_client_wallet::ToBaseWallet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CloudAgentInfo {

@@ -1,11 +1,8 @@
 #[cfg(test)]
 #[cfg(feature = "temp_gm_tests")]
 mod integration_tests {
-    use aries_vcx::did_doc::service_aries::AriesService;
     use aries_vcx::handlers::issuance::holder::Holder;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
-    use aries_vcx::ledger::base_ledger::BaseLedger;
-    use aries_vcx::ledger::indy_vdr_ledger::{IndyVdrLedger, IndyVdrLedgerPool};
     use aries_vcx::libindy::utils::pool::PoolConfig;
     use aries_vcx::libindy::utils::signus;
     use aries_vcx::messages::connection::did::Did;
@@ -13,11 +10,12 @@ mod integration_tests {
     use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
     use aries_vcx::messages::proof_presentation::presentation_ack::PresentationAck;
     use aries_vcx::messages::proof_presentation::presentation_request::PresentationRequest;
+    use aries_vcx::plugins::ledger::base_ledger::BaseLedger;
+    use aries_vcx::plugins::ledger::indy_vdr_ledger::{IndyVdrLedger, IndyVdrLedgerPool};
+    use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
     use aries_vcx::protocols::issuance::actions::CredentialIssuanceAction;
-    use aries_vcx::utils::json;
-    use aries_vcx::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
-    use indy_vdr::pool::{PoolBuilder, PoolRunner, PoolTransactions};
+    use indy_vdr::pool::{PoolBuilder, PoolTransactions};
     use serde_json::Value;
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -32,8 +30,8 @@ mod integration_tests {
         handlers::connection::connection::Connection,
         libindy::utils::wallet::{create_and_open_wallet, WalletConfig},
         messages::connection::invite::Invitation,
+        plugins::wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet},
         utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
-        wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet},
     };
     use indy_sys::WalletHandle;
 
@@ -514,10 +512,7 @@ mod integration_tests {
 
     mod helper {
 
-        use std::{
-            fs::{self, File},
-            path::Path, io::Write,
-        };
+        use std::{fs::File, io::Write, path::Path};
 
         use agency_client::{
             agency_client::AgencyClient,
@@ -526,7 +521,7 @@ mod integration_tests {
         use aries_vcx::{
             core::profile::{indy_profile::IndySdkProfile, profile::Profile},
             messages::connection::invite::PairwiseInvitation,
-            wallet::agency_client_wallet::ToBaseAgencyClientWallet,
+            plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet,
         };
         use url::Url;
 

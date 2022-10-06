@@ -35,20 +35,24 @@ impl BaseWallet for IndySdkWallet {
         signus::get_verkey_from_wallet(self.handle, did).await
     }
 
-    async fn add_wallet_record(&self, xtype: &str, id: &str, value: &str, tags: Option<&str>) -> VcxResult<()> {
-        wallet::add_wallet_record(self.handle, xtype, id, value, tags).await
+    async fn add_wallet_record(&self, xtype: &str, id: &str, value: &str, tags_json: Option<&str>) -> VcxResult<()> {
+        wallet::add_wallet_record(self.handle, xtype, id, value, tags_json).await
     }
 
-    async fn get_wallet_record(&self, xtype: &str, id: &str, options: &str) -> VcxResult<String> {
-        wallet::get_wallet_record(self.handle, xtype, id, options).await
+    async fn get_wallet_record(&self, xtype: &str, id: &str, options_json: &str) -> VcxResult<String> {
+        wallet::get_wallet_record(self.handle, xtype, id, options_json).await
     }
 
     async fn delete_wallet_record(&self, xtype: &str, id: &str) -> VcxResult<()> {
-        todo!()
+        wallet::delete_wallet_record(self.handle, xtype, id).await
     }
 
     async fn update_wallet_record_value(&self, xtype: &str, id: &str, value: &str) -> VcxResult<()> {
-        todo!()
+        wallet::update_wallet_record_value(self.handle, xtype, id, value).await
+    }
+
+    async fn update_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()> {
+        wallet::update_wallet_record_tags(self.handle, xtype, id, tags_json).await
     }
 
     async fn sign(&self, my_vk: &str, msg: &[u8]) -> VcxResult<Vec<u8>> {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{ledger::base_ledger::BaseLedger, wallet::base_wallet::BaseWallet, anoncreds::base_anoncreds::BaseAnonCreds, prover::base_prover::BaseProver};
+use crate::plugins::{ledger::base_ledger::BaseLedger, wallet::base_wallet::BaseWallet, anoncreds::base_anoncreds::BaseAnonCreds, prover::base_prover::BaseProver};
 
 pub trait Profile : std::fmt::Debug + Send + Sync {
 

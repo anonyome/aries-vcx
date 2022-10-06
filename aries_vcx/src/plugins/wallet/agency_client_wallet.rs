@@ -26,11 +26,11 @@ impl BaseWallet for AgencyClientWallet {
         todo!()
     }
 
-    async fn add_wallet_record(&self, xtype: &str, id: &str, value: &str, tags: Option<&str>) -> VcxResult<()> {
+    async fn add_wallet_record(&self, xtype: &str, id: &str, value: &str, tags_json: Option<&str>) -> VcxResult<()> {
         todo!()
     }
 
-    async fn get_wallet_record(&self, xtype: &str, id: &str, options: &str) -> VcxResult<String> {
+    async fn get_wallet_record(&self, xtype: &str, id: &str, options_json: &str) -> VcxResult<String> {
         todo!()
     }
 
@@ -39,6 +39,10 @@ impl BaseWallet for AgencyClientWallet {
     }
 
     async fn update_wallet_record_value(&self, xtype: &str, id: &str, value: &str) -> VcxResult<()> {
+        todo!()
+    }
+
+    async fn update_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()> {
         todo!()
     }
 
