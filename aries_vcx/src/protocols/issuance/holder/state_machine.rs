@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
+use crate::global::settings;
 use crate::messages::a2a::{A2AMessage, MessageId};
 use crate::messages::ack::Ack;
 use crate::messages::error::ProblemReport;
@@ -508,8 +509,9 @@ pub async fn create_credential_request(
     let anoncreds = Arc::clone(profile).inject_anoncreds();
     let (cred_def_id, cred_def_json) = anoncreds.get_cred_def_json(cred_def_id).await?;
 
+    let master_secret_id = settings::DEFAULT_LINK_SECRET_ALIAS;
     anoncreds
-        .prover_create_credential_req(prover_did, cred_offer, &cred_def_json)
+        .prover_create_credential_req(prover_did, cred_offer, &cred_def_json, master_secret_id)
         .await
         .map_err(|err| err.extend("Cannot create credential request"))
         .map(|(s1, s2)| (s1, s2, cred_def_id, cred_def_json))

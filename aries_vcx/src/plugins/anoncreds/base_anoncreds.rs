@@ -20,6 +20,14 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
         revoc_states_json: Option<&str>,
     ) -> VcxResult<String>;
 
+    // * `filter_json`: filter for credentials {
+    //    "schema_id": string, (Optional)
+    //    "schema_issuer_did": string, (Optional)
+    //    "schema_name": string, (Optional)
+    //    "schema_version": string, (Optional)
+    //    "issuer_did": string, (Optional)
+    //    "cred_def_id": string, (Optional)
+    //  }
     async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String>;
 
     async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String>;
@@ -29,6 +37,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
         prover_did: &str,
         credential_offer_json: &str,
         credential_def_json: &str,
+        master_secret_id: &str,
     ) -> VcxResult<(String, String)>;
 
     async fn prover_create_revocation_state(
@@ -52,10 +61,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()>;
 
-    async fn prover_create_master_secret(
-        &self,
-        master_secret_id: &str,
-    ) -> VcxResult<String>;
+    async fn prover_create_master_secret(&self, master_secret_id: &str) -> VcxResult<String>;
 
     // SKIP (internal): libindy_issuer_create_schema
     // SKIP (internal): libindy_issuer_revoke_credential
@@ -115,5 +121,4 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     // SKIP (tineral): _check_schema_response
     // SKIP (Internal): _check_response
     // SKIP (internla/scope): generate_nonce
-    
 }

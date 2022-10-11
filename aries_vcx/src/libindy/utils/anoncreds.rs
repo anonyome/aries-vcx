@@ -303,18 +303,18 @@ pub async fn libindy_prover_create_credential_req(
     prover_did: &str,
     credential_offer_json: &str,
     credential_def_json: &str,
+    master_secret_id: &str
 ) -> VcxResult<(String, String)> {
     if settings::indy_mocks_enabled() {
         return Ok((utils::constants::CREDENTIAL_REQ_STRING.to_owned(), String::new()));
     }
 
-    let master_secret_name = settings::DEFAULT_LINK_SECRET_ALIAS;
     let x = anoncreds::prover_create_credential_req(
         wallet_handle,
         prover_did,
         credential_offer_json,
         credential_def_json,
-        master_secret_name,
+        master_secret_id,
     )
     .await;
     x.map_err(VcxError::from)
@@ -884,11 +884,13 @@ pub mod test_utils {
             .await
             .unwrap();
         let institution_did = settings::get_config_value(settings::CONFIG_INSTITUTION_DID).unwrap();
+        let master_secret_id = settings::DEFAULT_LINK_SECRET_ALIAS;
         let (req, req_meta) = libindy::utils::anoncreds::libindy_prover_create_credential_req(
             wallet_handle,
             &institution_did,
             &offer,
             cred_def_json,
+            master_secret_id
         )
         .await
         .unwrap();

@@ -25,6 +25,7 @@ use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
+use crate::utils::json::{TryGetIndex, AsTypeOrDeserializationError};
 
 use super::base_ledger::BaseLedger;
 
@@ -504,33 +505,5 @@ impl From<VdrError> for VcxError {
 impl From<ValidationError> for VcxError {
     fn from(err: ValidationError) -> Self {
         VcxError::from_msg(VcxErrorKind::InvalidIndyVdrInput, err)
-    }
-}
-
-trait TryGetIndex {
-    type Val;
-    fn try_get_index(&self, index: &str) -> Result<Self::Val, VcxError>;
-}
-
-impl<'a> TryGetIndex for &'a Value {
-    type Val = &'a Value;
-    fn try_get_index(&self, index: &str) -> Result<&'a Value, VcxError> {
-        self.get(index).ok_or(VcxError::from_msg(
-            VcxErrorKind::InvalidJson,
-            format!("Could not index '{}' in IndyVDR response payload", index),
-        ))
-    }
-}
-
-trait AsStrOrDeserializationError {
-    fn as_str_or_err(&self) -> Result<&str, VcxError>;
-}
-
-impl AsStrOrDeserializationError for &Value {
-    fn as_str_or_err(&self) -> Result<&str, VcxError> {
-        self.as_str().ok_or(VcxError::from_msg(
-            VcxErrorKind::InvalidJson,
-            format!("Could not deserialize '{}' value as string", self.to_string()),
-        ))
     }
 }

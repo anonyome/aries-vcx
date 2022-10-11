@@ -11,10 +11,12 @@ mod integration_tests {
     use aries_vcx::plugins::ledger::indy_ledger;
     use aries_vcx::plugins::ledger::indy_vdr_ledger::{IndyVdrLedger, IndyVdrLedgerPool};
     use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
+    use aries_vcx::plugins::wallet::base_wallet::AsyncFnIteratorCollect;
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
     use indy_vdr::pool::{PoolBuilder, PoolTransactions};
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::thread;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use agency_client::agency_client::AgencyClient;
     use aries_vcx::{
@@ -171,13 +173,38 @@ mod integration_tests {
         let credx_anoncreds = IndyCredxAnonCreds::new(Arc::clone(&mod_profile));
         let indysdk_anoncreds = indy_profile.clone().inject_anoncreds();
 
-        let ms = credx_anoncreds.prover_create_master_secret("abc").await.unwrap();
+        let ms = credx_anoncreds.prover_create_master_secret("rand1").await.unwrap();
 
         println!("{:?}", ms);
 
-        let ms = indysdk_anoncreds.prover_create_master_secret("abc").await.unwrap();
+        let ms = indysdk_anoncreds.prover_create_master_secret("rand1").await.unwrap();
 
         println!("{:?}", ms);
+
+        ()
+    }
+
+    #[tokio::test]
+    async fn test_wallet_search() {
+        let (_, _, indy_profile, _) = setup_profiles().await;
+
+        let wallet = indy_profile.inject_wallet();
+
+        let mut iterator1 = wallet.iterate_wallet_records("AAAAAA", "{}", "{}").await.unwrap();
+
+        let x = iterator1.collect().await.unwrap();
+
+        println!("{:?}", x);
+        
+        let mut iterator2 = wallet
+            .iterate_wallet_records("VCX_CREDENTIAL", "{}", "{}")
+            .await
+            .unwrap();
+
+
+        let y = iterator2.collect().await.unwrap();
+
+        println!("{:?}", y);
 
         ()
     }

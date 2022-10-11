@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::error::VcxResult;
+use crate::{error::VcxResult, utils::async_fn_iterator::AsyncFnIterator};
 
 use super::base_wallet::BaseWallet;
 use agency_client::{error::AgencyClientResult, wallet::base_agency_client_wallet::BaseAgencyClientWallet};
@@ -10,6 +10,8 @@ use async_trait::async_trait;
 pub(crate) struct AgencyClientWallet {
     inner: Arc<dyn BaseAgencyClientWallet>,
 }
+
+// TODO - throw proper "not implemented" error 
 
 #[allow(unused_variables)]
 #[async_trait]
@@ -43,6 +45,10 @@ impl BaseWallet for AgencyClientWallet {
     }
 
     async fn update_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()> {
+        todo!()
+    }
+
+    async fn iterate_wallet_records(&self, xtype: &str, query: &str, options: &str) -> VcxResult<Box<dyn AsyncFnIterator<Item = VcxResult<String>>>>  {
         todo!()
     }
 

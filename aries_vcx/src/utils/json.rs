@@ -69,6 +69,53 @@ fn _collect_keys(map: &Map<String, Value>) -> Vec<String> {
     rtn
 }
 
+pub(crate) trait TryGetIndex {
+    type Val;
+    fn try_get_index(&self, index: &str) -> Result<Self::Val, VcxError>;
+}
+
+impl<'a> TryGetIndex for &'a Value {
+    type Val = &'a Value;
+    fn try_get_index(&self, index: &str) -> Result<&'a Value, VcxError> {
+        self.get(index).ok_or(VcxError::from_msg(
+            VcxErrorKind::InvalidJson,
+            format!("Could not index '{}' in IndyVDR response payload", index),
+        ))
+    }
+}
+
+pub(crate) trait AsTypeOrDeserializationError {
+    fn as_str_or_err(&self) -> Result<&str, VcxError>;
+
+    fn as_object_or_err(&self) -> Result<&Map<String, Value>, VcxError>;
+
+    fn as_bool_or_err(&self) -> Result<bool, VcxError>;
+}
+
+impl AsTypeOrDeserializationError for &Value {
+    fn as_str_or_err(&self) -> Result<&str, VcxError> {
+        self.as_str().ok_or(VcxError::from_msg(
+            VcxErrorKind::InvalidJson,
+            format!("Could not deserialize '{}' value as string", self.to_string()),
+        ))
+    }
+
+    fn as_object_or_err(&self) -> Result<&Map<String, Value>, VcxError> {
+        self.as_object().ok_or(VcxError::from_msg(
+            VcxErrorKind::InvalidJson,
+            format!("Could not deserialize '{}' value as object", self.to_string()),
+        ))
+    }
+
+    fn as_bool_or_err(&self) -> Result<bool, VcxError> {
+        self.as_bool().ok_or(VcxError::from_msg(
+            VcxErrorKind::InvalidJson,
+            format!("Could not deserialize '{}' value as bool", self.to_string()),
+        ))
+    }
+}
+
+
 #[cfg(test)]
 #[cfg(feature = "general_test")]
 mod unit_tests {

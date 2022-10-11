@@ -55,8 +55,16 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         prover_did: &str,
         credential_offer_json: &str,
         credential_def_json: &str,
+        master_secret_id: &str,
     ) -> VcxResult<(String, String)> {
-        libindy_anoncreds::libindy_prover_create_credential_req(self.profile.indy_handle, prover_did, credential_offer_json, credential_def_json).await
+        libindy_anoncreds::libindy_prover_create_credential_req(
+            self.profile.indy_handle,
+            prover_did,
+            credential_offer_json,
+            credential_def_json,
+            master_secret_id,
+        )
+        .await
     }
 
     async fn prover_create_revocation_state(
@@ -66,7 +74,13 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         cred_rev_id: &str,
         tails_file: &str,
     ) -> VcxResult<String> {
-        libindy_anoncreds::libindy_prover_create_revocation_state(rev_reg_def_json, rev_reg_delta_json, cred_rev_id, tails_file).await
+        libindy_anoncreds::libindy_prover_create_revocation_state(
+            rev_reg_def_json,
+            rev_reg_delta_json,
+            cred_rev_id,
+            tails_file,
+        )
+        .await
     }
 
     async fn prover_store_credential(
@@ -77,13 +91,18 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         cred_def_json: &str,
         rev_reg_def_json: Option<&str>,
     ) -> VcxResult<String> {
-        libindy_anoncreds::libindy_prover_store_credential(self.profile.indy_handle, cred_id, cred_req_meta, cred_json, cred_def_json, rev_reg_def_json).await
+        libindy_anoncreds::libindy_prover_store_credential(
+            self.profile.indy_handle,
+            cred_id,
+            cred_req_meta,
+            cred_json,
+            cred_def_json,
+            rev_reg_def_json,
+        )
+        .await
     }
 
-    async fn prover_create_master_secret(
-        &self,
-        master_secret_id: &str,
-    ) -> VcxResult<String> {
+    async fn prover_create_master_secret(&self, master_secret_id: &str) -> VcxResult<String> {
         libindy_anoncreds::libindy_prover_create_master_secret(self.profile.indy_handle, master_secret_id).await
     }
 

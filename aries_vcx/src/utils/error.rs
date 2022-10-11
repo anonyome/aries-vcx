@@ -459,6 +459,11 @@ pub static INDY_VDR_INPUT_INPUT: Error = Error {
     message: "Input to IndyVdr was invalid",
 };
 
+pub static PARSING: Error = Error {
+    code_num: 1115,
+    message: "Parsing error occured"
+};
+
 lazy_static! {
     static ref ERROR_C_MESSAGES: HashMap<u32, CString> = {
         let mut m = HashMap::new();

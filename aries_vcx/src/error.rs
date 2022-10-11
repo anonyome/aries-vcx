@@ -211,6 +211,8 @@ pub enum VcxErrorKind {
     SerializationError,
     #[fail(display = "Value needs to be base58")]
     NotBase58,
+    #[fail(display = "Could not parse a value")]
+    ParsingError,
 
     // A2A
     #[fail(display = "Invalid HTTP response.")]
@@ -528,6 +530,7 @@ impl From<VcxErrorKind> for u32 {
             VcxErrorKind::CreateOutOfBand => error::CREATE_OUT_OF_BAND.code_num,
             VcxErrorKind::CreateAgent => error::CREATE_AGENT.code_num,
             VcxErrorKind::InvalidIndyVdrInput => error::INDY_VDR_INPUT_INPUT.code_num,
+            VcxErrorKind::ParsingError => error::PARSING.code_num
         }
     }
 }

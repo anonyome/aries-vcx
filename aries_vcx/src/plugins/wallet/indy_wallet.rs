@@ -1,14 +1,18 @@
+use std::thread;
+
 use async_trait::async_trait;
-use indyrs::WalletHandle;
+use futures::executor::block_on;
+use indyrs::{SearchHandle, WalletHandle};
+use serde_json::Value;
 
 use crate::{
-    error::VcxResult,
-    libindy::utils::*
+    error::{VcxError, VcxResult},
+    libindy::utils::*,
+    utils::{async_fn_iterator::AsyncFnIterator, json::TryGetIndex},
 };
 
 use super::base_wallet::BaseWallet;
 
-// #[allow(dead_code)]
 #[derive(Debug)]
 pub struct IndySdkWallet {
     handle: WalletHandle,
@@ -55,6 +59,18 @@ impl BaseWallet for IndySdkWallet {
         wallet::update_wallet_record_tags(self.handle, xtype, id, tags_json).await
     }
 
+    async fn iterate_wallet_records(
+        &self,
+        xtype: &str,
+        query: &str,
+        options: &str,
+    ) -> VcxResult<Box<dyn AsyncFnIterator<Item = VcxResult<String>>>> {
+        let search = wallet::open_search_wallet(self.handle, xtype, query, options).await?;
+        let iter = IndyWalletRecordIterator::new(self.handle, search);
+
+        Ok(Box::new(iter))
+    }
+
     async fn sign(&self, my_vk: &str, msg: &[u8]) -> VcxResult<Vec<u8>> {
         crypto::sign(self.handle, my_vk, msg).await
     }
@@ -63,16 +79,65 @@ impl BaseWallet for IndySdkWallet {
         crypto::verify(vk, msg, signature).await
     }
 
-    async fn pack_message(
-        &self,
-        sender_vk: Option<&str>,
-        receiver_keys: &str,
-        msg: &[u8],
-    ) -> VcxResult<Vec<u8>> {
+    async fn pack_message(&self, sender_vk: Option<&str>, receiver_keys: &str, msg: &[u8]) -> VcxResult<Vec<u8>> {
         crypto::pack_message(self.handle, sender_vk, receiver_keys, msg).await
     }
 
     async fn unpack_message(&self, msg: &[u8]) -> VcxResult<Vec<u8>> {
         crypto::unpack_message(self.handle, msg).await
+    }
+}
+
+struct IndyWalletRecordIterator {
+    wallet_handle: WalletHandle,
+    search_handle: SearchHandle,
+}
+
+impl IndyWalletRecordIterator {
+    fn new(wallet_handle: WalletHandle, search_handle: SearchHandle) -> Self {
+        IndyWalletRecordIterator {
+            wallet_handle,
+            search_handle,
+        }
+    }
+
+    async fn fetch_next_records(&self) -> VcxResult<Option<String>> {
+        let indy_res_json = wallet::fetch_next_records_wallet(self.wallet_handle, self.search_handle, 1).await?;
+
+        let indy_res: Value = serde_json::from_str(&indy_res_json)?;
+
+        let records = (&indy_res).try_get_index("records")?;
+
+        let item: Option<VcxResult<String>> = records
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|item| Some(serde_json::to_string(item).map_err(VcxError::from)));
+
+        item.transpose()
+    }
+}
+
+#[async_trait]
+impl AsyncFnIterator for IndyWalletRecordIterator {
+    type Item = VcxResult<String>;
+
+    async fn next(&mut self) -> Option<Self::Item> {
+        let records = self.fetch_next_records().await;
+        records.transpose()
+    }
+}
+
+impl Drop for IndyWalletRecordIterator {
+    fn drop(&mut self) {
+        println!("DROPPING {}", self.search_handle);
+
+        let search_handle = self.search_handle;
+
+        thread::spawn(move || {
+            block_on(async {
+                wallet::close_search_wallet(search_handle).await.ok();
+                println!("CLOSED {}", search_handle);
+            });
+        });
     }
 }
