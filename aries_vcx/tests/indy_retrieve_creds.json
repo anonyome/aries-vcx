@@ -1,0 +1,30 @@
+{
+  "attrs": {
+    "gpa": [
+      {
+        "cred_info": {
+          "attrs": { "gpa": "3", "year": "2013" },
+          "cred_def_id": "D6EMVkDnBmuMCtZGwjgR9A:3:CL:90634:GM1_Uni_Transcript",
+          "cred_rev_id": "3",
+          "referent": "e288ad42-3199-406e-9932-93f88c82b846",
+          "rev_reg_id": "D6EMVkDnBmuMCtZGwjgR9A:4:D6EMVkDnBmuMCtZGwjgR9A:3:CL:90634:GM1_Uni_Transcript:CL_ACCUM:cd6bdfb8-7754-4926-9eae-8e6cf13eeed6",
+          "schema_id": "D6EMVkDnBmuMCtZGwjgR9A:2:Uni_Transcript:1.0"
+        },
+        "interval": { "from": 1665566593, "to": 1665566593 }
+      }
+    ],
+    "year": [
+      {
+        "cred_info": {
+          "attrs": { "gpa": "3", "year": "2013" },
+          "cred_def_id": "D6EMVkDnBmuMCtZGwjgR9A:3:CL:90634:GM1_Uni_Transcript",
+          "cred_rev_id": "3",
+          "referent": "e288ad42-3199-406e-9932-93f88c82b846",
+          "rev_reg_id": "D6EMVkDnBmuMCtZGwjgR9A:4:D6EMVkDnBmuMCtZGwjgR9A:3:CL:90634:GM1_Uni_Transcript:CL_ACCUM:cd6bdfb8-7754-4926-9eae-8e6cf13eeed6",
+          "schema_id": "D6EMVkDnBmuMCtZGwjgR9A:2:Uni_Transcript:1.0"
+        },
+        "interval": { "from": 1665566593, "to": 1665566593 }
+      }
+    ]
+  }
+}

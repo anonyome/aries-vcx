@@ -1,10 +1,15 @@
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    iter::FromIterator,
+    sync::Arc,
+};
 
 use crate::{
     core::profile::profile::Profile,
     error::{VcxError, VcxErrorKind, VcxResult},
     plugins::wallet::base_wallet::AsyncFnIteratorCollect,
     utils::{
+        constants::ATTRS,
         json::{AsTypeOrDeserializationError, TryGetIndex},
         uuid::uuid,
     },
@@ -12,7 +17,8 @@ use crate::{
 use async_trait::async_trait;
 use credx::{
     types::{
-        Credential as CredxCredential, DidValue, MasterSecret, RevocationRegistryDefinition, RevocationRegistryDelta,
+        AddCredential, Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue,
+        MasterSecret, PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId,
     },
     ursa::{bn::BigNumber, errors::UrsaCryptoError},
 };
@@ -52,8 +58,8 @@ impl IndyCredxAnonCreds {
 
         let record: Value = serde_json::from_str(&record)?;
 
-        let ms_value = (&record).try_get_index("value")?;
-        let ms_decimal = ms_value.as_str_or_err()?;
+        let ms_value = (&record).try_get("value")?;
+        let ms_decimal = ms_value.try_as_str()?;
         let ms_bn: BigNumber = BigNumber::from_dec(ms_decimal)?;
         let ursa_ms: UrsaMasterSecret = serde_json::from_value(json!({ "ms": ms_bn }))?;
 
@@ -67,9 +73,9 @@ impl IndyCredxAnonCreds {
             .get_wallet_record(CATEGORY_CREDENTIAL, credential_id, "{}")
             .await?;
         let cred_record: Value = serde_json::from_str(&cred_record)?;
-        let cred_record_value = (&cred_record).try_get_index("value")?;
+        let cred_record_value = (&cred_record).try_get("value")?;
 
-        let cred_json = cred_record_value.as_str_or_err()?;
+        let cred_json = cred_record_value.try_as_str()?;
 
         let credential: CredxCredential = serde_json::from_str(cred_json)?;
 
@@ -89,10 +95,10 @@ impl IndyCredxAnonCreds {
             .map(|record| {
                 let cred_record: Value = serde_json::from_str(record)?;
 
-                let cred_record_id = (&cred_record).try_get_index("id")?.as_str_or_err()?.to_string();
-                let cred_record_value = (&cred_record).try_get_index("value")?;
+                let cred_record_id = (&cred_record).try_get("id")?.try_as_str()?.to_string();
+                let cred_record_value = (&cred_record).try_get("value")?;
 
-                let cred_json = cred_record_value.as_str_or_err()?;
+                let cred_json = cred_record_value.try_as_str()?;
 
                 let credential: CredxCredential = serde_json::from_str(cred_json)?;
 
@@ -103,6 +109,22 @@ impl IndyCredxAnonCreds {
             .collect();
 
         id_cred_tuple_list
+    }
+
+    async fn _get_credentials_for_proof_req_for_attr_name(
+        &self,
+        proof_req: &str,
+        attr_name: &str,
+    ) -> VcxResult<Vec<(String, CredxCredential)>> {
+        // todo - probably need to filter by proof_req cred def id (do this via restrictions)
+        let _ = proof_req;
+
+        let wql_query = format!(
+            r#"{{ "{attr_marker_tag_name}" : "1" }}"#,
+            attr_marker_tag_name = _format_attribute_as_marker_tag_name(attr_name)
+        );
+
+        self._get_credentials(&wql_query).await
     }
 }
 
@@ -130,40 +152,116 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         credential_defs_json: &str,
         revoc_states_json: Option<&str>,
     ) -> VcxResult<String> {
-        // todo revoc_states gets embedded in `credentials`
+        let pres_req: PresentationRequest = serde_json::from_str(proof_req_json)?;
 
         let requested_credentials: Value = serde_json::from_str(requested_credentials_json)?;
-        let requested_attributes = (&requested_credentials).try_get_index("requested_attributes")?;
-        let requested_predicates = (&requested_credentials).try_get_index("requested_predicates")?;
-        let self_attested_attributes = (&requested_credentials).try_get_index("self_attested_attributes")?;
+        let requested_attributes = (&requested_credentials).try_get("requested_attributes")?;
+        
+        let requested_predicates = (&requested_credentials).try_get("requested_predicates")?;
+        let self_attested_attributes = (&requested_credentials).try_get("self_attested_attributes")?;
 
-        let credentials: PresentCredentials = PresentCredentials::new();
+        let rev_states: Option<Value> = if let Some(revoc_states_json) = revoc_states_json {
+            Some(serde_json::from_str(revoc_states_json)?)
+        } else {
+            None
+        };
 
-        for (attrib, val) in requested_attributes.as_object_or_err()?.iter() {
-            let cred_id = val.try_get_index("cred_id")?.as_str_or_err()?;
-            let timestamp = val.get("timestamp").and_then(|timestamp| timestamp.as_u64());
-            let revealed = val.try_get_index("revealed")?.as_bool_or_err()?;
+        let _schemas: HashMap<SchemaId, Schema> = serde_json::from_str(schemas_json)?;
+        let _cred_defs: HashMap<CredentialDefinitionId, CredentialDefinition> =
+            serde_json::from_str(credential_defs_json)?;
 
-            let credential = CredxCredential {
-                schema_id: todo!(),
-                cred_def_id: todo!(),
-                rev_reg_id: todo!(),
-                values: todo!(),
-                signature: todo!(),
-                signature_correctness_proof: todo!(),
-                rev_reg: todo!(),
-                witness: todo!(),
-            };
-            // credential.
-            // credentials.add_credential(, timestamp, rev_state)
+        let mut present_credentials: PresentCredentials = PresentCredentials::new();
+
+        let mut proof_details_by_cred_id: HashMap<
+            String,
+            (
+                CredxCredential,
+                Option<u64>,
+                Option<CredentialRevocationState>,
+                Vec<(String, bool)>,
+            ),
+        > = HashMap::new();
+
+        for (reft, detail) in requested_attributes.try_as_object()?.iter() {
+            let _cred_id = detail.try_get("cred_id")?;
+            let cred_id = _cred_id.try_as_str()?;
+
+            let revealed = detail.try_get("revealed")?.try_as_bool()?;
+
+            if let Some((_, _, _, attr_refts_revealed)) = proof_details_by_cred_id.get_mut(cred_id) {
+                // mapping made for this credential already, add reft and its revealed status
+                attr_refts_revealed.push((reft.to_string(), revealed));
+            } else {
+                let credential = self._get_credential(&cred_id).await?;
+
+                // get rev state if timestamp and cred_rev_reg_id exist, add it to cache
+                let timestamp = detail.get("timestamp").and_then(|timestamp| timestamp.as_u64());
+                let cred_rev_reg_id = credential.rev_reg_id.as_ref().map(|id| id.0.to_string());
+
+                let rev_state = if let (Some(timestamp), Some(cred_rev_reg_id)) = (timestamp, cred_rev_reg_id) {
+                    let rev_state = rev_states
+                        .as_ref()
+                        .and_then(|_rev_states| _rev_states.get(cred_rev_reg_id.to_string()));
+                    let rev_state = rev_state.ok_or(VcxError::from_msg(
+                        VcxErrorKind::InvalidJson,
+                        format!(
+                            "No revocation states provided for credential '{}' with rev_reg_id '{}'",
+                            cred_id, cred_rev_reg_id
+                        ),
+                    ))?;
+
+                    let rev_state = rev_state.get(timestamp.to_string()).ok_or(VcxError::from_msg(
+                        VcxErrorKind::InvalidJson,
+                        format!(
+                            "No revocation states provided for credential '{}' with rev_reg_id '{}' at timestamp '{}'",
+                            cred_id, cred_rev_reg_id, timestamp
+                        ),
+                    ))?;
+
+                    let rev_state: CredentialRevocationState = serde_json::from_value(rev_state.clone())?;
+                    Some(rev_state)
+                } else {
+                    None
+                };
+
+                proof_details_by_cred_id.insert(
+                    cred_id.to_string(),
+                    (credential, timestamp, rev_state, vec![(reft.to_string(), revealed)]),
+                );
+            }
         }
-        // credentials.
-        // credx::prover::create_presentation(pres_req, credentials, self_attested, master_secret, schemas, cred_defs)
-        todo!()
+
+        // TODO future - predicates and self attested
+
+        for (_cred_id, (credential, timestamp, rev_state, attr_refts_revealed)) in proof_details_by_cred_id.iter() {
+            let mut add_cred = present_credentials.add_credential(&credential, *timestamp, rev_state.as_ref());
+
+            for (referent, revealed) in attr_refts_revealed {
+                add_cred.add_requested_attribute(referent, *revealed);
+            }
+        }
+
+        let master_secret = self.get_master_secret(master_secret_id).await?;
+
+        let mut schemas: HashMap<SchemaId, &Schema> = HashMap::new();
+
+        for (k, v) in _schemas.iter() {
+            schemas.insert(k.clone(), v);
+        }
+
+        let mut cred_defs: HashMap<CredentialDefinitionId, &CredentialDefinition> = HashMap::new();
+
+        for (k, v) in _cred_defs.iter() {
+            cred_defs.insert(k.clone(), v);
+        }
+
+        let presentation = credx::prover::create_presentation(&pres_req, present_credentials, None, &master_secret, &schemas, &cred_defs)?;
+
+        Ok(serde_json::to_string(&presentation)?)
     }
 
     async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String> {
-        // TODO - convert filter_json to query;
+        // TODO - convert filter_json to wql query;
         let query = "{}";
 
         let creds = self._get_credentials("{}").await?;
@@ -179,19 +277,51 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String> {
-        // aca-py:
-        // construct "referents" from requested_attrs and requested_preds inside proof_req json
-        // for each reft in referents:
-        //
 
-        let proof_req: Value = serde_json::from_str(proof_req)?;
+        let proof_req_v: Value = serde_json::from_str(proof_req)?;
 
-        let requested_attributes = (&proof_req).try_get_index("requested_attributes")?;
-        let requested_predicates = (&proof_req).try_get_index("requested_predicates")?;
+        let requested_attributes = (&proof_req_v).try_get("requested_attributes")?;
+        let requested_attributes = requested_attributes.try_as_object()?;
+        let requested_predicates = (&proof_req_v).try_get("requested_predicates")?;
+        let requested_predicates = requested_predicates.try_as_object()?;
 
-        println!("{}", serde_json::to_string(&proof_req)?);
+        let mut referents = requested_attributes
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .collect::<Vec<String>>();
+        referents.append(
+            &mut requested_predicates
+                .iter()
+                .map(|(k, _)| k.to_string())
+                .collect::<Vec<String>>(),
+        );
 
-        todo!()
+        let mut v: Value = json!({});
+
+        for (item_referent, requested_attr_val) in requested_attributes {
+            let _attr_name = requested_attr_val.try_get("name")?;
+            let _attr_name = _attr_name.try_as_str()?;
+            let attr_name = _normalize_attr_name(_attr_name);
+
+            let non_revoked = requested_attr_val.get("non_revoked");
+
+            let credx_creds = self
+                ._get_credentials_for_proof_req_for_attr_name(proof_req, &attr_name)
+                .await?;
+
+            let mut credentials_json = vec![];
+
+            for (cred_id, credx_cred) in credx_creds {
+                credentials_json.push(json!({
+                    "cred_info": _make_cred_info(&cred_id, &credx_cred)?,
+                    "interval": non_revoked
+                }))
+            }
+
+            v[ATTRS][item_referent] = Value::Array(credentials_json);
+        }
+
+        Ok(serde_json::to_string(&v)?)
     }
 
     async fn prover_create_credential_req(
@@ -304,10 +434,15 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             "rev_reg_id": rev_reg_id
         });
 
-        for (k, attr_value) in credential.values.0.iter() {
-            let attr_name = _normalize_attr_name(k.to_string());
-            let tag_name = format!("attr::{}::value", attr_name);
-            tags[tag_name] = Value::String(attr_value.raw.to_string());
+        for (raw_attr_name, attr_value) in credential.values.0.iter() {
+            let attr_name = _normalize_attr_name(raw_attr_name);
+            // add attribute name and raw value pair
+            let value_tag_name = _format_attribute_as_value_tag_name(&attr_name);
+            tags[value_tag_name] = Value::String(attr_value.raw.to_string());
+
+            // add attribute name and marker (used for checking existent)
+            let marker_tag_name = _format_attribute_as_marker_tag_name(&attr_name);
+            tags[marker_tag_name] = Value::String("1".to_string());
         }
 
         let credential_id = cred_id.map_or(uuid(), String::from);
@@ -402,8 +537,9 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 }
 
-fn _normalize_attr_name(name: String) -> String {
-    name.replace(" ", "")
+fn _normalize_attr_name(name: &str) -> String {
+    // "name": string, // attribute name, (case insensitive and ignore spaces)
+    name.replace(" ", "").to_lowercase()
 }
 
 fn _make_cred_info(credential_id: &str, cred: &CredxCredential) -> VcxResult<Value> {
@@ -435,6 +571,14 @@ fn _make_cred_info(credential_id: &str, cred: &CredxCredential) -> VcxResult<Val
     });
 
     Ok(val)
+}
+
+fn _format_attribute_as_value_tag_name(attribute_name: &str) -> String {
+    format!("attr::{attribute_name}::value")
+}
+
+fn _format_attribute_as_marker_tag_name(attribute_name: &str) -> String {
+    format!("attr::{attribute_name}::marker")
 }
 
 impl From<CredxError> for VcxError {

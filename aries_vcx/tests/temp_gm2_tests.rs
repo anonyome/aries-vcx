@@ -2,6 +2,7 @@
 #[cfg(feature = "temp_gm_tests")]
 mod integration_tests {
     use aries_vcx::core::profile::modular_wallet_profile::{LedgerPoolConfig, ModularWalletProfile};
+    use aries_vcx::libindy;
     use aries_vcx::libindy::utils::pool::PoolConfig;
     use aries_vcx::messages::connection::did::Did;
     use aries_vcx::plugins::anoncreds;
@@ -14,6 +15,7 @@ mod integration_tests {
     use aries_vcx::plugins::wallet::base_wallet::AsyncFnIteratorCollect;
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
     use indy_vdr::pool::{PoolBuilder, PoolTransactions};
+    use serde_json::Value;
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -195,16 +197,39 @@ mod integration_tests {
         let x = iterator1.collect().await.unwrap();
 
         println!("{:?}", x);
-        
+
         let mut iterator2 = wallet
             .iterate_wallet_records("VCX_CREDENTIAL", "{}", "{}")
             .await
             .unwrap();
 
-
         let y = iterator2.collect().await.unwrap();
 
         println!("{:?}", y);
+
+        ()
+    }
+
+    #[tokio::test]
+    async fn test_wql_exists() {
+        // test if we can do an $exist query on indy wallet
+
+        let (_, _, indy_profile, _) = setup_profiles().await;
+
+        let wallet = indy_profile.inject_wallet();
+
+        let xtype = "BRYG";
+        // wallet.add_wallet_record(xtype, "3", "aaa", Some(r#"{"tag2": "val"}"#)).await.unwrap();
+
+        // find records where tag2 exists
+        // let query = r#"{ "$exists" : ["tag1"] }"#;
+        let query = r#"{ "$or": [{"tagName": {"$neq": "."}}, {"$tagName": "."}] }"#;
+        // let query = r#"{ "$not" : {"tag2": "."} }"#;
+        let mut records_i = wallet.iterate_wallet_records(xtype, query, r#"{"retrieveTags": true}"#).await.unwrap();
+
+        let xyz = records_i.collect().await.unwrap();
+
+        println!("{:?}", xyz);
 
         ()
     }

@@ -124,8 +124,6 @@ mod integration_tests {
             //     .unwrap()
         );
 
-        // clear_connection_messages(&conn, &agency_client).await;
-
         let (msg_id, message) = helper::get_first_connection_msg(&conn, &profile, &agency_client).await;
 
         println!("MESSAGE!: {:?}", message);
@@ -189,7 +187,7 @@ mod integration_tests {
         let profile = mod_profile;
 
         println!(
-            "{:?}",
+            "{}",
             Arc::clone(&profile)
                 .inject_anoncreds()
                 .prover_get_credentials(None)
@@ -209,7 +207,7 @@ mod integration_tests {
         // conn.update_message_status(&msg_id, &agency_client).await.unwrap();
 
         let creds = prover.retrieve_credentials(&profile).await.unwrap();
-        println!("creds; {:?}", creds);
+        println!("creds; {}", creds);
 
         let credentials: HashMap<String, serde_json::Value> = serde_json::from_str(&creds).unwrap();
 

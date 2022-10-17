@@ -219,8 +219,8 @@ impl IndyVdrLedger {
 
     fn get_response_json_data_field(&self, response_json: &str) -> VcxResult<Value> {
         let res: Value = serde_json::from_str(response_json)?;
-        let result = (&res).try_get_index("result")?;
-        Ok(result.try_get_index("data")?.to_owned())
+        let result = (&res).try_get("result")?;
+        Ok(result.try_get("data")?.to_owned())
     }
 }
 
@@ -280,20 +280,20 @@ impl BaseLedger for IndyVdrLedger {
         // process the response
 
         let response_json: Value = serde_json::from_str(&response)?;
-        let result_json = (&response_json).try_get_index("result")?;
+        let result_json = (&response_json).try_get("result")?;
 
-        let schema_id = result_json.try_get_index("ref")?;
-        let signature_type = result_json.try_get_index("signature_type")?;
+        let schema_id = result_json.try_get("ref")?;
+        let signature_type = result_json.try_get("signature_type")?;
         let tag = result_json.get("tag").map_or(json!("default"), |x| x.to_owned());
-        let origin_did = result_json.try_get_index("origin")?;
+        let origin_did = result_json.try_get("origin")?;
         // (from ACApy) FIXME: issuer has a method to create a cred def ID
         // may need to qualify the DID
         let cred_def_id = format!(
             "{}:3:{}:{}:{}",
-            origin_did.as_str_or_err()?,
-            signature_type.as_str_or_err()?,
+            origin_did.try_as_str()?,
+            signature_type.try_as_str()?,
             schema_id,
-            (&tag).as_str_or_err()?
+            (&tag).try_as_str()?
         );
         let data = self.get_response_json_data_field(&response)?;
 
@@ -322,7 +322,7 @@ impl BaseLedger for IndyVdrLedger {
         if let Some(data_str) = data.as_str() {
             data = serde_json::from_str(data_str)?;
         }
-        let service = (&data).try_get_index("service")?;
+        let service = (&data).try_get("service")?;
 
         serde_json::from_value(service.to_owned()).map_err(|err| {
             VcxError::from_msg(
@@ -370,26 +370,26 @@ impl BaseLedger for IndyVdrLedger {
         let res = self._submit_request(request).await?;
 
         let res_data = self.get_response_json_data_field(&res)?;
-        let response_value = (&res_data).try_get_index("value")?;
+        let response_value = (&res_data).try_get("value")?;
 
         let empty_json_list = json!([]);
 
         let mut delta_value = json!({
-            "accum": response_value.try_get_index("accum_to")?.try_get_index("value")?.try_get_index("accum")?,
+            "accum": response_value.try_get("accum_to")?.try_get("value")?.try_get("accum")?,
             "issued": if let Some(v) = response_value.get("issued") { v } else { &empty_json_list },
             "revoked": if let Some(v) = response_value.get("revoked") { v } else { &empty_json_list }
         });
 
         if let Some(accum_from) = response_value.get("accum_from") {
-            let prev_accum = accum_from.try_get_index("value")?.try_get_index("accum")?;
+            let prev_accum = accum_from.try_get("value")?.try_get("accum")?;
             delta_value["prev_accum"] = prev_accum.to_owned();
         }
 
         let reg_delta = json!({"ver": "1.0", "value": delta_value});
 
         let delta_timestamp = response_value
-            .try_get_index("accum_to")?
-            .try_get_index("txnTime")?
+            .try_get("accum_to")?
+            .try_get("txnTime")?
             .as_u64()
             .ok_or(VcxError::from_msg(
                 VcxErrorKind::InvalidJson,
@@ -397,7 +397,7 @@ impl BaseLedger for IndyVdrLedger {
             ))?;
 
         let response_reg_def_id = (&res_data)
-            .try_get_index("revocRegDefId")?
+            .try_get("revocRegDefId")?
             .as_str()
             .ok_or(VcxError::from_msg(
                 VcxErrorKind::InvalidJson,

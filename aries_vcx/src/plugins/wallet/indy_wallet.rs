@@ -106,7 +106,7 @@ impl IndyWalletRecordIterator {
 
         let indy_res: Value = serde_json::from_str(&indy_res_json)?;
 
-        let records = (&indy_res).try_get_index("records")?;
+        let records = (&indy_res).try_get("records")?;
 
         let item: Option<VcxResult<String>> = records
             .as_array()
