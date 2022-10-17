@@ -485,7 +485,9 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()> {
-        todo!()
+        let wallet = self.profile.inject_wallet();
+
+        wallet.delete_wallet_record(CATEGORY_CREDENTIAL, cred_id).await
     }
 
     async fn get_schema_json(&self, schema_id: &str) -> VcxResult<(String, String)> {
@@ -534,6 +536,11 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             .await?;
 
         Ok((cred_def_id.to_string(), cred_def_json))
+    }
+
+    async fn generate_nonce(&self) -> VcxResult<String> {
+        let nonce = credx::verifier::generate_nonce()?;
+        Ok(serde_json::to_string(&nonce)?)
     }
 }
 

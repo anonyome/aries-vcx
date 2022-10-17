@@ -6,6 +6,7 @@ use crate::messages::error::ProblemReport;
 use crate::messages::proof_presentation::presentation::Presentation;
 use crate::messages::proof_presentation::presentation_request::PresentationRequest;
 use crate::messages::status::Status;
+use crate::proofs::prover::prover::generate_indy_proof;
 use crate::protocols::proof_presentation::prover::states::finished::FinishedState;
 use crate::protocols::proof_presentation::prover::states::presentation_preparation_failed::PresentationPreparationFailedState;
 use crate::protocols::proof_presentation::prover::states::presentation_prepared::PresentationPreparedState;
@@ -26,8 +27,9 @@ impl PresentationRequestReceived {
         credentials: &str,
         self_attested_attrs: &str,
     ) -> VcxResult<String> {
-        let prover = Arc::clone(profile).inject_prover();
-        prover.generate_indy_proof(
+        
+        generate_indy_proof(
+            profile,
             credentials,
             self_attested_attrs,
             &self.presentation_request.request_presentations_attach.content()?,

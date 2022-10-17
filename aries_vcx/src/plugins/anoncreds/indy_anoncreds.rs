@@ -134,4 +134,8 @@ impl BaseAnonCreds for IndySdkAnonCreds {
     async fn get_cred_def(&self, issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)> {
         libindy_anoncreds::get_cred_def(issuer_did, cred_def_id).await
     }
+
+    async fn generate_nonce(&self) -> VcxResult<String> {
+        libindy_anoncreds::generate_nonce().await
+    }
 }

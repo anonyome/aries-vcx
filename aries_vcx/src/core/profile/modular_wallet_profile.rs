@@ -8,7 +8,6 @@ use crate::{
             base_ledger::BaseLedger,
             indy_vdr_ledger::{IndyVdrLedger, IndyVdrLedgerPool},
         },
-        prover::base_prover::BaseProver,
         wallet::base_wallet::BaseWallet,
     },
 };
@@ -48,12 +47,5 @@ impl Profile for ModularWalletProfile {
     fn inject_anoncreds(self: Arc<Self>) -> Arc<dyn BaseAnonCreds> {
         // todo - in the future we should lazy eval and avoid creating a new instance each time
         Arc::new(IndyCredxAnonCreds::new(self))
-    }
-
-    fn inject_prover(self: Arc<Self>) -> Arc<dyn BaseProver> {
-        // todo - in the future we should lazy eval and avoid creating a new instance each time
-        // Arc::new(IndySdkProver::new(self))
-        // Arc::new()
-        todo!()
     }
 }

@@ -120,5 +120,6 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     // SKIP (scope): get_ledger_txn
     // SKIP (tineral): _check_schema_response
     // SKIP (Internal): _check_response
-    // SKIP (internla/scope): generate_nonce
+
+    async fn generate_nonce(&self) -> VcxResult<String>;
 }

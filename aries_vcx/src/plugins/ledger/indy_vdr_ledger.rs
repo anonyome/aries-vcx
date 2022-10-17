@@ -2,9 +2,10 @@ use indy_vdr as vdr;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
+use vdr::ledger::requests::schema::SchemaV1;
 
 use async_trait::async_trait;
-use indy_credx::types::RevocationRegistryId;
+use indy_credx::types::{RevocationRegistryId, Schema, AttributeNames};
 use serde_json::Value;
 use tokio::sync::oneshot;
 use vdr::common::error::VdrError;
@@ -25,7 +26,7 @@ use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
-use crate::utils::json::{TryGetIndex, AsTypeOrDeserializationError};
+use crate::utils::json::{AsTypeOrDeserializationError, TryGetIndex};
 
 use super::base_ledger::BaseLedger;
 
@@ -53,7 +54,9 @@ impl IndyVdrLedgerPool {
 
 impl std::fmt::Debug for IndyVdrLedgerPool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IndyVdrLedgerPool").field("runner", &"PoolRunner").finish()
+        f.debug_struct("IndyVdrLedgerPool")
+            .field("runner", &"PoolRunner")
+            .finish()
     }
 }
 
@@ -119,29 +122,12 @@ impl IndyVdrLedger {
         self._submit_request(request).await
     }
 
-    async fn _append_txn_author_agreement_to_request(&self, request: PreparedRequest) -> VcxResult<PreparedRequest> {
-        if let Some(taa) = get_txn_author_agreement()? {
-            let mut request = request;
-            let acceptance = TxnAuthrAgrmtAcceptanceData {
-                mechanism: taa.acceptance_mechanism_type,
-                // TODO - default digest?
-                taa_digest: taa.taa_digest.map_or(String::from(""), |v| v),
-                time: taa.time_of_acceptance,
-            };
-            request.set_txn_author_agreement_acceptance(&acceptance)?;
-
-            return Ok(request);
-        } else {
-            Ok(request)
-        }
-    }
-
     #[allow(dead_code)]
     async fn get_txn_author_agreement(&self) -> VcxResult<GetTxnAuthorAgreementData> {
         let request = self.build_get_txn_author_agreement_request()?;
         let response = self._submit_request(request).await?;
 
-        let data = self.get_response_json_data_field(&response)?;
+        let data = _get_response_json_data_field(&response)?;
 
         let taa_data: GetTxnAuthorAgreementData = serde_json::from_value(data)?;
 
@@ -216,12 +202,6 @@ impl IndyVdrLedger {
             .request_builder()?
             .build_attrib_request(&identifier, &dest, None, attrib_json.as_ref(), None)?)
     }
-
-    fn get_response_json_data_field(&self, response_json: &str) -> VcxResult<Value> {
-        let res: Value = serde_json::from_str(response_json)?;
-        let result = (&res).try_get("result")?;
-        Ok(result.try_get("data")?.to_owned())
-    }
 }
 
 #[async_trait]
@@ -258,8 +238,36 @@ impl BaseLedger for IndyVdrLedger {
 
         let response = self._submit_request(request).await?;
 
-        // TODO - process the response?
-        Ok(response)
+        // process the response
+
+        let response_json: Value = serde_json::from_str(&response)?;
+        let result_json = (&response_json).try_get("result")?;
+        let data_json = result_json.try_get("data")?;
+
+        let seq_no = result_json.get("seqNo").and_then(|x| x.as_u64().map(|x| x as u32));
+
+        let name = data_json.try_get("name")?;
+        let name = name.try_as_str()?;
+        let version = data_json.try_get("version")?;
+        let version = version.try_as_str()?;
+        let dest = result_json.try_get("dest")?;
+        let dest = dest.try_as_str()?;
+        let schema_id = SchemaId::new(&DidValue::from_str(dest)?, name, version);
+
+        let attr_names = data_json.try_get("attr_names")?;
+        let attr_names: AttributeNames = serde_json::from_value(attr_names.to_owned())?;
+
+        let schema = SchemaV1 {
+            id: schema_id,
+            name: name.to_string(),
+            version: version.to_string(),
+            attr_names,
+            seq_no,
+        };
+
+        // TODO - store in cache
+
+        Ok(serde_json::to_string(&Schema::SchemaV1(schema))?)
     }
 
     async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String> {
@@ -295,7 +303,7 @@ impl BaseLedger for IndyVdrLedger {
             schema_id,
             (&tag).try_as_str()?
         );
-        let data = self.get_response_json_data_field(&response)?;
+        let data = _get_response_json_data_field(&response)?;
 
         let cred_def_value = json!({
             "ver": "1.0",
@@ -316,7 +324,7 @@ impl BaseLedger for IndyVdrLedger {
 
         let response = self._submit_request(request).await?;
 
-        let mut data = self.get_response_json_data_field(&response)?;
+        let mut data = _get_response_json_data_field(&response)?;
 
         // convert `data` from JSON string to JSON Value if necessary
         if let Some(data_str) = data.as_str() {
@@ -335,7 +343,7 @@ impl BaseLedger for IndyVdrLedger {
     async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String> {
         let attrib_json_str = json!({ "service": service }).to_string();
         let request = self._build_attrib_request(did, did, Some(&attrib_json_str))?;
-        let request = self._append_txn_author_agreement_to_request(request).await?;
+        let request = _append_txn_author_agreement_to_request(request).await?;
 
         self._sign_and_submit_request(did, request).await
     }
@@ -345,7 +353,7 @@ impl BaseLedger for IndyVdrLedger {
         let request = self.request_builder()?.build_get_revoc_reg_def_request(None, &id)?;
         let res = self._submit_request(request).await?;
 
-        let mut data = self.get_response_json_data_field(&res)?;
+        let mut data = _get_response_json_data_field(&res)?;
 
         data["ver"] = Value::String("1.0".to_string());
 
@@ -369,7 +377,7 @@ impl BaseLedger for IndyVdrLedger {
             .build_get_revoc_reg_delta_request(None, &revoc_reg_def_id, from, to)?;
         let res = self._submit_request(request).await?;
 
-        let res_data = self.get_response_json_data_field(&res)?;
+        let res_data = _get_response_json_data_field(&res)?;
         let response_value = (&res_data).try_get("value")?;
 
         let empty_json_list = json!([]);
@@ -387,14 +395,15 @@ impl BaseLedger for IndyVdrLedger {
 
         let reg_delta = json!({"ver": "1.0", "value": delta_value});
 
-        let delta_timestamp = response_value
-            .try_get("accum_to")?
-            .try_get("txnTime")?
-            .as_u64()
-            .ok_or(VcxError::from_msg(
-                VcxErrorKind::InvalidJson,
-                "Error parsing accum_to.txnTime value as u64",
-            ))?;
+        let delta_timestamp =
+            response_value
+                .try_get("accum_to")?
+                .try_get("txnTime")?
+                .as_u64()
+                .ok_or(VcxError::from_msg(
+                    VcxErrorKind::InvalidJson,
+                    "Error parsing accum_to.txnTime value as u64",
+                ))?;
 
         let response_reg_def_id = (&res_data)
             .try_get("revocRegDefId")?
@@ -416,63 +425,33 @@ impl BaseLedger for IndyVdrLedger {
             delta_timestamp,
         ))
     }
-
-    // async fn build_schema_request(&self, submitter_did: &str, data: &str) -> VcxResult<String> {
-    //     let identifier = DidValue::from_str(submitter_did)?;
-    //     let schema: Schema = serde_json::from_str(data)?;
-    //     let prepared_request = self.request_builder()?.build_schema_request(&identifier, schema)?;
-
-    //     return Ok(serde_json::to_string(&prepared_request.req_json)?);
-    // }
-
-    // async fn build_create_credential_def_txn(
-    //     &self,
-    //     submitter_did: &str,
-    //     credential_def_json: &str,
-    // ) -> VcxResult<String> {
-    //     let identifier = DidValue::from_str(submitter_did)?;
-    //     let cred_def: CredentialDefinition = serde_json::from_str(credential_def_json)?;
-    //     let prepared_request = self.request_builder()?.build_cred_def_request(&identifier, cred_def)?;
-
-    //     return Ok(serde_json::to_string(&prepared_request.req_json)?);
-    // }
-
-    // async fn append_txn_author_agreement_to_request(&self, request_json: &str) -> VcxResult<String> {
-    //     let request = PreparedRequest::from_request_json(request_json)?;
-    //     let request = self._append_txn_author_agreement_to_request(request).await?;
-
-    //     return Ok(serde_json::to_string(&request.req_json)?);
-    // }
-
-    // async fn build_nym_request(
-    //     &self,
-    //     submitter_did: &str,
-    //     target_did: &str,
-    //     verkey: Option<&str>,
-    //     data: Option<&str>,
-    //     role: Option<&str>,
-    // ) -> VcxResult<String> {
-    //     let identifier = DidValue::from_str(submitter_did)?;
-    //     let dest = DidValue::from_str(target_did)?;
-    //     let prepared_request = self.request_builder()?.build_nym_request(
-    //         &identifier,
-    //         &dest,
-    //         verkey.map(String::from),
-    //         data.map(String::from),
-    //         role.map(String::from),
-    //     )?;
-
-    //     return Ok(serde_json::to_string(&prepared_request.req_json)?);
-    // }
-
-    // fn parse_response(&self, response: &str) -> VcxResult<Response> {
-    //     // sharing a libindy_ledger resource as this is a simply deserialization
-    //     libindy_ledger::parse_response(response)
-    // }
 }
 
 fn current_epoch_time() -> i64 {
     time::get_time().sec
+}
+
+async fn _append_txn_author_agreement_to_request(request: PreparedRequest) -> VcxResult<PreparedRequest> {
+    if let Some(taa) = get_txn_author_agreement()? {
+        let mut request = request;
+        let acceptance = TxnAuthrAgrmtAcceptanceData {
+            mechanism: taa.acceptance_mechanism_type,
+            // TODO - default digest?
+            taa_digest: taa.taa_digest.map_or(String::from(""), |v| v),
+            time: taa.time_of_acceptance,
+        };
+        request.set_txn_author_agreement_acceptance(&acceptance)?;
+
+        return Ok(request);
+    } else {
+        Ok(request)
+    }
+}
+
+fn _get_response_json_data_field(response_json: &str) -> VcxResult<Value> {
+    let res: Value = serde_json::from_str(response_json)?;
+    let result = (&res).try_get("result")?;
+    Ok(result.try_get("data")?.to_owned())
 }
 
 impl From<VdrError> for VcxError {

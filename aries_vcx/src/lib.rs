@@ -46,6 +46,8 @@ pub mod protocols;
 
 pub mod core;
 pub mod plugins;
+pub mod proofs;
+
 #[cfg(test)]
 pub mod test {
     pub fn source_id() -> String {

@@ -1,13 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use indy_sys::WalletHandle;
 use serde_json::Value;
 
-use crate::error::prelude::*;
-use crate::libindy::proofs::proof_request::ProofRequestData;
-use crate::libindy::proofs::proof_request_internal::NonRevokedInterval;
-use crate::libindy::utils::anoncreds;
-use crate::libindy::utils::anoncreds::{get_rev_reg_def_json, get_rev_reg_delta_json};
+use crate::{error::prelude::*, proofs::{proof_request_internal::NonRevokedInterval, proof_request::ProofRequestData}, plugins::anoncreds::base_anoncreds::BaseAnonCreds};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct CredInfoProver {
@@ -23,7 +18,7 @@ pub struct CredInfoProver {
 }
 
 pub async fn build_schemas_json_prover(
-    wallet_handle: WalletHandle,
+    anoncreds: &Arc<dyn BaseAnonCreds>,
     credentials_identifiers: &Vec<CredInfoProver>,
 ) -> VcxResult<String> {
     trace!(
@@ -34,7 +29,7 @@ pub async fn build_schemas_json_prover(
 
     for cred_info in credentials_identifiers {
         if rtn.get(&cred_info.schema_id).is_none() {
-            let (_, schema_json) = anoncreds::get_schema_json(wallet_handle, &cred_info.schema_id)
+            let (_, schema_json) = anoncreds.get_schema_json(&cred_info.schema_id)
                 .await
                 .map_err(|err| err.map(VcxErrorKind::InvalidSchema, "Cannot get schema"))?;
 
@@ -52,7 +47,7 @@ pub async fn build_schemas_json_prover(
 }
 
 pub async fn build_cred_defs_json_prover(
-    wallet_handle: WalletHandle,
+    anoncreds: &Arc<dyn BaseAnonCreds>,
     credentials_identifiers: &Vec<CredInfoProver>,
 ) -> VcxResult<String> {
     trace!(
@@ -63,7 +58,7 @@ pub async fn build_cred_defs_json_prover(
 
     for cred_info in credentials_identifiers {
         if rtn.get(&cred_info.cred_def_id).is_none() {
-            let (_, credential_def) = anoncreds::get_cred_def_json(wallet_handle, &cred_info.cred_def_id)
+            let (_, credential_def) = anoncreds.get_cred_def_json(&cred_info.cred_def_id)
                 .await
                 .map_err(|err| {
                     err.map(
@@ -154,7 +149,7 @@ fn _get_revocation_interval(attr_name: &str, proof_req: &ProofRequestData) -> Vc
     }
 }
 
-pub async fn build_rev_states_json(credentials_identifiers: &mut Vec<CredInfoProver>) -> VcxResult<String> {
+pub async fn build_rev_states_json(anoncreds: &Arc<dyn BaseAnonCreds>, credentials_identifiers: &mut Vec<CredInfoProver>) -> VcxResult<String> {
     trace!(
         "build_rev_states_json >> credentials_identifiers: {:?}",
         credentials_identifiers
@@ -174,11 +169,11 @@ pub async fn build_rev_states_json(credentials_identifiers: &mut Vec<CredInfoPro
                     (None, None)
                 };
 
-                let (_, rev_reg_def_json) = get_rev_reg_def_json(rev_reg_id).await?;
+                let (_, rev_reg_def_json) = anoncreds.get_rev_reg_def_json(rev_reg_id).await?;
 
-                let (rev_reg_id, rev_reg_delta_json, timestamp) = get_rev_reg_delta_json(rev_reg_id, from, to).await?;
+                let (rev_reg_id, rev_reg_delta_json, timestamp) = anoncreds.get_rev_reg_delta_json(rev_reg_id, from, to).await?;
 
-                let rev_state_json = anoncreds::libindy_prover_create_revocation_state(
+                let rev_state_json = anoncreds.prover_create_revocation_state(
                     &rev_reg_def_json,
                     &rev_reg_delta_json,
                     cred_rev_id,
