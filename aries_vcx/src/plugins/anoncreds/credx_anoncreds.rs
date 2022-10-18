@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::FromIterator,
-    sync::Arc,
-};
+use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 
 use crate::{
     core::profile::profile::Profile,
@@ -17,8 +13,8 @@ use crate::{
 use async_trait::async_trait;
 use credx::{
     types::{
-        AddCredential, Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue,
-        MasterSecret, PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId,
+        Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue, MasterSecret,
+        PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId,
     },
     ursa::{bn::BigNumber, errors::UrsaCryptoError},
 };
@@ -37,7 +33,7 @@ use serde_json::Value;
 use super::base_anoncreds::BaseAnonCreds;
 
 const CATEGORY_CREDENTIAL: &str = "VCX_CREDENTIAL";
-const CATEGORY_MASTER_SECRET: &str = "VCX_MASTER_CREDENTIAL";
+const CATEGORY_LINK_SECRET: &str = "VCX_LINK_SECRET";
 
 #[derive(Debug)]
 pub struct IndyCredxAnonCreds {
@@ -49,11 +45,11 @@ impl IndyCredxAnonCreds {
         IndyCredxAnonCreds { profile }
     }
 
-    async fn get_master_secret(&self, master_secret_id: &str) -> VcxResult<MasterSecret> {
+    async fn get_link_secret(&self, link_secret_id: &str) -> VcxResult<MasterSecret> {
         let wallet = self.profile.inject_wallet();
 
         let record = wallet
-            .get_wallet_record(CATEGORY_MASTER_SECRET, master_secret_id, "{}")
+            .get_wallet_record(CATEGORY_LINK_SECRET, link_secret_id, "{}")
             .await?;
 
         let record: Value = serde_json::from_str(&record)?;
@@ -113,16 +109,35 @@ impl IndyCredxAnonCreds {
 
     async fn _get_credentials_for_proof_req_for_attr_name(
         &self,
-        proof_req: &str,
+        restrictions: Option<&Value>,
         attr_name: &str,
     ) -> VcxResult<Vec<(String, CredxCredential)>> {
-        // todo - probably need to filter by proof_req cred def id (do this via restrictions)
-        let _ = proof_req;
 
-        let wql_query = format!(
-            r#"{{ "{attr_marker_tag_name}" : "1" }}"#,
-            attr_marker_tag_name = _format_attribute_as_marker_tag_name(attr_name)
-        );
+        let attr_marker_tag_name = _format_attribute_as_marker_tag_name(attr_name);
+
+        let wql_attr_query = json!({
+            attr_marker_tag_name: "1"
+        });
+
+        let restrictions = restrictions.map(|x| x.to_owned());
+
+        let wql_query = if let Some(restrictions) = restrictions {
+            match restrictions {
+                Value::Array(mut arr) => {
+                    arr.push(wql_attr_query);
+                    json!({
+                    "$and": arr
+                })},
+                Value::Object(obj) => json!({
+                    "$and": vec![wql_attr_query, Value::Object(obj.to_owned())]
+                }),
+                _ => wql_attr_query
+            }
+        } else {
+            wql_attr_query
+        };
+
+        let wql_query = serde_json::to_string(&wql_query)?;
 
         self._get_credentials(&wql_query).await
     }
@@ -147,7 +162,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         &self,
         proof_req_json: &str,
         requested_credentials_json: &str,
-        master_secret_id: &str,
+        link_secret_id: &str,
         schemas_json: &str,
         credential_defs_json: &str,
         revoc_states_json: Option<&str>,
@@ -156,7 +171,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
 
         let requested_credentials: Value = serde_json::from_str(requested_credentials_json)?;
         let requested_attributes = (&requested_credentials).try_get("requested_attributes")?;
-        
+
         let requested_predicates = (&requested_credentials).try_get("requested_predicates")?;
         let self_attested_attributes = (&requested_credentials).try_get("self_attested_attributes")?;
 
@@ -241,7 +256,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             }
         }
 
-        let master_secret = self.get_master_secret(master_secret_id).await?;
+        let link_secret = self.get_link_secret(link_secret_id).await?;
 
         let mut schemas: HashMap<SchemaId, &Schema> = HashMap::new();
 
@@ -255,7 +270,14 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             cred_defs.insert(k.clone(), v);
         }
 
-        let presentation = credx::prover::create_presentation(&pres_req, present_credentials, None, &master_secret, &schemas, &cred_defs)?;
+        let presentation = credx::prover::create_presentation(
+            &pres_req,
+            present_credentials,
+            None,
+            &link_secret,
+            &schemas,
+            &cred_defs,
+        )?;
 
         Ok(serde_json::to_string(&presentation)?)
     }
@@ -277,26 +299,14 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String> {
-
         let proof_req_v: Value = serde_json::from_str(proof_req)?;
 
         let requested_attributes = (&proof_req_v).try_get("requested_attributes")?;
         let requested_attributes = requested_attributes.try_as_object()?;
         let requested_predicates = (&proof_req_v).try_get("requested_predicates")?;
-        let requested_predicates = requested_predicates.try_as_object()?;
+        let _requested_predicates = requested_predicates.try_as_object()?;
 
-        let mut referents = requested_attributes
-            .iter()
-            .map(|(k, _)| k.to_string())
-            .collect::<Vec<String>>();
-        referents.append(
-            &mut requested_predicates
-                .iter()
-                .map(|(k, _)| k.to_string())
-                .collect::<Vec<String>>(),
-        );
-
-        let mut v: Value = json!({});
+        let mut cred_by_attr: Value = json!({});
 
         for (item_referent, requested_attr_val) in requested_attributes {
             let _attr_name = requested_attr_val.try_get("name")?;
@@ -304,9 +314,10 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             let attr_name = _normalize_attr_name(_attr_name);
 
             let non_revoked = requested_attr_val.get("non_revoked");
+            let restrictions = requested_attr_val.get("restrictions");
 
             let credx_creds = self
-                ._get_credentials_for_proof_req_for_attr_name(proof_req, &attr_name)
+                ._get_credentials_for_proof_req_for_attr_name(restrictions, &attr_name)
                 .await?;
 
             let mut credentials_json = vec![];
@@ -318,10 +329,12 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
                 }))
             }
 
-            v[ATTRS][item_referent] = Value::Array(credentials_json);
+            cred_by_attr[ATTRS][item_referent] = Value::Array(credentials_json);
         }
 
-        Ok(serde_json::to_string(&v)?)
+        // TODO - predicates
+
+        Ok(serde_json::to_string(&cred_by_attr)?)
     }
 
     async fn prover_create_credential_req(
@@ -329,18 +342,18 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         prover_did: &str,
         credential_offer_json: &str,
         credential_def_json: &str,
-        master_secret_id: &str,
+        link_secret_id: &str,
     ) -> VcxResult<(String, String)> {
         let prover_did = DidValue::from_str(prover_did)?;
         let cred_def: CredentialDefinition = serde_json::from_str(credential_def_json)?;
         let credential_offer: CredentialOffer = serde_json::from_str(credential_offer_json)?;
-        let master_secret = self.get_master_secret(master_secret_id).await?;
+        let link_secret = self.get_link_secret(link_secret_id).await?;
 
         let (cred_req, cred_req_metadata) = credx::prover::create_credential_request(
             &prover_did,
             &cred_def,
-            &master_secret,
-            &master_secret_id,
+            &link_secret,
+            &link_secret_id,
             &credential_offer,
         )?;
 
@@ -387,8 +400,8 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     ) -> VcxResult<String> {
         let mut credential: CredxCredential = serde_json::from_str(cred_json)?;
         let cred_request_metadata: CredentialRequestMetadata = serde_json::from_str(cred_req_meta)?;
-        let master_secret_id = &cred_request_metadata.master_secret_name;
-        let master_secret = self.get_master_secret(master_secret_id).await?;
+        let link_secret_id = &cred_request_metadata.master_secret_name;
+        let link_secret = self.get_link_secret(link_secret_id).await?;
         let cred_def: CredentialDefinition = serde_json::from_str(cred_def_json)?;
         let rev_reg_def: Option<RevocationRegistryDefinition> = if let Some(rev_reg_def_json) = rev_reg_def_json {
             serde_json::from_str(rev_reg_def_json)?
@@ -399,7 +412,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         credx::prover::process_credential(
             &mut credential,
             &cred_request_metadata,
-            &master_secret,
+            &link_secret,
             &cred_def,
             rev_reg_def.as_ref(),
         )?;
@@ -430,7 +443,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             "schema_name": schema_name,
             "schema_version": schema_version,
             "issuer_did": issuer_did.0,
-            "cred-def_id": cred_def_id.0,
+            "cred_def_id": cred_def_id.0,
             "rev_reg_id": rev_reg_id
         });
 
@@ -458,18 +471,18 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         Ok(credential_id)
     }
 
-    async fn prover_create_master_secret(&self, master_secret_id: &str) -> VcxResult<String> {
+    async fn prover_create_link_secret(&self, link_secret_id: &str) -> VcxResult<String> {
         let wallet = self.profile.inject_wallet();
 
         let existing_record = wallet
-            .get_wallet_record(CATEGORY_MASTER_SECRET, master_secret_id, "{}")
+            .get_wallet_record(CATEGORY_LINK_SECRET, link_secret_id, "{}")
             .await
             .ok(); // ignore error, as we only care about whether it exists or not
 
         if existing_record.is_some() {
             return Err(VcxError::from_msg(
                 VcxErrorKind::DuplicationMasterSecret,
-                format!("Master secret id: {} already exists in wallet.", master_secret_id),
+                format!("Master secret id: {} already exists in wallet.", link_secret_id),
             ));
         }
 
@@ -478,10 +491,10 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         let ms_decimal = secret.value.value().unwrap().to_dec().unwrap();
 
         wallet
-            .add_wallet_record(CATEGORY_MASTER_SECRET, master_secret_id, &ms_decimal, None)
+            .add_wallet_record(CATEGORY_LINK_SECRET, link_secret_id, &ms_decimal, None)
             .await?;
 
-        return Ok(master_secret_id.to_string());
+        return Ok(link_secret_id.to_string());
     }
 
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()> {

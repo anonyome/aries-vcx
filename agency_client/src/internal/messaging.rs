@@ -4,7 +4,6 @@ use crate::httpclient;
 use crate::messages::a2a_message::Client2AgencyMessage;
 use crate::messages::forward::ForwardV2;
 use crate::testing::mocking::AgencyMockDecrypted;
-use crate::utils::libindy::crypto;
 use core::u8;
 use serde_json::Value;
 
@@ -75,7 +74,6 @@ impl AgencyClient {
 
     pub async fn parse_message_from_response(&self, response: &Vec<u8>) -> AgencyClientResult<String> {
         let unpacked_msg = self.get_wallet().unpack_message(&response[..]).await?;
-        // let unpacked_msg = crypto::unpack_message(self.get_wallet_handle(), &response[..]).await?;
         let message: Value = ::serde_json::from_slice(unpacked_msg.as_slice()).map_err(|err| {
             AgencyClientError::from_msg(
                 AgencyClientErrorKind::InvalidJson,

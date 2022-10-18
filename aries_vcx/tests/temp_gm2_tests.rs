@@ -175,11 +175,11 @@ mod integration_tests {
         let credx_anoncreds = IndyCredxAnonCreds::new(Arc::clone(&mod_profile));
         let indysdk_anoncreds = indy_profile.clone().inject_anoncreds();
 
-        let ms = credx_anoncreds.prover_create_master_secret("rand1").await.unwrap();
+        let ms = credx_anoncreds.prover_create_link_secret("rand1").await.unwrap();
 
         println!("{:?}", ms);
 
-        let ms = indysdk_anoncreds.prover_create_master_secret("rand1").await.unwrap();
+        let ms = indysdk_anoncreds.prover_create_link_secret("rand1").await.unwrap();
 
         println!("{:?}", ms);
 

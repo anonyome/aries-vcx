@@ -102,7 +102,7 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         .await
     }
 
-    async fn prover_create_master_secret(&self, master_secret_id: &str) -> VcxResult<String> {
+    async fn prover_create_link_secret(&self, master_secret_id: &str) -> VcxResult<String> {
         libindy_anoncreds::libindy_prover_create_master_secret(self.profile.indy_handle, master_secret_id).await
     }
 

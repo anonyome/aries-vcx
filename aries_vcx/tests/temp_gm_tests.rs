@@ -91,6 +91,15 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn print_creds() {
+        let (conn, _, mod_profile, indy_profile, agency_client) = setup::setup_with_existing_conn().await;
+        let profile = mod_profile;
+
+        println!("{}", profile.inject_anoncreds().prover_get_credentials(None).await.unwrap());
+        ()
+    }
+
+    #[tokio::test]
     async fn clear_credentials() {
         let (conn, _, mod_profile, indy_profile, agency_client) = setup::setup_with_existing_conn().await;
 
@@ -381,7 +390,7 @@ mod integration_tests {
             // initialization for indy profile
             Arc::clone(&indy_profile)
                 .inject_anoncreds()
-                .prover_create_master_secret(settings::DEFAULT_LINK_SECRET_ALIAS)
+                .prover_create_link_secret(settings::DEFAULT_LINK_SECRET_ALIAS)
                 .await
                 .ok();
             global::pool::open_main_pool(&PoolConfig {
@@ -395,7 +404,7 @@ mod integration_tests {
             // initialization for modular wallet profile
             Arc::clone(&mod_profile)
                 .inject_anoncreds()
-                .prover_create_master_secret(settings::DEFAULT_LINK_SECRET_ALIAS)
+                .prover_create_link_secret(settings::DEFAULT_LINK_SECRET_ALIAS)
                 .await
                 .ok();
             // -----
