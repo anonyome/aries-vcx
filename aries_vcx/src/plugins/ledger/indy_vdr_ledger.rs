@@ -24,6 +24,7 @@ use crate::did_doc::service_aries::AriesService;
 use crate::error::VcxResult;
 use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
+use crate::libindy::utils::anoncreds::RevocationRegistryDefinition;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 use crate::utils::json::{AsTypeOrDeserializationError, TryGetIndex};
@@ -224,17 +225,17 @@ impl BaseLedger for IndyVdrLedger {
         self._submit_request(request).await
     }
 
-    async fn get_schema(&self, submitter_did: &str, schema_id: &str) -> VcxResult<String> {
+    async fn get_schema(&self, submitter_did: Option<&str>, schema_id: &str) -> VcxResult<String> {
         // TODO try from cache first
 
         // TODO - do we need to handle someone submitting a schema request by seq number?
 
-        let identifier = DidValue::from_str(submitter_did)?;
+        // let identifier = DidValue::from_str(submitter_did)?;
         let id = SchemaId::from_str(schema_id)?;
 
         let request = self
             .request_builder()?
-            .build_get_schema_request(Some(&identifier), &id)?;
+            .build_get_schema_request(None, &id)?;
 
         let response = self._submit_request(request).await?;
 
@@ -425,6 +426,48 @@ impl BaseLedger for IndyVdrLedger {
             delta_timestamp,
         ))
     }
+
+    async fn get_rev_reg(&self, rev_reg_id: &str, timestamp: u64) -> VcxResult<(String, String, u64)> {
+        Err(unimplemented_method_err("indy_vdr get_rev_reg"))
+    }
+
+    async fn get_ledger_txn(&self, submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr get_ledger_txn"))
+    }
+
+    // build_schema_request - todo - used in libvcx
+
+    async fn publish_schema(&self, schema: &str) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr publish_schema"))
+    }
+
+    async fn publish_cred_def(&self, issuer_did: &str, cred_def_json: &str) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr publish_cred_def"))
+    }
+
+    async fn publish_rev_reg_def(
+        &self,
+        issuer_did: &str,
+        rev_reg_def: &RevocationRegistryDefinition,
+    ) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr publish_rev_reg_def"))
+    }
+
+    async fn publish_rev_reg_delta(
+        &self,
+        issuer_did: &str,
+        rev_reg_id: &str,
+        rev_reg_entry_json: &str,
+    ) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr publish_rev_reg_delta"))
+    }
+}
+
+fn unimplemented_method_err(method_name: &str) -> VcxError {
+    VcxError::from_msg(
+        VcxErrorKind::UnimplementedFeature,
+        format!("method called '{}' is not yet implemented in AriesVCX", method_name)
+    )
 }
 
 fn current_epoch_time() -> i64 {

@@ -464,6 +464,11 @@ pub static PARSING: Error = Error {
     message: "Parsing error occured"
 };
 
+pub static UNIMPLEMENTED_FEATURE: Error = Error {
+    code_num: 1116,
+    message: "Unimplemented feature was called"
+};
+
 lazy_static! {
     static ref ERROR_C_MESSAGES: HashMap<u32, CString> = {
         let mut m = HashMap::new();

@@ -129,14 +129,12 @@ impl AsyncFnIterator for IndyWalletRecordIterator {
 
 impl Drop for IndyWalletRecordIterator {
     fn drop(&mut self) {
-        println!("DROPPING {}", self.search_handle);
 
         let search_handle = self.search_handle;
 
         thread::spawn(move || {
             block_on(async {
                 wallet::close_search_wallet(search_handle).await.ok();
-                println!("CLOSED {}", search_handle);
             });
         });
     }

@@ -471,12 +471,13 @@ async fn _store_credential(
         cred_def_json
     );
 
+    let ledger = Arc::clone(profile).inject_ledger();
     let anoncreds = Arc::clone(profile).inject_anoncreds();
 
     let credential_json = credential.credentials_attach.content()?;
     let rev_reg_id = _parse_rev_reg_id_from_credential(&credential_json)?;
     let rev_reg_def_json = if let Some(rev_reg_id) = rev_reg_id {
-        let (_, json) = anoncreds.get_rev_reg_def_json(&rev_reg_id).await?;
+        let json = ledger.get_rev_reg_def_json(&rev_reg_id).await?;
         Some(json)
     } else {
         None
@@ -506,15 +507,16 @@ pub async fn create_credential_request(
     prover_did: &str,
     cred_offer: &str,
 ) -> VcxResult<(String, String, String, String)> {
+    let ledger = Arc::clone(profile).inject_ledger();
     let anoncreds = Arc::clone(profile).inject_anoncreds();
-    let (cred_def_id, cred_def_json) = anoncreds.get_cred_def_json(cred_def_id).await?;
+    let cred_def_json = ledger.get_cred_def(cred_def_id).await?;
 
     let master_secret_id = settings::DEFAULT_LINK_SECRET_ALIAS;
     anoncreds
         .prover_create_credential_req(prover_did, cred_offer, &cred_def_json, master_secret_id)
         .await
         .map_err(|err| err.extend("Cannot create credential request"))
-        .map(|(s1, s2)| (s1, s2, cred_def_id, cred_def_json))
+        .map(|(s1, s2)| (s1, s2, cred_def_id.to_string(), cred_def_json))
 }
 
 async fn _make_credential_request(

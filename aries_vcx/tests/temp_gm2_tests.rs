@@ -160,11 +160,11 @@ mod integration_tests {
 
         println!(
             "vdr; {}\n",
-            credx_anoncreds.get_cred_def(None, cred_def_id).await.unwrap().1
+            vdr_ledger.get_cred_def(cred_def_id).await.unwrap()
         );
         println!(
             "indy; {}",
-            indy_sdk_anoncreds.get_cred_def(None, cred_def_id).await.unwrap().1
+            indy_sdk_ledger.get_cred_def(cred_def_id).await.unwrap()
         );
     }
 

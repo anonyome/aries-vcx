@@ -4,7 +4,10 @@ use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::global::settings;
 use crate::proofs::proof_request::ProofRequestData;
-use crate::proofs::prover::prover_internal::{credential_def_identifiers, build_rev_states_json, build_requested_credentials_json, build_schemas_json_prover, build_cred_defs_json_prover};
+use crate::proofs::prover::prover_internal::{
+    build_cred_defs_json_prover, build_requested_credentials_json, build_rev_states_json, build_schemas_json_prover,
+    credential_def_identifiers,
+};
 use crate::utils::mockdata::mock_settings::get_mock_generate_indy_proof;
 
 pub async fn generate_indy_proof(
@@ -27,8 +30,6 @@ pub async fn generate_indy_proof(
         }
     }
 
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
-
     let proof_request: ProofRequestData = serde_json::from_str(proof_req_data_json).map_err(|err| {
         VcxError::from_msg(
             VcxErrorKind::InvalidJson,
@@ -38,21 +39,24 @@ pub async fn generate_indy_proof(
 
     let mut credentials_identifiers = credential_def_identifiers(credentials, &proof_request)?;
 
-    let revoc_states_json = build_rev_states_json(&anoncreds, &mut credentials_identifiers).await?;
+    let revoc_states_json = build_rev_states_json(profile, &mut credentials_identifiers).await?;
     let requested_credentials =
         build_requested_credentials_json(&credentials_identifiers, self_attested_attrs, &proof_request)?;
 
-    let schemas_json = build_schemas_json_prover(&anoncreds, &credentials_identifiers).await?;
-    let credential_defs_json = build_cred_defs_json_prover(&anoncreds, &credentials_identifiers).await?;
+    let schemas_json = build_schemas_json_prover(profile, &credentials_identifiers).await?;
+    let credential_defs_json = build_cred_defs_json_prover(profile, &credentials_identifiers).await?;
 
-    let proof = anoncreds.prover_create_proof(
-        proof_req_data_json,
-        &requested_credentials,
-        settings::DEFAULT_LINK_SECRET_ALIAS,
-        &schemas_json,
-        &credential_defs_json,
-        Some(&revoc_states_json),
-    )
-    .await?;
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
+
+    let proof = anoncreds
+        .prover_create_proof(
+            proof_req_data_json,
+            &requested_credentials,
+            settings::DEFAULT_LINK_SECRET_ALIAS,
+            &schemas_json,
+            &credential_defs_json,
+            Some(&revoc_states_json),
+        )
+        .await?;
     Ok(proof)
 }

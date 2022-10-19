@@ -23,8 +23,8 @@ pub fn verify_thread_id(thread_id: &str, message: &CredentialIssuanceAction) -> 
 }
 
 pub async fn is_cred_def_revokable(profile: &Arc<dyn Profile>, cred_def_id: &str) -> VcxResult<bool> {
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
-    let (_, cred_def_json) = anoncreds.get_cred_def_json(cred_def_id).await.map_err(|err| {
+    let ledger = Arc::clone(profile).inject_ledger();
+    let cred_def_json = ledger.get_cred_def(cred_def_id).await.map_err(|err| {
         VcxError::from_msg(
             VcxErrorKind::InvalidLedgerResponse,
             format!("Failed to obtain credential definition from ledger or cache: {}", err),

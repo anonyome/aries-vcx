@@ -236,8 +236,8 @@ mod integration_tests {
                 .and_then(|v| v.as_str())
                 .unwrap();
 
-            let (_, rev_reg_def_json) = Arc::clone(&profile)
-                .inject_anoncreds()
+            let rev_reg_def_json = Arc::clone(&profile)
+                .inject_ledger()
                 .get_rev_reg_def_json(cred_rev_reg_id)
                 .await
                 .unwrap();

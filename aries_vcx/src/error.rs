@@ -45,6 +45,8 @@ pub enum VcxErrorKind {
     ActionNotSupported,
     #[fail(display = "Invalid parameter in indy_vdr")]
     InvalidIndyVdrInput,
+    #[fail(display = "Unimplemented feature")]
+    UnimplementedFeature,
 
     // Connection
     #[fail(display = "Could not create connection")]
@@ -530,7 +532,8 @@ impl From<VcxErrorKind> for u32 {
             VcxErrorKind::CreateOutOfBand => error::CREATE_OUT_OF_BAND.code_num,
             VcxErrorKind::CreateAgent => error::CREATE_AGENT.code_num,
             VcxErrorKind::InvalidIndyVdrInput => error::INDY_VDR_INPUT_INPUT.code_num,
-            VcxErrorKind::ParsingError => error::PARSING.code_num
+            VcxErrorKind::ParsingError => error::PARSING.code_num,
+            VcxErrorKind::UnimplementedFeature => error::UNIMPLEMENTED_FEATURE.code_num,
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::FromIterator, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     core::profile::profile::Profile,
@@ -145,6 +145,49 @@ impl IndyCredxAnonCreds {
 
 #[async_trait]
 impl BaseAnonCreds for IndyCredxAnonCreds {
+
+    async fn verifier_verify_proof(
+        &self,
+        proof_req_json: &str,
+        proof_json: &str,
+        schemas_json: &str,
+        credential_defs_json: &str,
+        rev_reg_defs_json: &str,
+        rev_regs_json: &str,
+    ) -> VcxResult<bool> {
+        Err(unimplemented_method_err("credx verifier_verify_proof"))
+    }
+
+    async fn issuer_create_and_store_credential_def(
+        &self,
+        issuer_did: &str,
+        schema_json: &str,
+        tag: &str,
+        sig_type: Option<&str>,
+        config_json: &str,
+    ) -> VcxResult<(String, String)> {
+        Err(unimplemented_method_err("credx issuer_create_and_store_credential_def"))
+    }
+
+    async fn issuer_create_credential_offer(
+        &self, 
+        cred_def_id: &str,
+    ) -> VcxResult<String> {
+        Err(unimplemented_method_err("credx issuer_create_credential_offer"))
+    }
+    
+    
+    async fn issuer_create_credential(
+        &self,
+        cred_offer_json: &str,
+        cred_req_json: &str,
+        cred_values_json: &str,
+        rev_reg_id: Option<String>,
+        tails_file: Option<String>,
+    ) -> VcxResult<(String, Option<String>, Option<String>)> {
+        Err(unimplemented_method_err("credx issuer_create_credential"))
+    }
+
     /// * `requested_credentials_json`: either a credential or self-attested attribute for each requested attribute
     ///     {
     ///         "self_attested_attributes": {
@@ -503,52 +546,14 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         wallet.delete_wallet_record(CATEGORY_CREDENTIAL, cred_id).await
     }
 
-    async fn get_schema_json(&self, schema_id: &str) -> VcxResult<(String, String)> {
-        let submitter_did = crate::utils::random::generate_random_did();
-        let schema_json = Arc::clone(&self.profile)
-            .inject_ledger()
-            .get_schema(&submitter_did, schema_id)
-            .await?;
-
-        Ok((schema_id.to_string(), schema_json))
-    }
-
-    async fn get_cred_def_json(&self, cred_def_id: &str) -> VcxResult<(String, String)> {
-        let cred_def_json = Arc::clone(&self.profile)
-            .inject_ledger()
-            .get_cred_def(cred_def_id)
-            .await?;
-
-        Ok((cred_def_id.to_string(), cred_def_json))
-    }
-
-    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<(String, String)> {
-        let rev_reg_def_json = Arc::clone(&self.profile)
-            .inject_ledger()
-            .get_rev_reg_def_json(rev_reg_id)
-            .await?;
-        Ok((rev_reg_id.to_string(), rev_reg_def_json))
-    }
-
-    async fn get_rev_reg_delta_json(
+    async fn issuer_create_schema(
         &self,
-        rev_reg_id: &str,
-        from: Option<u64>,
-        to: Option<u64>,
-    ) -> VcxResult<(String, String, u64)> {
-        Arc::clone(&self.profile)
-            .inject_ledger()
-            .get_rev_reg_delta_json(rev_reg_id, from, to)
-            .await
-    }
-
-    async fn get_cred_def(&self, issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)> {
-        let cred_def_json = Arc::clone(&self.profile)
-            .inject_ledger()
-            .get_cred_def_no_cache(issuer_did, cred_def_id)
-            .await?;
-
-        Ok((cred_def_id.to_string(), cred_def_json))
+        issuer_did: &str,
+        name: &str,
+        version: &str,
+        attrs: &str,
+    ) -> VcxResult<(String, String)> {
+        Err(unimplemented_method_err("credx issuer_create_schema"))
     }
 
     async fn generate_nonce(&self) -> VcxResult<String> {
@@ -599,6 +604,13 @@ fn _format_attribute_as_value_tag_name(attribute_name: &str) -> String {
 
 fn _format_attribute_as_marker_tag_name(attribute_name: &str) -> String {
     format!("attr::{attribute_name}::marker")
+}
+
+fn unimplemented_method_err(method_name: &str) -> VcxError {
+    VcxError::from_msg(
+        VcxErrorKind::UnimplementedFeature,
+        format!("method called '{}' is not yet implemented in AriesVCX", method_name)
+    )
 }
 
 impl From<CredxError> for VcxError {

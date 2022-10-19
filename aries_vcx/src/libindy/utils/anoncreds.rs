@@ -91,7 +91,7 @@ pub async fn libindy_create_and_store_revoc_reg(
     .map_err(VcxError::from)
 }
 
-pub async fn libindy_create_and_store_credential_def(
+pub async fn libindy_issuer_create_and_store_credential_def(
     wallet_handle: WalletHandle,
     issuer_did: &str,
     schema_json: &str,
@@ -503,7 +503,7 @@ pub async fn generate_cred_def(
 
     let config_json = json!({"support_revocation": support_revocation.unwrap_or(false)}).to_string();
 
-    libindy_create_and_store_credential_def(wallet_handle, issuer_did, schema_json, tag, sig_type, &config_json).await
+    libindy_issuer_create_and_store_credential_def(wallet_handle, issuer_did, schema_json, tag, sig_type, &config_json).await
 }
 
 pub async fn publish_cred_def(wallet_handle: WalletHandle, issuer_did: &str, cred_def_json: &str) -> VcxResult<()> {

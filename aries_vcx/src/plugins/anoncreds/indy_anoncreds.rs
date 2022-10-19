@@ -21,6 +21,50 @@ impl IndySdkAnonCreds {
 
 #[async_trait]
 impl BaseAnonCreds for IndySdkAnonCreds {
+
+    async fn verifier_verify_proof(
+        &self,
+        proof_req_json: &str,
+        proof_json: &str,
+        schemas_json: &str,
+        credential_defs_json: &str,
+        rev_reg_defs_json: &str,
+        rev_regs_json: &str,
+    ) -> VcxResult<bool> {
+        libindy_anoncreds::libindy_verifier_verify_proof(proof_req_json, proof_json, schemas_json, credential_defs_json, rev_reg_defs_json, rev_regs_json).await
+    }
+
+    async fn issuer_create_and_store_credential_def(
+        &self,
+        issuer_did: &str,
+        schema_json: &str,
+        tag: &str,
+        sig_type: Option<&str>,
+        config_json: &str,
+    ) -> VcxResult<(String, String)> {
+        libindy_anoncreds::libindy_issuer_create_and_store_credential_def(self.profile.indy_handle, issuer_did, schema_json, tag, sig_type, config_json).await
+    }
+
+    
+    async fn issuer_create_credential_offer(
+        &self, 
+        cred_def_id: &str,
+    ) -> VcxResult<String> {
+        libindy_anoncreds::libindy_issuer_create_credential_offer(self.profile.indy_handle, cred_def_id).await
+    }
+    
+    
+    async fn issuer_create_credential(
+        &self,
+        cred_offer_json: &str,
+        cred_req_json: &str,
+        cred_values_json: &str,
+        rev_reg_id: Option<String>,
+        tails_file: Option<String>,
+    ) -> VcxResult<(String, Option<String>, Option<String>)> {
+        libindy_anoncreds::libindy_issuer_create_credential(self.profile.indy_handle, cred_offer_json, cred_req_json, cred_values_json, rev_reg_id, tails_file).await
+    }
+
     async fn prover_create_proof(
         &self,
         proof_req_json: &str,
@@ -102,37 +146,22 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         .await
     }
 
-    async fn prover_create_link_secret(&self, master_secret_id: &str) -> VcxResult<String> {
-        libindy_anoncreds::libindy_prover_create_master_secret(self.profile.indy_handle, master_secret_id).await
-    }
-
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()> {
         libindy_anoncreds::libindy_prover_delete_credential(self.profile.indy_handle, cred_id).await
     }
 
-    async fn get_schema_json(&self, schema_id: &str) -> VcxResult<(String, String)> {
-        libindy_anoncreds::get_schema_json(self.profile.indy_handle, schema_id).await
+    async fn prover_create_link_secret(&self, master_secret_id: &str) -> VcxResult<String> {
+        libindy_anoncreds::libindy_prover_create_master_secret(self.profile.indy_handle, master_secret_id).await
     }
 
-    async fn get_cred_def_json(&self, cred_def_id: &str) -> VcxResult<(String, String)> {
-        libindy_anoncreds::get_cred_def_json(self.profile.indy_handle, cred_def_id).await
-    }
-
-    async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<(String, String)> {
-        libindy_anoncreds::get_rev_reg_def_json(rev_reg_id).await
-    }
-
-    async fn get_rev_reg_delta_json(
+    async fn issuer_create_schema(
         &self,
-        rev_reg_id: &str,
-        from: Option<u64>,
-        to: Option<u64>,
-    ) -> VcxResult<(String, String, u64)> {
-        libindy_anoncreds::get_rev_reg_delta_json(rev_reg_id, from, to).await
-    }
-
-    async fn get_cred_def(&self, issuer_did: Option<&str>, cred_def_id: &str) -> VcxResult<(String, String)> {
-        libindy_anoncreds::get_cred_def(issuer_did, cred_def_id).await
+        issuer_did: &str,
+        name: &str,
+        version: &str,
+        attrs: &str,
+    ) -> VcxResult<(String, String)> {
+        libindy_anoncreds::libindy_issuer_create_schema(issuer_did, name, version, attrs).await
     }
 
     async fn generate_nonce(&self) -> VcxResult<String> {
