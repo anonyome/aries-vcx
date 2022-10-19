@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::sync::Arc;
 
 use indy_sys::WalletHandle;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::messages::a2a::{A2AMessage, MessageId};
 use crate::messages::error::ProblemReport;
@@ -206,7 +208,7 @@ impl VerifierSM {
 
     pub async fn step(
         self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         message: VerifierMessages,
         send_message: Option<SendClosure>,
     ) -> VcxResult<Self> {
@@ -272,7 +274,7 @@ impl VerifierSM {
             },
             VerifierFullState::PresentationRequestSent(state) => match message {
                 VerifierMessages::VerifyPresentation(presentation) => match state
-                    .verify_presentation(wallet_handle, &presentation, &thread_id)
+                    .verify_presentation(profile, &presentation, &thread_id)
                     .await
                 {
                     Ok(()) => {

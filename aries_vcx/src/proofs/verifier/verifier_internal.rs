@@ -1,10 +1,11 @@
-use indy_sys::WalletHandle;
+use std::sync::Arc;
+
 use serde_json;
 use serde_json::Value;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::global::settings;
-use crate::libindy::utils::anoncreds;
 use crate::utils::openssl::encode;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
@@ -95,15 +96,18 @@ pub fn validate_proof_revealed_attributes(proof_json: &str) -> VcxResult<()> {
 }
 
 pub async fn build_cred_defs_json_verifier(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     credential_data: &Vec<CredInfoVerifier>,
 ) -> VcxResult<String> {
     debug!("building credential_def_json for proof validation");
+
+    let ledger = Arc::clone(profile).inject_ledger();
     let mut credential_json = json!({});
 
     for cred_info in credential_data.iter() {
         if credential_json.get(&cred_info.cred_def_id).is_none() {
-            let (id, credential_def) = anoncreds::get_cred_def_json(wallet_handle, &cred_info.cred_def_id).await?;
+            let id = &cred_info.cred_def_id;
+            let credential_def = ledger.get_cred_def(&cred_info.cred_def_id).await?;
 
             let credential_def = serde_json::from_str(&credential_def).map_err(|err| {
                 VcxError::from_msg(
@@ -120,16 +124,18 @@ pub async fn build_cred_defs_json_verifier(
 }
 
 pub async fn build_schemas_json_verifier(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     credential_data: &Vec<CredInfoVerifier>,
 ) -> VcxResult<String> {
     debug!("building schemas json for proof validation");
 
+    let ledger = Arc::clone(profile).inject_ledger();
     let mut schemas_json = json!({});
 
     for cred_info in credential_data.iter() {
         if schemas_json.get(&cred_info.schema_id).is_none() {
-            let (id, schema_json) = anoncreds::get_schema_json(wallet_handle, &cred_info.schema_id)
+            let id = &cred_info.schema_id;
+            let schema_json= ledger.get_schema(None, &cred_info.schema_id)
                 .await
                 .map_err(|err| err.map(VcxErrorKind::InvalidSchema, "Cannot get schema"))?;
 
@@ -147,9 +153,10 @@ pub async fn build_schemas_json_verifier(
     Ok(schemas_json.to_string())
 }
 
-pub async fn build_rev_reg_defs_json(credential_data: &Vec<CredInfoVerifier>) -> VcxResult<String> {
+pub async fn build_rev_reg_defs_json(profile: &Arc<dyn Profile>, credential_data: &Vec<CredInfoVerifier>) -> VcxResult<String> {
     debug!("building rev_reg_def_json for proof validation");
 
+    let ledger = Arc::clone(profile).inject_ledger();
     let mut rev_reg_defs_json = json!({});
 
     for cred_info in credential_data.iter() {
@@ -159,22 +166,24 @@ pub async fn build_rev_reg_defs_json(credential_data: &Vec<CredInfoVerifier>) ->
             .ok_or(VcxError::from(VcxErrorKind::InvalidRevocationDetails))?;
 
         if rev_reg_defs_json.get(rev_reg_id).is_none() {
-            let (id, json) = anoncreds::get_rev_reg_def_json(rev_reg_id)
+            
+            let json = ledger.get_rev_reg_def_json(rev_reg_id)
                 .await
                 .or(Err(VcxError::from(VcxErrorKind::InvalidRevocationDetails)))?;
 
             let rev_reg_def_json = serde_json::from_str(&json).or(Err(VcxError::from(VcxErrorKind::InvalidSchema)))?;
 
-            rev_reg_defs_json[id] = rev_reg_def_json;
+            rev_reg_defs_json[rev_reg_id] = rev_reg_def_json;
         }
     }
 
     Ok(rev_reg_defs_json.to_string())
 }
 
-pub async fn build_rev_reg_json(credential_data: &Vec<CredInfoVerifier>) -> VcxResult<String> {
+pub async fn build_rev_reg_json(profile: &Arc<dyn Profile>, credential_data: &Vec<CredInfoVerifier>) -> VcxResult<String> {
     debug!("building rev_reg_json for proof validation");
 
+    let ledger = Arc::clone(profile).inject_ledger();
     let mut rev_regs_json = json!({});
 
     for cred_info in credential_data.iter() {
@@ -189,7 +198,7 @@ pub async fn build_rev_reg_json(credential_data: &Vec<CredInfoVerifier>) -> VcxR
             .ok_or(VcxError::from(VcxErrorKind::InvalidRevocationTimestamp))?;
 
         if rev_regs_json.get(rev_reg_id).is_none() {
-            let (id, json, timestamp) = anoncreds::get_rev_reg(rev_reg_id, timestamp.to_owned())
+            let (id, json, timestamp) = ledger.get_rev_reg(rev_reg_id, timestamp.to_owned())
                 .await
                 .or(Err(VcxError::from(VcxErrorKind::InvalidRevocationDetails)))?;
 

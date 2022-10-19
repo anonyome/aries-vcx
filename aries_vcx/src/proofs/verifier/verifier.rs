@@ -1,15 +1,12 @@
-use indy_sys::WalletHandle;
+use std::sync::Arc;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
-use crate::libindy::proofs::verifier::verifier_internal::{
-    build_cred_defs_json_verifier, build_rev_reg_defs_json, build_rev_reg_json, build_schemas_json_verifier,
-    get_credential_info, validate_proof_revealed_attributes,
-};
-use crate::libindy::utils::anoncreds;
+use crate::proofs::verifier::verifier_internal::{validate_proof_revealed_attributes, get_credential_info, build_cred_defs_json_verifier, build_schemas_json_verifier, build_rev_reg_defs_json, build_rev_reg_json};
 use crate::utils::mockdata::mock_settings::get_mock_result_for_validate_indy_proof;
 
 pub async fn validate_indy_proof(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     proof_json: &str,
     proof_req_json: &str,
 ) -> VcxResult<bool> {
@@ -21,16 +18,16 @@ pub async fn validate_indy_proof(
 
     let credential_data = get_credential_info(proof_json)?;
 
-    let credential_defs_json = build_cred_defs_json_verifier(wallet_handle, &credential_data)
+    let credential_defs_json = build_cred_defs_json_verifier(profile, &credential_data)
         .await
         .unwrap_or(json!({}).to_string());
-    let schemas_json = build_schemas_json_verifier(wallet_handle, &credential_data)
+    let schemas_json = build_schemas_json_verifier(profile, &credential_data)
         .await
         .unwrap_or(json!({}).to_string());
-    let rev_reg_defs_json = build_rev_reg_defs_json(&credential_data)
+    let rev_reg_defs_json = build_rev_reg_defs_json(profile, &credential_data)
         .await
         .unwrap_or(json!({}).to_string());
-    let rev_regs_json = build_rev_reg_json(&credential_data)
+    let rev_regs_json = build_rev_reg_json(profile, &credential_data)
         .await
         .unwrap_or(json!({}).to_string());
 
@@ -40,7 +37,9 @@ pub async fn validate_indy_proof(
     debug!("*******\n{}\n********", proof_req_json);
     debug!("*******\n{}\n********", rev_reg_defs_json);
     debug!("*******\n{}\n********", rev_regs_json);
-    anoncreds::libindy_verifier_verify_proof(
+
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
+    anoncreds.verifier_verify_proof(
         proof_req_json,
         proof_json,
         &schemas_json,
