@@ -46,7 +46,7 @@ pub mod protocols;
 
 pub mod core;
 pub mod plugins;
-pub mod proofs;
+pub mod xyz;
 
 #[cfg(test)]
 pub mod test {

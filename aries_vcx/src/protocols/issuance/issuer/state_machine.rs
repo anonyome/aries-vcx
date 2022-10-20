@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::sync::Arc;
 
-use indy_sys::WalletHandle;
-
+use crate::core::profile::profile::Profile;
 use crate::error::{VcxError, VcxErrorKind, VcxResult};
-use crate::libindy::credentials::encode_attributes;
-use crate::libindy::utils::anoncreds;
+use crate::xyz::credentials::encode_attributes;
 use crate::messages::a2a::{A2AMessage, MessageId};
 use crate::messages::error::ProblemReport;
 use crate::messages::issuance::credential::Credential;
@@ -83,16 +82,17 @@ pub struct IssuerSM {
     state: IssuerFullState,
 }
 
-async fn _revoke(wallet_handle: WalletHandle, rev_info: &Option<RevocationInfoV1>, publish: bool) -> VcxResult<()> {
+async fn _revoke(profile: &Arc<dyn Profile>, rev_info: &Option<RevocationInfoV1>, publish: bool) -> VcxResult<()> {
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
     match rev_info {
         Some(rev_info) => {
             if let (Some(cred_rev_id), Some(rev_reg_id), Some(tails_file)) =
                 (&rev_info.cred_rev_id, &rev_info.rev_reg_id, &rev_info.tails_file)
             {
                 if publish {
-                    anoncreds::revoke_credential(wallet_handle, tails_file, rev_reg_id, cred_rev_id).await?;
+                    anoncreds.revoke_credential_and_publish(tails_file, rev_reg_id, cred_rev_id).await?;
                 } else {
-                    anoncreds::revoke_credential_local(wallet_handle, tails_file, rev_reg_id, cred_rev_id).await?;
+                    anoncreds.revoke_credential_local(tails_file, rev_reg_id, cred_rev_id).await?;
                 }
                 Ok(())
             } else {
@@ -153,12 +153,12 @@ impl IssuerSM {
         }
     }
 
-    pub async fn revoke(&self, wallet_handle: WalletHandle, publish: bool) -> VcxResult<()> {
+    pub async fn revoke(&self, profile: &Arc<dyn Profile>, publish: bool) -> VcxResult<()> {
         trace!("Issuer::revoke >>> publish: {}", publish);
 
         match &self.state {
-            IssuerFullState::CredentialSent(state) => _revoke(wallet_handle, &state.revocation_info_v1, publish).await,
-            IssuerFullState::Finished(state) => _revoke(wallet_handle, &state.revocation_info_v1, publish).await,
+            IssuerFullState::CredentialSent(state) => _revoke(profile, &state.revocation_info_v1, publish).await,
+            IssuerFullState::Finished(state) => _revoke(profile, &state.revocation_info_v1, publish).await,
             _ => Err(VcxError::from(VcxErrorKind::NotReady)),
         }
     }
@@ -364,7 +364,7 @@ impl IssuerSM {
 
     pub async fn handle_message(
         self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         cim: CredentialIssuanceAction,
         send_message: Option<SendClosure>,
     ) -> VcxResult<Self> {
@@ -415,7 +415,7 @@ impl IssuerSM {
             IssuerFullState::RequestReceived(state_data) => match cim {
                 CredentialIssuanceAction::CredentialSend() => {
                     let credential_msg = _create_credential(
-                        wallet_handle,
+                        profile,
                         &state_data.request,
                         &state_data.rev_reg_id,
                         &state_data.tails_file,
@@ -508,7 +508,7 @@ impl IssuerSM {
 }
 
 async fn _create_credential(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     request: &CredentialRequest,
     rev_reg_id: &Option<String>,
     tails_file: &Option<String>,
@@ -516,6 +516,7 @@ async fn _create_credential(
     cred_data: &str,
     thread_id: &str,
 ) -> VcxResult<(Credential, Option<String>)> {
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
     let offer = offer.offers_attach.content()?;
     trace!("Issuer::_create_credential >>> request: {:?}, rev_reg_id: {:?}, tails_file: {:?}, offer: {}, cred_data: {}, thread_id: {}", request, rev_reg_id, tails_file, offer, cred_data, thread_id);
     if !request.from_thread(thread_id) {
@@ -529,8 +530,7 @@ async fn _create_credential(
     };
     let request = &request.requests_attach.content()?;
     let cred_data = encode_attributes(cred_data)?;
-    let (libindy_credential, cred_rev_id, _) = anoncreds::libindy_issuer_create_credential(
-        wallet_handle,
+    let (libindy_credential, cred_rev_id, _) = anoncreds.issuer_create_credential(
         &offer,
         request,
         &cred_data,

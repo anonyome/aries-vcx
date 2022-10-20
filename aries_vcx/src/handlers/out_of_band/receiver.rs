@@ -1,7 +1,9 @@
 use std::clone::Clone;
+use std::sync::Arc;
 
 use agency_client::agency_client::AgencyClient;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::connection::Connection;
 use crate::handlers::out_of_band::OutOfBandInvitation;
@@ -35,38 +37,31 @@ impl OutOfBandReceiver {
         self.oob.id.0.clone()
     }
 
-    // pub async fn connection_exists(
-    //     &self,
-    //     connections: Vec<&Connection>,
-    // ) -> VcxResult<Option<&Connection>> {
-    //     todo!()
-    // }
-
-    // pub async fn connection_exists<'a>(
-    //     &self,
-    //     connections: &'a Vec<&'a Connection>,
-    // ) -> VcxResult<Option<&'a Connection>> {
-    //     todo!()
-    //     // trace!("OutOfBandReceiver::connection_exists >>>");
-    //     // for service in &self.oob.services {
-    //     //     for connection in connections {
-    //     //         match connection.bootstrap_did_doc() {
-    //     //             Some(did_doc) => {
-    //     //                 if let ServiceResolvable::Did(did) = service {
-    //     //                     if did.to_string() == did_doc.id {
-    //     //                         return Ok(Some(connection));
-    //     //                     }
-    //     //                 };
-    //     //                 if did_doc.resolve_service()? == service.resolve().await? {
-    //     //                     return Ok(Some(connection));
-    //     //                 };
-    //     //             }
-    //     //             None => break,
-    //     //         }
-    //     //     }
-    //     // }
-    //     // Ok(None)
-    // }
+    pub async fn connection_exists<'a>(
+        &self,
+        profile: &Arc<dyn Profile>,
+        connections: &'a Vec<&'a Connection>,
+    ) -> VcxResult<Option<&'a Connection>> {
+        trace!("OutOfBandReceiver::connection_exists >>>");
+        for service in &self.oob.services {
+            for connection in connections.iter() {
+                match connection.bootstrap_did_doc(profile) {
+                    Some(did_doc) => {
+                        if let ServiceResolvable::Did(did) = service {
+                            if did.to_string() == did_doc.id {
+                                return Ok(Some(connection));
+                            }
+                        };
+                        if did_doc.resolve_service()? == service.resolve().await? {
+                            return Ok(Some(connection));
+                        };
+                    }
+                    None => break,
+                }
+            }
+        }
+        Ok(None)
+    }
 
     // TODO: There may be multiple A2AMessages in a single OoB msg
     pub fn extract_a2a_message(&self) -> VcxResult<Option<A2AMessage>> {

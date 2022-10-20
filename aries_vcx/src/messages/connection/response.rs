@@ -5,7 +5,6 @@ use time;
 
 use crate::did_doc::DidDoc;
 use crate::error::prelude::*;
-use crate::libindy::utils::crypto;
 use crate::messages::a2a::message_family::MessageFamilies;
 use crate::messages::a2a::message_type::MessageType;
 use crate::messages::a2a::{A2AMessage, MessageId};
@@ -127,7 +126,7 @@ impl Response {
 }
 
 impl SignedResponse {
-    pub async fn decode(self, their_vk: &str) -> VcxResult<Response> {
+    pub async fn decode(self, wallet: &Arc<dyn BaseWallet>, their_vk: &str) -> VcxResult<Response> {
         let signature =
             base64::decode_config(&self.connection_sig.signature.as_bytes(), base64::URL_SAFE).map_err(|err| {
                 VcxError::from_msg(
@@ -144,7 +143,7 @@ impl SignedResponse {
                 )
             })?;
 
-        if !crypto::verify(their_vk, &sig_data, &signature).await? {
+        if !wallet.verify(their_vk, &sig_data, &signature).await? {
             return Err(VcxError::from_msg(
                 VcxErrorKind::InvalidJson,
                 "ConnectionResponse signature is invalid for original Invite recipient key",

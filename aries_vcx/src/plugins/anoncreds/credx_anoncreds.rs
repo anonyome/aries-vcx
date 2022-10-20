@@ -556,6 +556,31 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         Err(unimplemented_method_err("credx issuer_create_schema"))
     }
 
+
+    async fn revoke_credential_and_publish(
+        &self,
+        tails_file: &str,
+        rev_reg_id: &str,
+        cred_rev_id: &str,
+    ) -> VcxResult<String> {
+        Err(unimplemented_method_err("credx revoke_credential_and_publish"))
+    }
+    
+    // todo - think about moving this to somewhere else as it aggregates other calls
+    async fn revoke_credential_local(
+        &self,
+        tails_file: &str,
+        rev_reg_id: &str,
+        cred_rev_id: &str,
+    ) -> VcxResult<()> {
+        Err(unimplemented_method_err("credx revoke_credential_local"))
+    }
+    
+    // todo - think about moving this to somewhere else as it aggregates other calls
+    async fn publish_local_revocations(&self, rev_reg_id: &str) -> VcxResult<String> {
+        Err(unimplemented_method_err("credx publish_local_revocations"))
+    }
+
     async fn generate_nonce(&self) -> VcxResult<String> {
         let nonce = credx::verifier::generate_nonce()?;
         Ok(serde_json::to_string(&nonce)?)

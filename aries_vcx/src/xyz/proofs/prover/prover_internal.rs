@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use serde_json::Value;
 
-use crate::{error::prelude::*, proofs::{proof_request_internal::NonRevokedInterval, proof_request::ProofRequestData}, core::profile::profile::Profile};
+use crate::{error::prelude::*, xyz::proofs::{proof_request_internal::NonRevokedInterval, proof_request::ProofRequestData}, core::profile::profile::Profile};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct CredInfoProver {

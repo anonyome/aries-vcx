@@ -13,7 +13,6 @@ use crate::messages::a2a::A2AMessage;
 use crate::messages::connection::did::Did;
 use crate::messages::connection::request::Request;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
-use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicAgent {

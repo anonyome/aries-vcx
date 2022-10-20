@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
-use crate::proofs::verifier::verifier_internal::{validate_proof_revealed_attributes, get_credential_info, build_cred_defs_json_verifier, build_schemas_json_verifier, build_rev_reg_defs_json, build_rev_reg_json};
+use crate::xyz::proofs::verifier::verifier_internal::{validate_proof_revealed_attributes, get_credential_info, build_cred_defs_json_verifier, build_schemas_json_verifier, build_rev_reg_defs_json, build_rev_reg_json};
 use crate::utils::mockdata::mock_settings::get_mock_result_for_validate_indy_proof;
 
 pub async fn validate_indy_proof(

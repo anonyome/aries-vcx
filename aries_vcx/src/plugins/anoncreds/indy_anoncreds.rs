@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::{
-    core::profile::indy_profile::IndySdkProfile, error::VcxResult, libindy::utils::anoncreds as libindy_anoncreds,
+    core::profile::{indy_profile::IndySdkProfile, profile::Profile}, error::VcxResult, libindy::utils::anoncreds as libindy_anoncreds, global::settings, utils::constants::REV_REG_DELTA_JSON,
 };
 
 use super::base_anoncreds::BaseAnonCreds;
@@ -162,6 +162,31 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         attrs: &str,
     ) -> VcxResult<(String, String)> {
         libindy_anoncreds::libindy_issuer_create_schema(issuer_did, name, version, attrs).await
+    }
+
+    // todo - think about moving this to somewhere else as it aggregates other calls
+    async fn revoke_credential_and_publish(
+        &self,
+        tails_file: &str,
+        rev_reg_id: &str,
+        cred_rev_id: &str,
+    ) -> VcxResult<String> {
+        libindy_anoncreds::revoke_credential(self.profile.indy_handle, tails_file, rev_reg_id, cred_rev_id).await
+    }
+    
+    // todo - think about moving this to somewhere else as it aggregates other calls
+    async fn revoke_credential_local(
+        &self,
+        tails_file: &str,
+        rev_reg_id: &str,
+        cred_rev_id: &str,
+    ) -> VcxResult<()> {
+        libindy_anoncreds::revoke_credential_local(self.profile.indy_handle, tails_file, rev_reg_id, cred_rev_id).await
+    }
+    
+    // todo - think about moving this to somewhere else as it aggregates other calls
+    async fn publish_local_revocations(&self, rev_reg_id: &str) -> VcxResult<String> {
+        libindy_anoncreds::publish_local_revocations(self.profile.indy_handle, rev_reg_id).await
     }
 
     async fn generate_nonce(&self) -> VcxResult<String> {

@@ -125,11 +125,22 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     // SKIP (internal): is_cred_def_on_ledger
 
-    // todo - figure out below
-    // SKIP (scope): revoke_credential
-    // SKIP (scope): revoke_credential_local
-    // SKIP (scope): publish_local_revocations
-
+    // calculates new rev reg entry json and publishes to ledger (different to issuer_revoke_credential)
+    async fn revoke_credential_and_publish(
+        &self,
+        tails_file: &str,
+        rev_reg_id: &str,
+        cred_rev_id: &str,
+    ) -> VcxResult<String>;
+    
+    async fn revoke_credential_local(
+        &self,
+        tails_file: &str,
+        rev_reg_id: &str,
+        cred_rev_id: &str,
+    ) -> VcxResult<()>;
+    
+    async fn publish_local_revocations(&self, rev_reg_id: &str) -> VcxResult<String>;
 
     // SKIP (internal): libindy_to_unqualified
     // SKIP{ (internla)}: libindy_build_get_txn_request

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::global::settings;
-use crate::proofs::proof_request::ProofRequestData;
-use crate::proofs::prover::prover_internal::{
+use crate::xyz::proofs::proof_request::ProofRequestData;
+use crate::xyz::proofs::prover::prover_internal::{
     build_cred_defs_json_prover, build_requested_credentials_json, build_rev_states_json, build_schemas_json_prover,
     credential_def_identifiers,
 };

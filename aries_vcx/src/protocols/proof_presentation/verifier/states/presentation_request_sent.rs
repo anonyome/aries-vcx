@@ -7,7 +7,7 @@ use crate::messages::error::ProblemReport;
 use crate::messages::proof_presentation::presentation::Presentation;
 use crate::messages::proof_presentation::presentation_request::PresentationRequest;
 use crate::messages::status::Status;
-use crate::proofs::verifier::verifier::validate_indy_proof;
+use crate::xyz::proofs::verifier::verifier::validate_indy_proof;
 use crate::protocols::proof_presentation::verifier::state_machine::RevocationStatus;
 use crate::protocols::proof_presentation::verifier::states::finished::FinishedState;
 

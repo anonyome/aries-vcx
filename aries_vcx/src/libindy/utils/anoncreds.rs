@@ -759,7 +759,7 @@ pub mod test_utils {
     use crate::libindy;
     use crate::libindy::credential_def::revocation_registry::RevocationRegistry;
     use crate::libindy::credential_def::{CredentialDef, CredentialDefConfigBuilder};
-    use crate::libindy::credentials::encode_attributes;
+    use crate::xyz::credentials::encode_attributes;
     use crate::utils::constants::{TAILS_DIR, TEST_TAILS_URL};
     use crate::utils::get_temp_dir_path;
 

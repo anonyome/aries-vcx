@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::Arc;
 
-use indy_sys::WalletHandle;
-
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::messages::a2a::{A2AMessage, MessageId};

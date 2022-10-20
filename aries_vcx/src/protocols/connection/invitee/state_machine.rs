@@ -260,7 +260,7 @@ impl SmConnectionInvitee {
             "Cannot handle response: remote verkey not found",
         ))?;
 
-        let response = response.clone().decode(&remote_vk).await?;
+        let response = response.clone().decode(wallet, &remote_vk).await?;
 
         if !response.from_thread(&request.get_thread_id()) {
             return Err(VcxError::from_msg(
