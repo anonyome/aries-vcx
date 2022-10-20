@@ -47,7 +47,7 @@ impl Invitation {
             }
             Invitation::OutOfBand(invitation) => {
                 did_doc.set_id(invitation.id.0.clone());
-                let service = block_on(invitation.services[0].resolve()).unwrap_or_else(|err| {
+                let service = block_on(invitation.services[0].resolve(profile)).unwrap_or_else(|err| {
                     error!("Failed to obtain service definition from the ledger: {}", err);
                     AriesService::default()
                 });
@@ -163,10 +163,10 @@ impl PublicInvitation {
     }
 }
 
-impl TryFrom<&ServiceResolvable> for PairwiseInvitation {
+impl TryFrom<(&ServiceResolvable, &Arc<dyn Profile>)> for PairwiseInvitation {
     type Error = VcxError;
-    fn try_from(service_resolvable: &ServiceResolvable) -> Result<Self, Self::Error> {
-        let service = block_on(service_resolvable.resolve())?;
+    fn try_from((service_resolvable, profile): (&ServiceResolvable, &Arc<dyn Profile>)) -> Result<Self, Self::Error> {
+        let service = block_on(service_resolvable.resolve(profile))?;
         Ok(Self::create()
             .set_recipient_keys(service.recipient_keys)
             .set_routing_keys(service.routing_keys)

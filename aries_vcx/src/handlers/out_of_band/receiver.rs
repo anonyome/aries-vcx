@@ -52,7 +52,7 @@ impl OutOfBandReceiver {
                                 return Ok(Some(connection));
                             }
                         };
-                        if did_doc.resolve_service()? == service.resolve().await? {
+                        if did_doc.resolve_service()? == service.resolve(profile).await? {
                             return Ok(Some(connection));
                         };
                     }
