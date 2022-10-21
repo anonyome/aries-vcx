@@ -975,7 +975,7 @@ pub mod test_utils {
             .unwrap();
         assert_eq!(conn_requests.len(), 1);
         let mut institution_to_consumer = Connection::create_with_request(
-            faber.wallet_handle,
+            todo!(),
             conn_requests.pop().unwrap(),
             &faber.agent,
             &faber.agency_client,
@@ -987,7 +987,7 @@ pub mod test_utils {
             institution_to_consumer.get_state()
         );
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -996,7 +996,7 @@ pub mod test_utils {
         );
 
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1006,7 +1006,7 @@ pub mod test_utils {
 
         thread::sleep(Duration::from_millis(100));
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1032,7 +1032,7 @@ pub mod test_utils {
 
         let mut consumer_to_institution = Connection::create_with_invite(
             "institution",
-            alice.wallet_handle,
+            todo!(),
             &alice.agency_client,
             public_invite,
             ddo,
@@ -1041,11 +1041,11 @@ pub mod test_utils {
         .await
         .unwrap();
         consumer_to_institution
-            .connect(alice.wallet_handle, &alice.agency_client)
+            .connect(todo!(), &alice.agency_client)
             .await
             .unwrap();
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
 
@@ -1057,11 +1057,11 @@ pub mod test_utils {
     pub async fn create_connected_connections(alice: &mut Alice, faber: &mut Faber) -> (Connection, Connection) {
         debug!("Institution is going to create connection.");
         let mut institution_to_consumer =
-            Connection::create("consumer", faber.wallet_handle, &faber.agency_client, true)
+            Connection::create("consumer", todo!(), &faber.agency_client, true)
                 .await
                 .unwrap();
         institution_to_consumer
-            .connect(faber.wallet_handle, &faber.agency_client)
+            .connect(todo!(), &faber.agency_client)
             .await
             .unwrap();
         let details = institution_to_consumer.get_invite_details().unwrap();
@@ -1070,7 +1070,7 @@ pub mod test_utils {
         let ddo = into_did_doc(alice.pool_handle, &details).await.unwrap();
         let mut consumer_to_institution = Connection::create_with_invite(
             "institution",
-            alice.wallet_handle,
+            todo!(),
             &alice.agency_client,
             details.clone(),
             ddo,
@@ -1080,11 +1080,11 @@ pub mod test_utils {
         .unwrap();
 
         consumer_to_institution
-            .connect(alice.wallet_handle, &alice.agency_client)
+            .connect(todo!(), &alice.agency_client)
             .await
             .unwrap();
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
 
@@ -1093,7 +1093,7 @@ pub mod test_utils {
         debug!("Institution is going to process connection request.");
         thread::sleep(Duration::from_millis(100));
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1104,7 +1104,7 @@ pub mod test_utils {
 
         debug!("Consumer is going to complete the connection protocol.");
         consumer_to_institution
-            .find_message_and_update_state(alice.wallet_handle, &alice.agency_client)
+            .find_message_and_update_state(todo!(), &alice.agency_client)
             .await
             .unwrap();
         assert_eq!(
@@ -1116,7 +1116,7 @@ pub mod test_utils {
         debug!("Institution is going to complete the connection protocol.");
         thread::sleep(Duration::from_millis(100));
         institution_to_consumer
-            .find_message_and_update_state(faber.wallet_handle, &faber.agency_client)
+            .find_message_and_update_state(todo!(), &faber.agency_client)
             .await
             .unwrap();
         assert_eq!(

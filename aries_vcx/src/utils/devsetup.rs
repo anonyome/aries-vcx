@@ -398,7 +398,7 @@ pub async fn setup_issuer_wallet_and_agency_client() -> (String, WalletHandle, A
     let config_issuer = wallet_configure_issuer(wallet_handle, enterprise_seed).await.unwrap();
     init_issuer_config(&config_issuer).unwrap();
     let mut agency_client = AgencyClient::new();
-    provision_cloud_agent(&mut agency_client, wallet_handle, &config_provision_agent)
+    provision_cloud_agent(&mut agency_client, todo!(), &config_provision_agent)
         .await
         .unwrap();
 

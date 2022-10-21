@@ -1,10 +1,11 @@
 use core::fmt;
 use std::clone::Clone;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use futures::stream::StreamExt;
-use vdrtools_sys::WalletHandle;
+
 use serde::de::{Error, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -14,6 +15,7 @@ use agency_client::api::downloaded_message::DownloadedMessage;
 use agency_client::MessageStatusCode;
 
 use messages::did_doc::DidDoc;
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::cloud_agent::CloudAgentInfo;
 use crate::handlers::connection::legacy_agent_info::LegacyAgentInfo;
@@ -34,6 +36,7 @@ use crate::protocols::trustping::build_ping_response;
 use crate::protocols::SendClosure;
 use crate::utils::send_message;
 use crate::utils::serialization::SerializableObjectWithState;
+use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Clone, PartialEq)]
 pub struct Connection {
@@ -86,12 +89,12 @@ pub enum Actor {
 impl Connection {
     pub async fn create(
         source_id: &str,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         autohop_enabled: bool,
     ) -> VcxResult<Self> {
         trace!("Connection::create >>> source_id: {}", source_id);
-        let pairwise_info = PairwiseInfo::create(wallet_handle).await?;
+        let pairwise_info = PairwiseInfo::create(&profile.inject_wallet()).await?;
         let cloud_agent_info = CloudAgentInfo::create(agency_client, &pairwise_info).await?;
         Ok(Self {
             cloud_agent_info,
@@ -102,7 +105,7 @@ impl Connection {
 
     pub async fn create_with_invite(
         source_id: &str,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         invitation: Invitation,
         did_doc: DidDoc,
@@ -113,7 +116,7 @@ impl Connection {
             source_id,
             invitation
         );
-        let pairwise_info = PairwiseInfo::create(wallet_handle).await?;
+        let pairwise_info = PairwiseInfo::create(&profile.inject_wallet()).await?;
         let cloud_agent_info = CloudAgentInfo::create(agency_client, &pairwise_info).await?;
         let mut connection = Self {
             cloud_agent_info,
@@ -125,7 +128,7 @@ impl Connection {
     }
 
     pub async fn create_with_request(
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         request: Request,
         public_agent: &PublicAgent,
         agency_client: &AgencyClient,
@@ -141,7 +144,7 @@ impl Connection {
             connection_sm: SmConnection::Inviter(SmConnectionInviter::new(&request.id.0, pairwise_info)),
             autohop_enabled: true,
         };
-        connection.process_request(wallet_handle, agency_client, request).await?;
+        connection.process_request(profile, agency_client, request).await?;
         Ok(connection)
     }
 
@@ -210,17 +213,17 @@ impl Connection {
         self.cloud_agent_info.clone()
     }
 
-    pub async fn remote_did(&self) -> VcxResult<String> {
+    pub async fn remote_did(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.remote_did(),
-            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_did().await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_did(profile).await,
         }
     }
 
-    pub async fn remote_vk(&self) -> VcxResult<String> {
+    pub async fn remote_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.remote_vk(),
-            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_vk().await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_vk(profile).await,
         }
     }
 
@@ -253,17 +256,17 @@ impl Connection {
         }
     }
 
-    pub async fn their_did_doc(&self) -> Option<DidDoc> {
+    pub async fn their_did_doc(&self, profile: &Arc<dyn Profile>) -> Option<DidDoc> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.their_did_doc(),
-            SmConnection::Invitee(sm_invitee) => sm_invitee.their_did_doc().await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.their_did_doc(profile).await,
         }
     }
 
-    pub async fn bootstrap_did_doc(&self) -> Option<DidDoc> {
+    pub async fn bootstrap_did_doc(&self, profile: &Arc<dyn Profile>) -> Option<DidDoc> {
         match &self.connection_sm {
             SmConnection::Inviter(_sm_inviter) => None, // TODO: Inviter can remember bootstrap agent too, but we don't need it
-            SmConnection::Invitee(sm_invitee) => sm_invitee.bootstrap_did_doc().await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.bootstrap_did_doc(profile).await,
         }
     }
 
@@ -296,14 +299,15 @@ impl Connection {
 
     pub async fn process_request(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         request: Request,
     ) -> VcxResult<()> {
         trace!("Connection::process_request >>> request: {:?}", request);
         let (connection_sm, new_cloud_agent_info) = match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => {
-                let new_pairwise_info = PairwiseInfo::create(wallet_handle).await?;
+                let wallet = profile.inject_wallet();
+                let new_pairwise_info = PairwiseInfo::create(&wallet).await?;
                 let new_cloud_agent = CloudAgentInfo::create(agency_client, &new_pairwise_info).await?;
                 let new_routing_keys = new_cloud_agent.routing_keys(agency_client)?;
                 let new_service_endpoint = agency_client.get_agency_url_full();
@@ -312,7 +316,7 @@ impl Connection {
                         sm_inviter
                             .clone()
                             .handle_connection_request(
-                                wallet_handle,
+                                &wallet,
                                 request,
                                 &new_pairwise_info,
                                 new_routing_keys,
@@ -371,18 +375,20 @@ impl Connection {
 
     pub fn update_state_with_message(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: AgencyClient,
         message: Option<A2AMessage>,
     ) -> BoxFuture<'_, VcxResult<()>> {
+        let profile = Arc::clone(profile);
         Box::pin(async move {
+            let wallet = profile.inject_wallet();
             let (new_connection_sm, can_autohop) = match &self.connection_sm {
-                SmConnection::Inviter(_) => self.step_inviter(wallet_handle, message, &agency_client).await?,
-                SmConnection::Invitee(_) => self.step_invitee(wallet_handle, message).await?,
+                SmConnection::Inviter(_) => self.step_inviter(&wallet, message, &agency_client).await?,
+                SmConnection::Invitee(_) => self.step_invitee(&wallet, message).await?,
             };
             *self = new_connection_sm;
             if can_autohop && self.autohop_enabled {
-                let res = self.update_state_with_message(wallet_handle, agency_client, None).await;
+                let res = self.update_state_with_message(&profile, agency_client, None).await;
                 res
             } else {
                 Ok(())
@@ -392,7 +398,7 @@ impl Connection {
 
     pub async fn find_and_handle_message(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
     ) -> VcxResult<()> {
         if !self.is_in_final_state() {
@@ -402,7 +408,7 @@ impl Connection {
         let messages = self.get_messages_noauth(agency_client).await?;
         match self.find_message_to_handle(messages) {
             Some((uid, message)) => {
-                self.handle_message(message, wallet_handle).await?;
+                self.handle_message(message, profile).await?;
                 self.update_message_status(&uid, agency_client).await?;
             }
             None => {}
@@ -425,8 +431,8 @@ impl Connection {
         None
     }
 
-    pub async fn handle_message(&mut self, message: A2AMessage, wallet_handle: WalletHandle) -> VcxResult<()> {
-        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
+    pub async fn handle_message(&mut self, message: A2AMessage, profile: &Arc<dyn Profile>) -> VcxResult<()> {
+        let did_doc = self.their_did_doc(profile).ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!(
                 "Can't answer message {:?} because counterparty did doc is not available",
@@ -434,12 +440,13 @@ impl Connection {
             ),
         ))?;
         let pw_vk = &self.pairwise_info().pw_vk;
+        let wallet = profile.inject_wallet();
         match message {
             A2AMessage::Ping(ping) => {
                 info!("Answering ping, thread: {}", ping.get_thread_id());
                 if ping.response_requested {
                     send_message(
-                        wallet_handle,
+                        wallet,
                         pw_vk.to_string(),
                         did_doc.clone(),
                         build_ping_response(&ping).to_a2a_message(),
@@ -453,7 +460,7 @@ impl Connection {
                     handshake_reuse.get_thread_id()
                 );
                 let msg = build_handshake_reuse_accepted_msg(&handshake_reuse)?;
-                send_message(wallet_handle, pw_vk.to_string(), did_doc.clone(), msg.to_a2a_message()).await?;
+                send_message(wallet, pw_vk.to_string(), did_doc.clone(), msg.to_a2a_message()).await?;
             }
             A2AMessage::Query(query) => {
                 let supported_protocols = ProtocolRegistry::init().get_protocols_for_query(query.query.as_deref());
@@ -461,7 +468,7 @@ impl Connection {
                     "Answering discovery protocol query, @id: {}, with supported protocols: {:?}",
                     query.id.0, &supported_protocols
                 );
-                respond_discovery_query(wallet_handle, query, &did_doc, pw_vk, supported_protocols).await?;
+                respond_discovery_query(&wallet, query, &did_doc, pw_vk, supported_protocols).await?;
             }
             A2AMessage::Disclose(disclose) => {
                 info!("Handling disclose message, thread: {}", disclose.get_thread_id());
@@ -478,7 +485,7 @@ impl Connection {
 
     pub async fn find_message_and_update_state(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
     ) -> VcxResult<()> {
         if self.is_in_null_state() {
@@ -500,7 +507,7 @@ impl Connection {
         match self.find_message_to_update_state(messages) {
             Some((uid, message)) => {
                 trace!("Connection::update_state >>> handling message uid: {:?}", uid);
-                self.update_state_with_message(wallet_handle, agency_client.clone(), Some(message))
+                self.update_state_with_message(profile, agency_client.clone(), Some(message))
                     .await?;
                 self.cloud_agent_info()
                     .update_message_status(agency_client, self.pairwise_info(), uid)
@@ -508,7 +515,7 @@ impl Connection {
             }
             None => {
                 trace!("Connection::update_state >>> trying to update state without message");
-                self.update_state_with_message(wallet_handle, agency_client.clone(), None)
+                self.update_state_with_message(profile, agency_client.clone(), None)
                     .await?;
             }
         }
@@ -519,7 +526,7 @@ impl Connection {
 
     async fn step_inviter(
         &self,
-        wallet_handle: WalletHandle,
+        wallet: &Arc<dyn BaseWallet>,
         message: Option<A2AMessage>,
         agency_client: &AgencyClient,
     ) -> VcxResult<(Self, bool)> {
@@ -528,13 +535,13 @@ impl Connection {
                 let (sm_inviter, new_cloud_agent_info, can_autohop) = match message {
                     Some(message) => match message {
                         A2AMessage::ConnectionRequest(request) => {
-                            let new_pairwise_info = PairwiseInfo::create(wallet_handle).await?;
+                            let new_pairwise_info = PairwiseInfo::create(wallet).await?;
                             let new_cloud_agent = CloudAgentInfo::create(agency_client, &new_pairwise_info).await?;
                             let new_routing_keys = new_cloud_agent.routing_keys(agency_client)?;
                             let new_service_endpoint = new_cloud_agent.service_endpoint(agency_client)?;
                             let sm_connection = sm_inviter
                                 .handle_connection_request(
-                                    wallet_handle,
+                                    wallet,
                                     request,
                                     &new_pairwise_info,
                                     new_routing_keys,
@@ -555,7 +562,7 @@ impl Connection {
                     None => {
                         if let InviterFullState::Requested(_) = sm_inviter.state_object() {
                             (
-                                sm_inviter.handle_send_response(wallet_handle, &send_message).await?,
+                                sm_inviter.handle_send_response(wallet, &send_message).await?,
                                 None,
                                 false,
                             )
@@ -581,7 +588,7 @@ impl Connection {
         }
     }
 
-    async fn step_invitee(&self, wallet_handle: WalletHandle, message: Option<A2AMessage>) -> VcxResult<(Self, bool)> {
+    async fn step_invitee(&self, wallet: &Arc<dyn BaseWallet>, message: Option<A2AMessage>) -> VcxResult<(Self, bool)> {
         match self.connection_sm.clone() {
             SmConnection::Invitee(sm_invitee) => {
                 let (sm_invitee, can_autohop) = match message {
@@ -600,7 +607,7 @@ impl Connection {
                         }
                         _ => (sm_invitee, false),
                     },
-                    None => (sm_invitee.handle_send_ack(wallet_handle, &send_message).await?, false),
+                    None => (sm_invitee.handle_send_ack(wallet, &send_message).await?, false),
                 };
                 let connection = Self {
                     connection_sm: SmConnection::Invitee(sm_invitee),
@@ -628,7 +635,7 @@ impl Connection {
         }
     }
 
-    pub async fn connect(&mut self, wallet_handle: WalletHandle, agency_client: &AgencyClient) -> VcxResult<()> {
+    pub async fn connect(&mut self, profile: &Arc<dyn Profile>, agency_client: &AgencyClient) -> VcxResult<()> {
         trace!("Connection::connect >>> source_id: {}", self.source_id());
         self.connection_sm = match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => SmConnection::Inviter(sm_inviter.clone().create_invitation(
@@ -639,7 +646,7 @@ impl Connection {
                 sm_invitee
                     .clone()
                     .send_connection_request(
-                        wallet_handle,
+                        profile,
                         self.cloud_agent_info.routing_keys(agency_client)?,
                         self.cloud_agent_info.service_endpoint(agency_client)?,
                         send_message,
@@ -676,8 +683,8 @@ impl Connection {
         }
     }
 
-    pub async fn get_messages(&self, agency_client: &AgencyClient) -> VcxResult<HashMap<String, A2AMessage>> {
-        let expected_sender_vk = self.get_expected_sender_vk().await?;
+    pub async fn get_messages(&self, profile: &Arc<dyn Profile>, agency_client: &AgencyClient) -> VcxResult<HashMap<String, A2AMessage>> {
+        let expected_sender_vk = self.get_expected_sender_vk(profile).await?;
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => Ok(self
                 .cloud_agent_info()
@@ -690,8 +697,8 @@ impl Connection {
         }
     }
 
-    async fn get_expected_sender_vk(&self) -> VcxResult<String> {
-        self.remote_vk().await.map_err(|_err| {
+    fn get_expected_sender_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
+        self.remote_vk(profile).await.map_err(|_err| {
             VcxError::from_msg(
                 VcxErrorKind::NotReady,
                 "Verkey of connection counterparty \
@@ -700,23 +707,27 @@ impl Connection {
         })
     }
 
-    pub async fn get_message_by_id(&self, msg_id: &str, agency_client: &AgencyClient) -> VcxResult<A2AMessage> {
+    pub async fn get_message_by_id(&self, profile: &Arc<dyn Profile>, msg_id: &str, agency_client: &AgencyClient) -> VcxResult<A2AMessage> {
         trace!("Connection: get_message_by_id >>> msg_id: {}", msg_id);
-        let expected_sender_vk = self.get_expected_sender_vk().await?;
+        let expected_sender_vk = self.get_expected_sender_vk(profile).await?;
         self.cloud_agent_info()
             .get_message_by_id(agency_client, msg_id, &expected_sender_vk, self.pairwise_info())
             .await
     }
 
-    pub async fn send_message_closure(&self, wallet_handle: WalletHandle) -> VcxResult<SendClosure> {
+    pub fn send_message_closure(&self, profile: &Arc<dyn Profile>) -> VcxResult<SendClosure> {
         trace!("send_message_closure >>>");
-        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             "Cannot send message: Remote Connection information is not set",
         ))?;
         let sender_vk = self.pairwise_info().pw_vk.clone();
+
+        let wallet = profile.inject_wallet();
+
         Ok(Box::new(move |message: A2AMessage| {
-            Box::pin(send_message(wallet_handle, sender_vk.clone(), did_doc.clone(), message))
+            let w = Arc::clone(&wallet); // todo - unsure why this clone is required
+            Box::pin(send_message(w, sender_vk.clone(), did_doc.clone(), message))
         }))
     }
 
@@ -731,30 +742,30 @@ impl Connection {
         }
     }
 
-    pub async fn send_generic_message(&self, wallet_handle: WalletHandle, message: &str) -> VcxResult<String> {
+    pub async fn send_generic_message(&self, profile: &Arc<dyn Profile>, message: &str) -> VcxResult<String> {
         trace!("Connection::send_generic_message >>> message: {:?}", message);
         let message = Self::build_basic_message(message);
-        let send_message = self.send_message_closure(wallet_handle).await?;
+        let send_message = self.send_message_closure(profile).await?;
         send_message(message).await.map(|_| String::new())
     }
 
-    pub async fn send_a2a_message(&self, wallet_handle: WalletHandle, message: &A2AMessage) -> VcxResult<String> {
+    pub async fn send_a2a_message(&self, profile: &Arc<dyn Profile>, message: &A2AMessage) -> VcxResult<String> {
         trace!("Connection::send_a2a_message >>> message: {:?}", message);
-        let send_message = self.send_message_closure(wallet_handle).await?;
+        let send_message = self.send_message_closure(profile).await?;
         send_message(message.clone()).await.map(|_| String::new())
     }
 
     pub async fn send_ping(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         comment: Option<String>,
     ) -> VcxResult<TrustPingSender> {
         let mut trust_ping = TrustPingSender::build(true, comment);
-        trust_ping.send_ping(self.send_message_closure(wallet_handle).await?).await?;
+        trust_ping.send_ping(self.send_message_closure(profile).await?).await?;
         Ok(trust_ping)
     }
 
-    pub async fn send_handshake_reuse(&self, wallet_handle: WalletHandle, oob_msg: &str) -> VcxResult<()> {
+    pub async fn send_handshake_reuse(&self, profile: &Arc<dyn Profile>, oob_msg: &str) -> VcxResult<()> {
         trace!("Connection::send_handshake_reuse >>>");
         // todo: oob_msg argument should be typed OutOfBandInvitation, not string
         let oob = match serde_json::from_str::<A2AMessage>(oob_msg) {
@@ -774,12 +785,12 @@ impl Connection {
                 ));
             }
         };
-        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!("Can't send handshake-reuse to the counterparty, because their did doc is not available"),
         ))?;
         send_message(
-            wallet_handle,
+            profile.inject_wallet(),
             self.pairwise_info().pw_vk.clone(),
             did_doc.clone(),
             build_handshake_reuse_msg(&oob).to_a2a_message(),
@@ -796,7 +807,7 @@ impl Connection {
 
     pub async fn send_discovery_query(
         &self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         query: Option<String>,
         comment: Option<String>,
     ) -> VcxResult<()> {
@@ -805,15 +816,15 @@ impl Connection {
             query,
             comment
         );
-        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!("Can't send handshake-reuse to the counterparty, because their did doc is not available"),
         ))?;
-        send_discovery_query(wallet_handle, query, comment, &did_doc, &self.pairwise_info().pw_vk).await?;
+        send_discovery_query(&profile.inject_wallet(), query, comment, &did_doc, &self.pairwise_info().pw_vk).await?;
         Ok(())
     }
 
-    pub async fn get_connection_info(&self, agency_client: &AgencyClient) -> VcxResult<String> {
+    pub async fn get_connection_info(&self, profile: &Arc<dyn Profile>, agency_client: &AgencyClient) -> VcxResult<String> {
         trace!("Connection::get_connection_info >>>");
 
         let agent_info = self.cloud_agent_info();
@@ -828,7 +839,7 @@ impl Connection {
             protocols: Some(self.get_protocols()),
         };
 
-        let remote = match self.their_did_doc().await {
+        let remote = match self.their_did_doc(profile).await {
             Some(did_doc) => Some(SideConnectionInfo {
                 did: did_doc.id.clone(),
                 recipient_keys: did_doc.recipient_keys(),
@@ -856,6 +867,7 @@ impl Connection {
 
     pub async fn download_messages(
         &self,
+        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         status_codes: Option<Vec<MessageStatusCode>>,
         uids: Option<Vec<String>>,
@@ -869,20 +881,20 @@ impl Connection {
                         .download_encrypted_messages(agency_client, uids, status_codes, self.pairwise_info())
                         .await?,
                 )
-                .then(|msg| msg.decrypt_noauth(agency_client.get_wallet_handle()))
+                .then(|msg| msg.decrypt_noauth(agency_client.get_wallet()))
                 .filter_map(|res| async { res.ok() })
                 .collect::<Vec<DownloadedMessage>>()
                 .await;
                 Ok(msgs)
             }
             _ => {
-                let expected_sender_vk = self.remote_vk().await?;
+                let expected_sender_vk = self.remote_vk(profile).await?;
                 let msgs = futures::stream::iter(
                     self.cloud_agent_info()
                         .download_encrypted_messages(agency_client, uids, status_codes, self.pairwise_info())
                         .await?,
                 )
-                .then(|msg| msg.decrypt_auth(agency_client.get_wallet_handle(), &expected_sender_vk))
+                .then(|msg| msg.decrypt_auth(agency_client.get_wallet(), &expected_sender_vk))
                 .filter_map(|res| async { res.ok() })
                 .collect::<Vec<DownloadedMessage>>()
                 .await;

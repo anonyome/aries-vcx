@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::sync::Arc;
 
-use vdrtools_sys::WalletHandle;
+use crate::core::profile::profile::Profile;
 
 use crate::error::{VcxError, VcxErrorKind, VcxResult};
-use crate::indy::credentials::encoding::encode_attributes;
+use crate::xyz::credentials::encode_attributes;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::issuance::credential::Credential;
 use messages::issuance::credential_offer::{CredentialOffer, OfferInfo};
@@ -12,7 +13,6 @@ use messages::issuance::credential_proposal::CredentialProposal;
 use messages::issuance::credential_request::CredentialRequest;
 use messages::issuance::CredentialPreviewData;
 use messages::status::Status;
-use crate::indy::credentials::issuer;
 use crate::protocols::common::build_problem_report_msg;
 use crate::protocols::issuance::actions::CredentialIssuanceAction;
 use crate::protocols::issuance::issuer::states::credential_sent::CredentialSentState;
@@ -349,7 +349,7 @@ impl IssuerSM {
 
     pub async fn handle_message(
         self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         cim: CredentialIssuanceAction,
         send_message: Option<SendClosure>,
     ) -> VcxResult<Self> {
@@ -400,7 +400,7 @@ impl IssuerSM {
             IssuerFullState::RequestReceived(state_data) => match cim {
                 CredentialIssuanceAction::CredentialSend() => {
                     let credential_msg = _create_credential(
-                        wallet_handle,
+                        profile,
                         &state_data.request,
                         &state_data.rev_reg_id,
                         &state_data.tails_file,
@@ -491,7 +491,7 @@ impl IssuerSM {
 }
 
 async fn _create_credential(
-    wallet_handle: WalletHandle,
+    profile: &Arc<dyn Profile>,
     request: &CredentialRequest,
     rev_reg_id: &Option<String>,
     tails_file: &Option<String>,
@@ -499,6 +499,7 @@ async fn _create_credential(
     cred_data: &str,
     thread_id: &str,
 ) -> VcxResult<(Credential, Option<String>)> {
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
     let offer = offer.offers_attach.content()?;
     trace!("Issuer::_create_credential >>> request: {:?}, rev_reg_id: {:?}, tails_file: {:?}, offer: {}, cred_data: {}, thread_id: {}", request, rev_reg_id, tails_file, offer, cred_data, thread_id);
     if !request.from_thread(thread_id) {
@@ -512,8 +513,7 @@ async fn _create_credential(
     };
     let request = &request.requests_attach.content()?;
     let cred_data = encode_attributes(cred_data)?;
-    let (libindy_credential, cred_rev_id, _) = issuer::libindy_issuer_create_credential(
-        wallet_handle,
+    let (libindy_credential, cred_rev_id, _) = anoncreds.issuer_create_credential(
         &offer,
         request,
         &cred_data,

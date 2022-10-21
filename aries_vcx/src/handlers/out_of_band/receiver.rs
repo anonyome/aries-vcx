@@ -1,8 +1,9 @@
 use std::clone::Clone;
-use vdrtools_sys::PoolHandle;
+use std::sync::Arc;
 
 use agency_client::agency_client::AgencyClient;
 
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::connection::Connection;
 use messages::out_of_band::invitation::OutOfBandInvitation;
@@ -40,13 +41,13 @@ impl OutOfBandReceiver {
 
     pub async fn connection_exists<'a>(
         &self,
-        pool_handle: PoolHandle,
+        profile: &Arc<dyn Profile>,
         connections: &'a Vec<&'a Connection>,
     ) -> VcxResult<Option<&'a Connection>> {
         trace!("OutOfBandReceiver::connection_exists >>>");
         for service in &self.oob.services {
             for connection in connections {
-                match connection.bootstrap_did_doc().await {
+                match connection.bootstrap_did_doc(profile).await {
                     Some(did_doc) => {
                         if let ServiceResolvable::Did(did) = service {
                             if did.to_string() == did_doc.id {
@@ -54,6 +55,7 @@ impl OutOfBandReceiver {
                             }
                         };
                         if did_doc.get_service()? == resolve_service(pool_handle, &service).await? {
+                        // if did_doc.resolve_service()? == service.resolve(profile).await? {
                             return Ok(Some(connection));
                         };
                     }
@@ -140,7 +142,7 @@ impl OutOfBandReceiver {
         );
         Connection::create_with_invite(
             &self.oob.id.0,
-            agency_client.get_wallet_handle(),
+            todo!(),
             agency_client,
             Invitation::OutOfBand(self.oob.clone()),
             did_doc,

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::sync::Arc;
 
-use vdrtools_sys::{WalletHandle, PoolHandle};
-
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::problem_report::ProblemReport;
@@ -208,8 +208,7 @@ impl VerifierSM {
 
     pub async fn step(
         self,
-        wallet_handle: WalletHandle,
-        pool_handle: PoolHandle,
+        profile: &Arc<dyn Profile>,
         message: VerifierMessages,
         send_message: Option<SendClosure>,
     ) -> VcxResult<Self> {
@@ -274,7 +273,7 @@ impl VerifierSM {
             VerifierFullState::PresentationRequestSent(state) => match message {
                 VerifierMessages::VerifyPresentation(presentation) => {
                     let verification_result = state
-                        .verify_presentation(wallet_handle, pool_handle, &presentation, &thread_id)
+                        .verify_presentation(profile, &presentation, &thread_id)
                         .await;
                     let ack = build_verification_ack(&thread_id);
                     match send_message {
