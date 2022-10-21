@@ -4,6 +4,7 @@ mod integration_tests {
     use aries_vcx::core::profile::modular_wallet_profile::{LedgerPoolConfig, ModularWalletProfile};
     use aries_vcx::handlers::issuance::holder::Holder;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
+    use aries_vcx::indy::ledger::transactions::into_did_doc;
     use aries_vcx::libindy::utils::pool::PoolConfig;
     use aries_vcx::libindy::utils::signus;
     use aries_vcx::messages::connection::did::Did;
@@ -18,6 +19,7 @@ mod integration_tests {
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
     use indy_vdr::pool::{PoolBuilder, PoolTransactions};
     use serde_json::Value;
+    use vdrtools_sys::PoolHandle;
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{sync::Arc, thread, time::Duration};
@@ -47,8 +49,10 @@ mod integration_tests {
         let invitation = helper::url_to_invitation("http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiNDkyYzVkZGYtNjBiYi00YWM1LThkOGYtOTdlOWU2NGVkMjA0IiwgInJlY2lwaWVudEtleXMiOiBbIjNiOFU2eEJlS1VzRUNlNzN2UGNHdVdhejVTVUVaQVFRaUg5OHVNb2RqVkFXIl0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2Nsb3VkYWdlbnQuZ211bGhlYXJuZS5kaS10ZWFtLmRldi5zdWRvcGxhdGZvcm0uY29tOjgyMDAiLCAibGFiZWwiOiAiZ211bGhlYXJuZSJ9");
         let invitation = Invitation::Pairwise(invitation);
 
+        // todo - move this into_did_doc method
+        let their_did_doc = into_did_doc(PoolHandle(1), &invitation).await.unwrap();
         let autohop = false; // note that trinsic doesn't understand the ACK, so turn it off when using trinisc
-        let mut conn = Connection::create_with_invite("69", &profile, &agency_client, invitation, autohop)
+        let mut conn = Connection::create_with_invite("69", &profile, &agency_client, invitation, their_did_doc, autohop)
             .await
             .unwrap();
         conn.connect(&profile, &agency_client).await.unwrap();
