@@ -216,14 +216,14 @@ impl Connection {
     pub async fn remote_did(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.remote_did(),
-            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_did(profile).await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_did().await,
         }
     }
 
     pub async fn remote_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.remote_vk(),
-            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_vk(profile).await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.remote_vk().await,
         }
     }
 
@@ -259,14 +259,14 @@ impl Connection {
     pub async fn their_did_doc(&self, profile: &Arc<dyn Profile>) -> Option<DidDoc> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.their_did_doc(),
-            SmConnection::Invitee(sm_invitee) => sm_invitee.their_did_doc(profile).await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.their_did_doc().await,
         }
     }
 
     pub async fn bootstrap_did_doc(&self, profile: &Arc<dyn Profile>) -> Option<DidDoc> {
         match &self.connection_sm {
             SmConnection::Inviter(_sm_inviter) => None, // TODO: Inviter can remember bootstrap agent too, but we don't need it
-            SmConnection::Invitee(sm_invitee) => sm_invitee.bootstrap_did_doc(profile).await,
+            SmConnection::Invitee(sm_invitee) => sm_invitee.bootstrap_did_doc().await,
         }
     }
 
@@ -446,7 +446,7 @@ impl Connection {
                 info!("Answering ping, thread: {}", ping.get_thread_id());
                 if ping.response_requested {
                     send_message(
-                        wallet,
+                        &wallet,
                         pw_vk.to_string(),
                         did_doc.clone(),
                         build_ping_response(&ping).to_a2a_message(),
@@ -460,7 +460,7 @@ impl Connection {
                     handshake_reuse.get_thread_id()
                 );
                 let msg = build_handshake_reuse_accepted_msg(&handshake_reuse)?;
-                send_message(wallet, pw_vk.to_string(), did_doc.clone(), msg.to_a2a_message()).await?;
+                send_message(&wallet, pw_vk.to_string(), did_doc.clone(), msg.to_a2a_message()).await?;
             }
             A2AMessage::Query(query) => {
                 let supported_protocols = ProtocolRegistry::init().get_protocols_for_query(query.query.as_deref());
@@ -697,7 +697,7 @@ impl Connection {
         }
     }
 
-    fn get_expected_sender_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
+    async fn get_expected_sender_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
         self.remote_vk(profile).await.map_err(|_err| {
             VcxError::from_msg(
                 VcxErrorKind::NotReady,
@@ -715,7 +715,7 @@ impl Connection {
             .await
     }
 
-    pub fn send_message_closure(&self, profile: &Arc<dyn Profile>) -> VcxResult<SendClosure> {
+    pub async fn send_message_closure(&self, profile: &Arc<dyn Profile>) -> VcxResult<SendClosure> {
         trace!("send_message_closure >>>");
         let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
@@ -727,7 +727,7 @@ impl Connection {
 
         Ok(Box::new(move |message: A2AMessage| {
             let w = Arc::clone(&wallet); // todo - unsure why this clone is required
-            Box::pin(send_message(w, sender_vk.clone(), did_doc.clone(), message))
+            Box::pin(send_message(&w, sender_vk.clone(), did_doc.clone(), message))
         }))
     }
 
@@ -790,7 +790,7 @@ impl Connection {
             format!("Can't send handshake-reuse to the counterparty, because their did doc is not available"),
         ))?;
         send_message(
-            profile.inject_wallet(),
+            &profile.inject_wallet(),
             self.pairwise_info().pw_vk.clone(),
             did_doc.clone(),
             build_handshake_reuse_msg(&oob).to_a2a_message(),

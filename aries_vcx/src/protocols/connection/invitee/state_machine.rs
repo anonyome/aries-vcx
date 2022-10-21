@@ -164,8 +164,8 @@ impl SmConnectionInvitee {
         }
     }
 
-    pub fn remote_did(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
-        self.their_did_doc(profile)
+    pub fn remote_did(&self) -> VcxResult<String> {
+        self.their_did_doc()
             .await
             .map(|did_doc: DidDoc| did_doc.id)
             .ok_or(VcxError::from_msg(
@@ -174,8 +174,8 @@ impl SmConnectionInvitee {
             ))
     }
 
-    pub fn remote_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
-        self.their_did_doc(profile)
+    pub fn remote_vk(&self) -> VcxResult<String> {
+        self.their_did_doc()
             .await
             .and_then(|did_doc| did_doc.recipient_keys().get(0).cloned())
             .ok_or(VcxError::from_msg(
