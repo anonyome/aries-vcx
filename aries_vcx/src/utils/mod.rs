@@ -85,7 +85,7 @@ pub async fn send_message(
         &did_doc)
         .await?;
         
-    agency_client::httpclient::post_message(&envelope, &did_doc.get_endpoint()).await?;
+    agency_client::httpclient::post_message(envelope, &did_doc.get_endpoint()).await?;
     Ok(())
 }
 
@@ -106,6 +106,6 @@ pub async fn send_message_anonymously(
         &did_doc)
         .await?;
         
-    agency_client::httpclient::post_message(&envelope, &did_doc.get_endpoint()).await?;
+    agency_client::httpclient::post_message(envelope, &did_doc.get_endpoint()).await?;
     Ok(())
 }

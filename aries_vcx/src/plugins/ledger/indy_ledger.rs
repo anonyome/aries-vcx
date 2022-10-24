@@ -4,12 +4,9 @@ use async_trait::async_trait;
 
 use crate::core::profile::indy_profile::IndySdkProfile;
 
-use crate::libindy::utils::anoncreds::RevocationRegistryDefinition;
-use crate::libindy::utils::ledger::{self as libindy_ledger, publish_schema};
-use crate::{
-    did_doc::service_aries::AriesService, error::VcxResult,
-    messages::connection::did::Did,
-};
+use crate::indy;
+use crate::indy::primitives::revocation_registry::RevocationRegistryDefinition;
+use crate::{error::VcxResult, messages::connection::did::Did, messages::did_doc::service_aries::AriesService};
 
 use super::base_ledger::BaseLedger;
 
@@ -25,44 +22,77 @@ impl IndySdkLedger {
 
 #[async_trait]
 impl BaseLedger for IndySdkLedger {
-    async fn sign_and_submit_request(&self, issuer_did: &str, request_json: &str) -> VcxResult<String> {
-        libindy_ledger::libindy_sign_and_submit_request(self.profile.indy_handle, issuer_did, request_json).await
+    async fn sign_and_submit_request(&self, submitter_did: &str, request_json: &str) -> VcxResult<String> {
+        indy::ledger::transactions::libindy_sign_and_submit_request(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            request_json,
+        )
+        .await
     }
 
     async fn submit_request(&self, request_json: &str) -> VcxResult<String> {
-        libindy_ledger::libindy_submit_request(request_json).await
+        indy::ledger::transactions::libindy_submit_request(self.profile.indy_pool_handle, request_json).await
     }
 
     async fn get_nym(&self, did: &str) -> VcxResult<String> {
-        libindy_ledger::get_nym(did).await
+        indy::ledger::transactions::get_nym(self.profile.indy_pool_handle, did).await
     }
 
-    async fn get_schema(&self, submitter_did: Option<&str>, schema_id: &str) -> VcxResult<String> {
-        // TODO - submitter did
-        let submitter_did = if let Some(submitter_did) = submitter_did { submitter_did } else { "todo" };
-        libindy_ledger::libindy_get_schema(self.profile.indy_handle, submitter_did, schema_id).await
+    async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
+        if let Some(submitter_did) = submitter_did {
+            // with cache if possible
+            indy::ledger::transactions::libindy_get_schema(
+                self.profile.indy_wallet_handle,
+                self.profile.indy_pool_handle,
+                submitter_did,
+                schema_id,
+            )
+            .await
+        } else {
+            // no cache
+            indy::ledger::transactions::get_schema_json(
+                self.profile.indy_wallet_handle,
+                self.profile.indy_pool_handle,
+                schema_id,
+            )
+            .await
+            .map(|(_, json)| json)
+        }
     }
 
     async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String> {
-        libindy_ledger::libindy_get_cred_def(self.profile.indy_handle, cred_def_id).await
+        indy::ledger::transactions::libindy_get_cred_def(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            cred_def_id,
+        )
+        .await
     }
 
     async fn get_cred_def_no_cache(&self, submitter_did: Option<&str>, cred_def_id: &str) -> VcxResult<String> {
-        libindy_ledger::get_cred_def_no_cache(submitter_did, cred_def_id)
+        indy::ledger::transactions::get_cred_def(self.profile.indy_pool_handle, submitter_did, cred_def_id)
             .await
-            .map(|(_id, json)| json)
+            .map(|(_, json)| json)
     }
 
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
-        libindy_ledger::get_service(did).await
+        indy::ledger::transactions::get_service(self.profile.indy_pool_handle, did).await
     }
 
     async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String> {
-        libindy_ledger::add_service(self.profile.indy_handle, did, service).await
+        indy::ledger::transactions::add_service(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            did,
+            service,
+        )
+        .await
     }
 
     async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {
-        libindy_ledger::get_rev_reg_def_json(rev_reg_id)
+        indy::ledger::transactions::get_rev_reg_def_json(self.profile.indy_pool_handle, rev_reg_id)
             .await
             .map(|(_, json)| json)
     }
@@ -73,40 +103,79 @@ impl BaseLedger for IndySdkLedger {
         from: Option<u64>,
         to: Option<u64>,
     ) -> VcxResult<(String, String, u64)> {
-        libindy_ledger::get_rev_reg_delta_json(rev_reg_id, from, to).await
+        indy::ledger::transactions::get_rev_reg_delta_json(self.profile.indy_pool_handle, rev_reg_id, from, to).await
     }
 
     async fn get_rev_reg(&self, rev_reg_id: &str, timestamp: u64) -> VcxResult<(String, String, u64)> {
-        libindy_ledger::get_rev_reg(rev_reg_id, timestamp).await
+        indy::ledger::transactions::get_rev_reg(self.profile.indy_pool_handle, rev_reg_id, timestamp).await
     }
 
     async fn get_ledger_txn(&self, submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
-        libindy_ledger::get_ledger_txn(self.profile.indy_handle, submitter_did, seq_no).await
+        indy::ledger::transactions::get_ledger_txn(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            seq_no,
+        )
+        .await
     }
 
-    async fn publish_schema(&self, schema: &str) -> VcxResult<String> {
-        libindy_ledger::publish_schema(self.profile.indy_handle, schema).await
+    async fn publish_schema(
+        &self,
+        submitter_did: &str,
+        schema_json: &str,
+        endorser_did: Option<String>,
+    ) -> VcxResult<()> {
+        indy::primitives::credential_schema::publish_schema(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            schema_json,
+            endorser_did,
+        )
+        .await
     }
 
-    async fn publish_cred_def(&self, issuer_did: &str, cred_def_json: &str) -> VcxResult<String> {
-        libindy_ledger::publish_cred_def(self.profile.indy_handle, issuer_did, cred_def_json).await
+    async fn publish_cred_def(&self, submitter_did: &str, cred_def_json: &str) -> VcxResult<()> {
+        indy::primitives::credential_definition::publish_cred_def(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            cred_def_json,
+        )
+        .await
     }
 
     async fn publish_rev_reg_def(
         &self,
-        issuer_did: &str,
+        submitter_did: &str,
         rev_reg_def: &RevocationRegistryDefinition,
-    ) -> VcxResult<String> {
-        libindy_ledger::publish_rev_reg_def(self.profile.indy_handle, issuer_did, rev_reg_def).await
+    ) -> VcxResult<()> {
+        indy::primitives::revocation_registry::publish_rev_reg_def(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            rev_reg_def,
+        )
+        .await
     }
 
     async fn publish_rev_reg_delta(
         &self,
-        issuer_did: &str,
+        submitter_did: &str,
         rev_reg_id: &str,
         rev_reg_entry_json: &str,
-    ) -> VcxResult<String> {
-        libindy_ledger::publish_rev_reg_delta(self.profile.indy_handle, issuer_did, rev_reg_id, rev_reg_entry_json).await
+    ) -> VcxResult<()> {
+        indy::primitives::revocation_registry::publish_rev_reg_delta(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            rev_reg_id,
+            rev_reg_entry_json,
+        )
+        .await?;
+
+        Ok(())
     }
 
     // async fn build_schema_request(&self, submitter_did: &str, data: &str) -> VcxResult<String> {

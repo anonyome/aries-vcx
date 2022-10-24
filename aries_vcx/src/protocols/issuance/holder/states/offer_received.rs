@@ -1,4 +1,4 @@
-use vdrtools_sys::{WalletHandle, PoolHandle};
+use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;

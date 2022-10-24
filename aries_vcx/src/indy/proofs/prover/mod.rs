@@ -1,11 +1,10 @@
+pub mod prover;
+
 use vdrtools::anoncreds;
 use crate::error::{VcxError, VcxResult};
 use crate::global::settings;
 use crate::indy;
 use crate::utils::constants::REV_STATE_JSON;
-
-pub mod prover;
-mod prover_internal;
 
 pub async fn libindy_prover_create_revocation_state(
     rev_reg_def_json: &str,

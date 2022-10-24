@@ -100,14 +100,13 @@ pub async fn build_cred_defs_json_verifier(
     credential_data: &Vec<CredInfoVerifier>,
 ) -> VcxResult<String> {
     debug!("building credential_def_json for proof validation");
-
     let ledger = Arc::clone(profile).inject_ledger();
     let mut credential_json = json!({});
 
     for cred_info in credential_data.iter() {
         if credential_json.get(&cred_info.cred_def_id).is_none() {
-            let id = &cred_info.cred_def_id;
-            let credential_def = ledger.get_cred_def(&cred_info.cred_def_id).await?;
+            let cred_def_id = &cred_info.cred_def_id;
+            let credential_def = ledger.get_cred_def(cred_def_id).await?;
 
             let credential_def = serde_json::from_str(&credential_def).map_err(|err| {
                 VcxError::from_msg(
@@ -116,7 +115,7 @@ pub async fn build_cred_defs_json_verifier(
                 )
             })?;
 
-            credential_json[id] = credential_def;
+            credential_json[cred_def_id] = credential_def;
         }
     }
 
@@ -134,8 +133,8 @@ pub async fn build_schemas_json_verifier(
 
     for cred_info in credential_data.iter() {
         if schemas_json.get(&cred_info.schema_id).is_none() {
-            let id = &cred_info.schema_id;
-            let schema_json= ledger.get_schema(None, &cred_info.schema_id)
+            let schema_id = &cred_info.schema_id;
+            let schema_json = ledger.get_schema(schema_id, None)
                 .await
                 .map_err(|err| err.map(VcxErrorKind::InvalidSchema, "Cannot get schema"))?;
 
@@ -146,7 +145,7 @@ pub async fn build_schemas_json_verifier(
                 )
             })?;
 
-            schemas_json[id] = schema_val;
+            schemas_json[schema_id] = schema_val;
         }
     }
 
@@ -166,7 +165,6 @@ pub async fn build_rev_reg_defs_json(profile: &Arc<dyn Profile>, credential_data
             .ok_or(VcxError::from(VcxErrorKind::InvalidRevocationDetails))?;
 
         if rev_reg_defs_json.get(rev_reg_id).is_none() {
-            
             let json = ledger.get_rev_reg_def_json(rev_reg_id)
                 .await
                 .or(Err(VcxError::from(VcxErrorKind::InvalidRevocationDetails)))?;

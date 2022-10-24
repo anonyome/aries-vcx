@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use indyrs::WalletHandle;
+use vdrtools_sys::{WalletHandle, PoolHandle};
 
 use crate::plugins::{
     anoncreds::{base_anoncreds::BaseAnonCreds, indy_anoncreds::IndySdkAnonCreds},
@@ -13,12 +13,13 @@ use super::profile::Profile;
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub struct IndySdkProfile {
-    pub indy_handle: WalletHandle,
+    pub indy_wallet_handle: WalletHandle,
+    pub indy_pool_handle: PoolHandle
 }
 
 impl IndySdkProfile {
-    pub fn new(indy_handle: WalletHandle) -> Self {
-        IndySdkProfile { indy_handle }
+    pub fn new(indy_wallet_handle: WalletHandle, indy_pool_handle: PoolHandle) -> Self {
+        IndySdkProfile { indy_wallet_handle, indy_pool_handle }
     }
 }
 
@@ -30,7 +31,7 @@ impl Profile for IndySdkProfile {
 
     fn inject_wallet(&self) -> Arc<dyn BaseWallet> {
         // todo - in the future we should lazy eval and avoid creating a new instance each time
-        Arc::new(IndySdkWallet::new(self.indy_handle))
+        Arc::new(IndySdkWallet::new(self.indy_wallet_handle))
     }
 
     fn inject_anoncreds(self: Arc<Self>) -> Arc<dyn BaseAnonCreds> {

@@ -4,6 +4,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
+use crate::xyz::signing::decode_signed_connection_response;
 use messages::did_doc::DidDoc;
 use crate::error::prelude::*;
 use crate::handlers::util::verify_thread_id;
@@ -21,7 +22,6 @@ use crate::protocols::connection::invitee::states::invited::InvitedState;
 use crate::protocols::connection::invitee::states::requested::RequestedState;
 use crate::protocols::connection::invitee::states::responded::RespondedState;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
-use crate::indy::signing::decode_signed_connection_response;
 use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Clone)]
@@ -164,7 +164,7 @@ impl SmConnectionInvitee {
         }
     }
 
-    pub fn remote_did(&self) -> VcxResult<String> {
+    pub async fn remote_did(&self) -> VcxResult<String> {
         self.their_did_doc()
             .await
             .map(|did_doc: DidDoc| did_doc.id)
@@ -174,7 +174,7 @@ impl SmConnectionInvitee {
             ))
     }
 
-    pub fn remote_vk(&self) -> VcxResult<String> {
+    pub async fn remote_vk(&self) -> VcxResult<String> {
         self.their_did_doc()
             .await
             .and_then(|did_doc| did_doc.recipient_keys().get(0).cloned())
@@ -264,6 +264,8 @@ impl SmConnectionInvitee {
         ))?;
 
         // let response = response.clone().decode(wallet, &remote_vk).await?;
+        // let response = decode_signed_connection_response()
+        let response = decode_signed_connection_response(wallet, response.clone(), &remote_vk).await?;
 
         if !response.from_thread(&request.get_thread_id()) {
             return Err(VcxError::from_msg(

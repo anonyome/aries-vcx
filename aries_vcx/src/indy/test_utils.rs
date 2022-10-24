@@ -2,9 +2,10 @@ use std::thread;
 use std::time::Duration;
 use vdrtools_sys::{PoolHandle, WalletHandle};
 
+use crate::global::settings;
 use crate::indy::primitives::credential_definition::CredentialDefConfigBuilder;
 use crate::indy::primitives::revocation_registry::RevocationRegistry;
-use crate::indy::credentials::encoding::encode_attributes;
+use crate::xyz::credentials::encoding::encode_attributes;
 use crate::indy::primitives::credential_definition::CredentialDef;
 use crate::indy::credentials;
 use crate::indy::ledger::transactions::get_cred_def_json;
@@ -138,11 +139,13 @@ pub async fn create_credential_req(
     let offer = credentials::issuer::libindy_issuer_create_credential_offer(wallet_handle, cred_def_id)
         .await
         .unwrap();
+        let master_secret_name = settings::DEFAULT_LINK_SECRET_ALIAS;
     let (req, req_meta) = credentials::holder::libindy_prover_create_credential_req(
         wallet_handle,
         &did,
         &offer,
         cred_def_json,
+        master_secret_name
     )
         .await
         .unwrap();

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use messages::did_doc::DidDoc;
 use crate::error::prelude::*;
 use crate::handlers::util::verify_thread_id;
+use crate::xyz::signing::sign_connection_response;
 use messages::a2a::protocol_registry::ProtocolRegistry;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::connection::invite::{Invitation, PairwiseInvitation};
@@ -19,7 +20,6 @@ use crate::protocols::connection::inviter::states::invited::InvitedState;
 use crate::protocols::connection::inviter::states::requested::RequestedState;
 use crate::protocols::connection::inviter::states::responded::RespondedState;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
-use crate::indy::signing::sign_connection_response;
 use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Clone)]
@@ -363,7 +363,7 @@ impl SmConnectionInviter {
             InviterFullState::Invited(_) | InviterFullState::Initial(_) => {
                 let new_recipient_keys = vec![new_pairwise_info.pw_vk.clone()];
                 sign_connection_response(
-                    wallet_handle,
+                    wallet,
                     &self.pairwise_info.clone().pw_vk,
                     Response::create()
                         .set_did(new_pairwise_info.pw_did.to_string())

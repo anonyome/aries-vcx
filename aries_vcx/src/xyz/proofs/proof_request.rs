@@ -1,9 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::vec::Vec;
 
 use serde_json;
 
-use crate::{error::prelude::*, plugins::anoncreds::base_anoncreds::BaseAnonCreds};
+use crate::core::profile::profile::Profile;
+use crate::error::prelude::*;
 
 use super::proof_request_internal::{AttrInfo, NonRevokedInterval, PredicateInfo};
 
@@ -25,10 +27,11 @@ pub struct ProofRequestData {
 impl ProofRequestData {
     const DEFAULT_VERSION: &'static str = "1.0";
 
-    pub async fn create(anoncreds: Arc<dyn BaseAnonCreds>, name: &str) -> VcxResult<Self> {
+    pub async fn create(profile: &Arc<dyn Profile>, name: &str) -> VcxResult<Self> {
+        let nonce = Arc::clone(profile).inject_anoncreds().generate_nonce().await?;
         Ok(Self {
             name: name.to_string(),
-            nonce: anoncreds.generate_nonce().await?,
+            nonce,
             ..Self::default()
         })
     }
@@ -116,6 +119,19 @@ impl Default for ProofRequestData {
     }
 }
 
+pub type PresentationRequestData = ProofRequestData;
+
+#[cfg(feature = "test_utils")]
+pub mod test_utils {
+    use super::*;
+
+    pub fn _presentation_request_data() -> PresentationRequestData {
+        PresentationRequestData::default()
+            .set_requested_attributes_as_string(json!([{"name": "name"}]).to_string())
+            .unwrap()
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "general_test")]
 mod unit_tests {
@@ -127,6 +143,7 @@ mod unit_tests {
     use crate::utils::mockdata::mockdata_proof;
 
     use super::*;
+
 
     fn _expected_req_attrs() -> HashMap<String, AttrInfo> {
         let mut check_req_attrs: HashMap<String, AttrInfo> = HashMap::new();

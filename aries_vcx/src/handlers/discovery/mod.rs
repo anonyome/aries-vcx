@@ -17,7 +17,7 @@ pub async fn send_discovery_query(
 ) -> VcxResult<()> {
     let query_ = Query::create().set_query(query).set_comment(comment).set_out_time();
     send_message(
-        Arc::clone(wallet),
+        wallet,
         pw_vk.to_string(),
         did_doc.clone(),
         query_.to_a2a_message(),
@@ -38,7 +38,7 @@ pub async fn respond_discovery_query(
         .set_out_time();
 
     send_message(
-        Arc::clone(wallet),
+        wallet,
         pw_vk.to_string(),
         did_doc.clone(),
         disclose.to_a2a_message(),

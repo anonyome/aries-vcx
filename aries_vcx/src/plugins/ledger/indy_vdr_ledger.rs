@@ -1,16 +1,16 @@
 use indy_vdr as vdr;
+use messages::did_doc::service_aries::AriesService;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vdr::ledger::requests::schema::SchemaV1;
+use vdr::ledger::requests::schema::{SchemaV1, AttributeNames, Schema};
 
 use async_trait::async_trait;
-use indy_credx::types::{RevocationRegistryId, Schema, AttributeNames};
 use serde_json::Value;
 use tokio::sync::oneshot;
 use vdr::common::error::VdrError;
 use vdr::config::PoolConfig as IndyVdrPoolConfig;
-use vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId};
+use vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId, RevocationRegistryId};
 use vdr::ledger::requests::author_agreement::{GetTxnAuthorAgreementData, TxnAuthrAgrmtAcceptanceData};
 use vdr::ledger::RequestBuilder;
 use vdr::pool::{PoolBuilder, PoolTransactions};
@@ -20,11 +20,10 @@ use vdr::utils::{Qualifiable, ValidationError};
 
 use crate::core::profile::modular_wallet_profile::LedgerPoolConfig;
 use crate::core::profile::profile::Profile;
-use crate::did_doc::service_aries::AriesService;
 use crate::error::VcxResult;
 use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
-use crate::libindy::utils::anoncreds::RevocationRegistryDefinition;
+use crate::indy::primitives::revocation_registry::RevocationRegistryDefinition;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 use crate::utils::json::{AsTypeOrDeserializationError, TryGetIndex};
@@ -104,13 +103,13 @@ impl IndyVdrLedger {
         Ok(reply?)
     }
 
-    async fn _sign_and_submit_request(&self, issuer_did: &str, request: PreparedRequest) -> VcxResult<String> {
+    async fn _sign_and_submit_request(&self, submitter_did: &str, request: PreparedRequest) -> VcxResult<String> {
         let mut request = request;
         let to_sign = request.get_signature_input()?;
 
         let wallet = self.profile.inject_wallet();
 
-        let signer_verkey = wallet.get_verkey_from_wallet(issuer_did).await?;
+        let signer_verkey = wallet.get_verkey_from_wallet(submitter_did).await?;
 
         let signature = self
             .profile
@@ -207,10 +206,10 @@ impl IndyVdrLedger {
 
 #[async_trait]
 impl BaseLedger for IndyVdrLedger {
-    async fn sign_and_submit_request(&self, issuer_did: &str, request_json: &str) -> VcxResult<String> {
+    async fn sign_and_submit_request(&self, submitter_did: &str, request_json: &str) -> VcxResult<String> {
         let request = PreparedRequest::from_request_json(request_json)?;
 
-        self._sign_and_submit_request(issuer_did, request).await
+        self._sign_and_submit_request(submitter_did, request).await
     }
 
     async fn submit_request(&self, request_json: &str) -> VcxResult<String> {
@@ -225,7 +224,7 @@ impl BaseLedger for IndyVdrLedger {
         self._submit_request(request).await
     }
 
-    async fn get_schema(&self, submitter_did: Option<&str>, schema_id: &str) -> VcxResult<String> {
+    async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
         // TODO try from cache first
 
         // TODO - do we need to handle someone submitting a schema request by seq number?
@@ -437,28 +436,28 @@ impl BaseLedger for IndyVdrLedger {
 
     // build_schema_request - todo - used in libvcx
 
-    async fn publish_schema(&self, schema: &str) -> VcxResult<String> {
+    async fn publish_schema(&self, submitter_did: &str, schema_json: &str, endorser_did: Option<String>)  -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_schema"))
     }
 
-    async fn publish_cred_def(&self, issuer_did: &str, cred_def_json: &str) -> VcxResult<String> {
+    async fn publish_cred_def(&self, submitter_did: &str, cred_def_json: &str) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_cred_def"))
     }
 
     async fn publish_rev_reg_def(
         &self,
-        issuer_did: &str,
+        submitter_did: &str,
         rev_reg_def: &RevocationRegistryDefinition,
-    ) -> VcxResult<String> {
+    ) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_rev_reg_def"))
     }
 
     async fn publish_rev_reg_delta(
         &self,
-        issuer_did: &str,
+        submitter_did: &str,
         rev_reg_id: &str,
         rev_reg_entry_json: &str,
-    ) -> VcxResult<String> {
+    ) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_rev_reg_delta"))
     }
 }

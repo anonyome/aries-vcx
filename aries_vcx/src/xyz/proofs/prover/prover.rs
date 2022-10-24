@@ -3,12 +3,12 @@ use std::sync::Arc;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::global::settings;
+use crate::utils::mockdata::mock_settings::get_mock_generate_indy_proof;
 use crate::xyz::proofs::proof_request::ProofRequestData;
 use crate::xyz::proofs::prover::prover_internal::{
     build_cred_defs_json_prover, build_requested_credentials_json, build_rev_states_json, build_schemas_json_prover,
     credential_def_identifiers,
 };
-use crate::utils::mockdata::mock_settings::get_mock_generate_indy_proof;
 
 pub async fn generate_indy_proof(
     profile: &Arc<dyn Profile>,
@@ -29,6 +29,7 @@ pub async fn generate_indy_proof(
             return Ok(mocked_indy_proof);
         }
     }
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
 
     let proof_request: ProofRequestData = serde_json::from_str(proof_req_data_json).map_err(|err| {
         VcxError::from_msg(
@@ -45,8 +46,6 @@ pub async fn generate_indy_proof(
 
     let schemas_json = build_schemas_json_prover(profile, &credentials_identifiers).await?;
     let credential_defs_json = build_cred_defs_json_prover(profile, &credentials_identifiers).await?;
-
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
 
     let proof = anoncreds
         .prover_create_proof(

@@ -23,6 +23,7 @@ mysql_test = ["test_utils", "sqlx" ]
 temp_gm_tests = ["test_utils", "tokio/rt", "tokio/macros"]
 
 [dependencies]
+async-trait = "0.1.53"
 env_logger = "0.9.0"
 log = "0.4.16"
 chrono = "0.4.19"
@@ -42,7 +43,7 @@ vdrtoolsrs = { git = "https://gitlab.com/left-arm/vdr-tools.git", rev = "aa446cb
 vdrtools-sys = { git = "https://gitlab.com/left-arm/vdr-tools.git", rev = "aa446cb8d" }
 # indy alternatives ----
 indy-vdr = "0.3.4"
-indy-credx = "0.3.1"
+indy-credx = { git = "https://github.com/anonyome/indy-shared-rs.git", rev = "7342bc624d23ece8845d1a701cd2cdc9cd401bb0" }
 # ----------------------
 
 futures = "0.3.15"

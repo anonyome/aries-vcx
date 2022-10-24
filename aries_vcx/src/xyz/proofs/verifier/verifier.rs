@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
-use crate::xyz::proofs::verifier::verifier_internal::{validate_proof_revealed_attributes, get_credential_info, build_cred_defs_json_verifier, build_schemas_json_verifier, build_rev_reg_defs_json, build_rev_reg_json};
 use crate::utils::mockdata::mock_settings::get_mock_result_for_validate_indy_proof;
+use crate::xyz::proofs::verifier::verifier_internal::{validate_proof_revealed_attributes, get_credential_info, build_cred_defs_json_verifier, build_schemas_json_verifier, build_rev_reg_defs_json, build_rev_reg_json};
 
 pub async fn validate_indy_proof(
     profile: &Arc<dyn Profile>,
@@ -14,6 +14,7 @@ pub async fn validate_indy_proof(
         return mock_result;
     }
 
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
     validate_proof_revealed_attributes(proof_json)?;
 
     let credential_data = get_credential_info(proof_json)?;
@@ -37,8 +38,6 @@ pub async fn validate_indy_proof(
     debug!("*******\n{}\n********", proof_req_json);
     debug!("*******\n{}\n********", rev_reg_defs_json);
     debug!("*******\n{}\n********", rev_regs_json);
-
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
     anoncreds.verifier_verify_proof(
         proof_req_json,
         proof_json,

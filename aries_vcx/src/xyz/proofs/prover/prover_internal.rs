@@ -30,7 +30,7 @@ pub async fn build_schemas_json_prover(
 
     for cred_info in credentials_identifiers {
         if rtn.get(&cred_info.schema_id).is_none() {
-            let schema_json = ledger.get_schema(None, &cred_info.schema_id)
+            let schema_json = ledger.get_schema( &cred_info.schema_id, None)
                 .await
                 .map_err(|err| err.map(VcxErrorKind::InvalidSchema, "Cannot get schema"))?;
 
@@ -156,9 +156,8 @@ pub async fn build_rev_states_json(profile: &Arc<dyn Profile>, credentials_ident
         "build_rev_states_json >> credentials_identifiers: {:?}",
         credentials_identifiers
     );
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
     let ledger = Arc::clone(profile).inject_ledger();
-    
+    let anoncreds = Arc::clone(profile).inject_anoncreds();
     let mut rtn: Value = json!({});
     let mut timestamps: HashMap<String, u64> = HashMap::new();
 

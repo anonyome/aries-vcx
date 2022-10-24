@@ -27,7 +27,7 @@ use credx::{
     Error as CredxError,
 };
 use indy_credx as credx;
-use indy_vdr::utils::{Qualifiable, Validatable};
+// use indy_vdr::utils::{Qualifiable, Validatable};
 use serde_json::Value;
 
 use super::base_anoncreds::BaseAnonCreds;
@@ -75,7 +75,7 @@ impl IndyCredxAnonCreds {
 
         let credential: CredxCredential = serde_json::from_str(cred_json)?;
 
-        credential.validate()?;
+        // credential.validate()?;
 
         Ok(credential)
     }
@@ -98,7 +98,7 @@ impl IndyCredxAnonCreds {
 
                 let credential: CredxCredential = serde_json::from_str(cred_json)?;
 
-                credential.validate()?;
+                // credential.validate()?;
 
                 Ok((cred_record_id, credential))
             })
@@ -387,7 +387,8 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         credential_def_json: &str,
         link_secret_id: &str,
     ) -> VcxResult<(String, String)> {
-        let prover_did = DidValue::from_str(prover_did)?;
+        let prover_did = DidValue::new(prover_did, None);
+        // let prover_did = DidValue::from_str(prover_did)?;
         let cred_def: CredentialDefinition = serde_json::from_str(credential_def_json)?;
         let credential_offer: CredentialOffer = serde_json::from_str(credential_offer_json)?;
         let link_secret = self.get_link_secret(link_secret_id).await?;
@@ -460,10 +461,10 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             rev_reg_def.as_ref(),
         )?;
 
-        credential.validate()?;
+        // credential.validate()?;
 
         let schema_id = &credential.schema_id;
-        schema_id.validate()?;
+        // schema_id.validate()?;
         let (_schema_method, schema_issuer_did, schema_name, schema_version) =
             schema_id.parts().ok_or(VcxError::from_msg(
                 VcxErrorKind::InvalidSchema,
@@ -471,7 +472,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             ))?;
 
         let cred_def_id = &credential.cred_def_id;
-        cred_def_id.validate()?;
+        // cred_def_id.validate()?;
         let (_cred_def_method, issuer_did, _signature_type, _schema_id, _tag) =
             cred_def_id.parts().ok_or(VcxError::from_msg(
                 VcxErrorKind::InvalidSchema,
@@ -556,16 +557,6 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         Err(unimplemented_method_err("credx issuer_create_schema"))
     }
 
-
-    async fn revoke_credential_and_publish(
-        &self,
-        tails_file: &str,
-        rev_reg_id: &str,
-        cred_rev_id: &str,
-    ) -> VcxResult<String> {
-        Err(unimplemented_method_err("credx revoke_credential_and_publish"))
-    }
-    
     // todo - think about moving this to somewhere else as it aggregates other calls
     async fn revoke_credential_local(
         &self,
@@ -577,7 +568,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
     
     // todo - think about moving this to somewhere else as it aggregates other calls
-    async fn publish_local_revocations(&self, rev_reg_id: &str) -> VcxResult<String> {
+    async fn publish_local_revocations(&self, submitter_did: &str, rev_reg_id: &str) -> VcxResult<()> {
         Err(unimplemented_method_err("credx publish_local_revocations"))
     }
 

@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 
-use crate::{did_doc::service_aries::AriesService, error::VcxResult, messages::connection::did::Did, libindy::utils::anoncreds::RevocationRegistryDefinition};
+use crate::{messages::did_doc::service_aries::AriesService, error::VcxResult, messages::connection::did::Did, indy::primitives::revocation_registry::RevocationRegistryDefinition};
 
 #[async_trait]
 pub trait BaseLedger: Send + Sync {
     // multisign_request - internal
     // libindy_sign_request - internal/unused
 
-    async fn sign_and_submit_request(&self, issuer_did: &str, request_json: &str) -> VcxResult<String>;
+    async fn sign_and_submit_request(&self, submitter_did: &str, request_json: &str) -> VcxResult<String>;
 
     async fn submit_request(&self, request_json: &str) -> VcxResult<String>;
 
@@ -27,7 +27,7 @@ pub trait BaseLedger: Send + Sync {
     // get_role - internal
     // parse_response - internal
 
-    async fn get_schema(&self, submitter_did: Option<&str>, schema_id: &str) -> VcxResult<String>;
+    async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String>;
 
     // libindy_build_get_cred_def_request - internal
 
@@ -65,20 +65,20 @@ pub trait BaseLedger: Send + Sync {
 
     // build_schema_request - todo - used in libvcx
 
-    async fn publish_schema(&self, schema: &str) -> VcxResult<String>;
+    async fn publish_schema(&self, submitter_did: &str, schema_json: &str, endorser_did: Option<String>)  -> VcxResult<()>;
 
-    async fn publish_cred_def(&self, issuer_did: &str, cred_def_json: &str) -> VcxResult<String>;
+    async fn publish_cred_def(&self, submitter_did: &str, cred_def_json: &str) -> VcxResult<()>;
 
     async fn publish_rev_reg_def(
         &self,
-        issuer_did: &str,
+        submitter_did: &str,
         rev_reg_def: &RevocationRegistryDefinition,
-    ) -> VcxResult<String>;
+    ) -> VcxResult<()>;
 
     async fn publish_rev_reg_delta(
         &self,
-        issuer_did: &str,
+        submitter_did: &str,
         rev_reg_id: &str,
         rev_reg_entry_json: &str,
-    ) -> VcxResult<String>;
+    ) -> VcxResult<()>;
 }

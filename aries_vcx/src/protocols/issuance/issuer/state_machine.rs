@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::core::profile::profile::Profile;
 
 use crate::error::{VcxError, VcxErrorKind, VcxResult};
-use crate::xyz::credentials::encode_attributes;
+use crate::xyz::credentials::encoding::encode_attributes;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::issuance::credential::Credential;
 use messages::issuance::credential_offer::{CredentialOffer, OfferInfo};
