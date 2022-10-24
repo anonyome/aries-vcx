@@ -90,7 +90,6 @@ pub async fn decode_signed_connection_response(wallet: &Arc<dyn BaseWallet>, res
 #[cfg(feature = "general_test")]
 pub mod unit_tests {
     use messages::did_doc::test_utils::*;
-    use crate::indy::utils::test_setup::{create_trustee_key, setup_wallet};
     use messages::connection::response::test_utils::{_did, _response, _thread_id};
     use crate::utils::devsetup::SetupEmpty;
 

@@ -430,7 +430,6 @@ pub mod unit_tests {
     
     use crate::test::source_id;
     use crate::utils::devsetup::SetupMocks;
-    use crate::indy::signing::sign_connection_response;
 
     use super::*;
 

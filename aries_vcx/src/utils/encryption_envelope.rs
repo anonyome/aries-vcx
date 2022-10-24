@@ -197,9 +197,6 @@ impl EncryptionEnvelope {
 #[cfg(feature = "general_test")]
 pub mod unit_tests {
     use messages::did_doc::test_utils::*;
-    use crate::indy::signing::create_key;
-    use crate::indy::utils::test_setup;
-    use crate::indy::utils::test_setup::create_trustee_key;
     use messages::ack::test_utils::_ack;
     use crate::utils::devsetup::SetupEmpty;
 

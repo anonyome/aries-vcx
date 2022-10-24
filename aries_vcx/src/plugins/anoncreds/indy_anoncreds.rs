@@ -2,13 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{
-    core::profile::{indy_profile::IndySdkProfile, profile::Profile},
-    error::VcxResult,
-    global::settings,
-    indy,
-    utils::constants::REV_REG_DELTA_JSON,
-};
+use crate::{core::profile::indy_profile::IndySdkProfile, error::VcxResult, indy};
 
 use super::base_anoncreds::BaseAnonCreds;
 
@@ -34,7 +28,7 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         rev_reg_defs_json: &str,
         rev_regs_json: &str,
     ) -> VcxResult<bool> {
-        indy::proofs::verifier::verifier_libindy::libindy_verifier_verify_proof(
+        indy::proofs::verifier::verifier::libindy_verifier_verify_proof(
             proof_req_json,
             proof_json,
             schemas_json,
@@ -53,11 +47,20 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         sig_type: Option<&str>,
         config_json: &str,
     ) -> VcxResult<(String, String)> {
-        indy::primitives::credential_definition::libindy_create_and_store_credential_def(self.profile.indy_wallet_handle, issuer_did, schema_json, tag, sig_type, config_json).await
+        indy::primitives::credential_definition::libindy_create_and_store_credential_def(
+            self.profile.indy_wallet_handle,
+            issuer_did,
+            schema_json,
+            tag,
+            sig_type,
+            config_json,
+        )
+        .await
     }
 
     async fn issuer_create_credential_offer(&self, cred_def_id: &str) -> VcxResult<String> {
-        indy::credentials::issuer::libindy_issuer_create_credential_offer(self.profile.indy_wallet_handle, cred_def_id).await
+        indy::credentials::issuer::libindy_issuer_create_credential_offer(self.profile.indy_wallet_handle, cred_def_id)
+            .await
     }
 
     async fn issuer_create_credential(
@@ -105,7 +108,11 @@ impl BaseAnonCreds for IndySdkAnonCreds {
     }
 
     async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String> {
-        indy::proofs::prover::prover::libindy_prover_get_credentials_for_proof_req(self.profile.indy_wallet_handle, proof_req).await
+        indy::proofs::prover::prover::libindy_prover_get_credentials_for_proof_req(
+            self.profile.indy_wallet_handle,
+            proof_req,
+        )
+        .await
     }
 
     async fn prover_create_credential_req(
@@ -165,7 +172,11 @@ impl BaseAnonCreds for IndySdkAnonCreds {
     }
 
     async fn prover_create_link_secret(&self, master_secret_id: &str) -> VcxResult<String> {
-        indy::credentials::holder::libindy_prover_create_master_secret(self.profile.indy_wallet_handle, master_secret_id).await
+        indy::credentials::holder::libindy_prover_create_master_secret(
+            self.profile.indy_wallet_handle,
+            master_secret_id,
+        )
+        .await
     }
 
     async fn issuer_create_schema(
@@ -190,12 +201,24 @@ impl BaseAnonCreds for IndySdkAnonCreds {
 
     // todo - think about moving this to somewhere else as it aggregates other calls
     async fn revoke_credential_local(&self, tails_file: &str, rev_reg_id: &str, cred_rev_id: &str) -> VcxResult<()> {
-        indy::primitives::revocation_registry::revoke_credential_local(self.profile.indy_wallet_handle, tails_file, rev_reg_id, cred_rev_id).await
+        indy::primitives::revocation_registry::revoke_credential_local(
+            self.profile.indy_wallet_handle,
+            tails_file,
+            rev_reg_id,
+            cred_rev_id,
+        )
+        .await
     }
 
     // todo - think about moving this to somewhere else as it aggregates other calls
     async fn publish_local_revocations(&self, submitter_did: &str, rev_reg_id: &str) -> VcxResult<()> {
-        indy::primitives::revocation_registry::publish_local_revocations(self.profile.indy_wallet_handle, self.profile.indy_pool_handle, submitter_did, rev_reg_id).await
+        indy::primitives::revocation_registry::publish_local_revocations(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            rev_reg_id,
+        )
+        .await
     }
 
     async fn generate_nonce(&self) -> VcxResult<String> {

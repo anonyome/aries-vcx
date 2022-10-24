@@ -265,7 +265,6 @@ pub fn build_requested_credentials_json(
 pub mod pool_tests {
     use vdrtools_sys::PoolHandle;
 
-    use crate::indy::proofs::prover::prover_internal::{build_rev_states_json, CredInfoProver};
     use crate::utils::constants::{CRED_DEF_ID, CRED_REV_ID, LICENCE_CRED_ID, SCHEMA_ID, TAILS_DIR};
     use crate::utils::devsetup::SetupWalletPool;
     use crate::utils::get_temp_dir_path;
@@ -306,7 +305,6 @@ pub mod pool_tests {
 #[cfg(test)]
 #[cfg(feature = "general_test")]
 pub mod unit_tests {
-    use crate::indy::proofs::prover::prover_internal::CredInfoProver;
     use crate::utils::devsetup::*;
     use crate::utils::{
         constants::{

@@ -6,7 +6,7 @@ use agency_client::agency_client::AgencyClient;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::connection::Connection;
-use messages::out_of_band::invitation::OutOfBandInvitation;
+use crate::xyz::ledger::transactions::resolve_service;
 use messages::a2a::A2AMessage;
 use messages::attachment::AttachmentId;
 use messages::connection::invite::Invitation;
@@ -14,12 +14,12 @@ use messages::did_doc::DidDoc;
 use messages::issuance::credential::Credential;
 use messages::issuance::credential_offer::CredentialOffer;
 use messages::issuance::credential_request::CredentialRequest;
+use messages::out_of_band::invitation::OutOfBandInvitation;
 
 use messages::proof_presentation::presentation::Presentation;
 use messages::proof_presentation::presentation_request::PresentationRequest;
 
 use messages::did_doc::service_resolvable::ServiceResolvable;
-use crate::indy::ledger::transactions::resolve_service;
 
 #[derive(Default, Debug, PartialEq, Clone)]
 pub struct OutOfBandReceiver {
@@ -54,8 +54,7 @@ impl OutOfBandReceiver {
                                 return Ok(Some(connection));
                             }
                         };
-                        if did_doc.get_service()? == resolve_service(pool_handle, &service).await? {
-                        // if did_doc.resolve_service()? == service.resolve(profile).await? {
+                        if did_doc.get_service()? == resolve_service(profile, &service).await? {
                             return Ok(Some(connection));
                         };
                     }
@@ -135,14 +134,20 @@ impl OutOfBandReceiver {
         Ok(None)
     }
 
-    pub async fn build_connection(&self, agency_client: &AgencyClient, did_doc: DidDoc, autohop_enabled: bool) -> VcxResult<Connection> {
+    pub async fn build_connection(
+        &self,
+        profile: &Arc<dyn Profile>,
+        agency_client: &AgencyClient,
+        did_doc: DidDoc,
+        autohop_enabled: bool,
+    ) -> VcxResult<Connection> {
         trace!(
             "OutOfBandReceiver::build_connection >>> autohop_enabled: {}",
             autohop_enabled
         );
         Connection::create_with_invite(
             &self.oob.id.0,
-            todo!(),
+            profile,
             agency_client,
             Invitation::OutOfBand(self.oob.clone()),
             did_doc,

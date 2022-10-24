@@ -339,13 +339,14 @@ impl Connection {
 
     pub async fn send_response(
         &mut self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
     ) -> VcxResult<()> {
         trace!("Connection::send_response >>>");
+        let wallet = profile.inject_wallet();
         let connection_sm = match self.connection_sm.clone() {
             SmConnection::Inviter(sm_inviter) => {
                 if let InviterFullState::Requested(_) = sm_inviter.state_object() {
-                    sm_inviter.handle_send_response(wallet_handle, &send_message).await?
+                    sm_inviter.handle_send_response(&wallet, &send_message).await?
                 } else {
                     return Err(VcxError::from_msg(VcxErrorKind::NotReady, "Invalid action"));
                 }
@@ -432,7 +433,7 @@ impl Connection {
     }
 
     pub async fn handle_message(&mut self, message: A2AMessage, profile: &Arc<dyn Profile>) -> VcxResult<()> {
-        let did_doc = self.their_did_doc(profile).ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!(
                 "Can't answer message {:?} because counterparty did doc is not available",
@@ -446,7 +447,7 @@ impl Connection {
                 info!("Answering ping, thread: {}", ping.get_thread_id());
                 if ping.response_requested {
                     send_message(
-                        &wallet,
+                        wallet,
                         pw_vk.to_string(),
                         did_doc.clone(),
                         build_ping_response(&ping).to_a2a_message(),
@@ -460,7 +461,7 @@ impl Connection {
                     handshake_reuse.get_thread_id()
                 );
                 let msg = build_handshake_reuse_accepted_msg(&handshake_reuse)?;
-                send_message(&wallet, pw_vk.to_string(), did_doc.clone(), msg.to_a2a_message()).await?;
+                send_message(wallet, pw_vk.to_string(), did_doc.clone(), msg.to_a2a_message()).await?;
             }
             A2AMessage::Query(query) => {
                 let supported_protocols = ProtocolRegistry::init().get_protocols_for_query(query.query.as_deref());
@@ -726,8 +727,8 @@ impl Connection {
         let wallet = profile.inject_wallet();
 
         Ok(Box::new(move |message: A2AMessage| {
-            let w = Arc::clone(&wallet); // todo - unsure why this clone is required
-            Box::pin(send_message(&w, sender_vk.clone(), did_doc.clone(), message))
+            let w = Arc::clone(&wallet); // new instance of wallet just for this closure
+            Box::pin(send_message(w, sender_vk.clone(), did_doc.clone(), message))
         }))
     }
 
@@ -790,7 +791,7 @@ impl Connection {
             format!("Can't send handshake-reuse to the counterparty, because their did doc is not available"),
         ))?;
         send_message(
-            &profile.inject_wallet(),
+            profile.inject_wallet(),
             self.pairwise_info().pw_vk.clone(),
             did_doc.clone(),
             build_handshake_reuse_msg(&oob).to_a2a_message(),

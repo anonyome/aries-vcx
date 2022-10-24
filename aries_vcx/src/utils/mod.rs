@@ -72,14 +72,14 @@ pub fn get_temp_dir_path(filename: &str) -> PathBuf {
 }
 
 pub async fn send_message(
-    wallet: &Arc<dyn BaseWallet>,
+    wallet: Arc<dyn BaseWallet>,
     sender_verkey: String,
     did_doc: DidDoc,
     message: A2AMessage,
 ) -> VcxResult<()> {
     trace!("send_message >>> message: {:?}, did_doc: {:?}", message, &did_doc);
     let EncryptionEnvelope(envelope) = EncryptionEnvelope::create(
-        wallet, 
+        &wallet, 
         &message, 
         Some(&sender_verkey), 
         &did_doc)
@@ -90,7 +90,7 @@ pub async fn send_message(
 }
 
 pub async fn send_message_anonymously(
-    wallet: &Arc<dyn BaseWallet>,
+    wallet: Arc<dyn BaseWallet>,
     did_doc: &DidDoc,
     message: &A2AMessage,
 ) -> VcxResult<()> {
@@ -100,7 +100,7 @@ pub async fn send_message_anonymously(
         &did_doc
     );
     let EncryptionEnvelope(envelope) = EncryptionEnvelope::create(
-        wallet, 
+        &wallet, 
         &message, 
         None,
         &did_doc)

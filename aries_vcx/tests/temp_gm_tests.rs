@@ -4,10 +4,7 @@ mod integration_tests {
     use aries_vcx::core::profile::modular_wallet_profile::{LedgerPoolConfig, ModularWalletProfile};
     use aries_vcx::handlers::issuance::holder::Holder;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
-    use aries_vcx::indy::ledger::transactions::into_did_doc;
-    use aries_vcx::libindy::utils::pool::PoolConfig;
-    use aries_vcx::libindy::utils::signus;
-    use aries_vcx::messages::connection::did::Did;
+    use aries_vcx::indy::ledger::pool::{create_pool_ledger_config, open_pool_ledger};
     use aries_vcx::messages::issuance::credential::Credential;
     use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
     use aries_vcx::messages::proof_presentation::presentation_ack::PresentationAck;
@@ -16,13 +13,14 @@ mod integration_tests {
     use aries_vcx::plugins::ledger::indy_vdr_ledger::{IndyVdrLedger, IndyVdrLedgerPool};
     use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
     use aries_vcx::protocols::issuance::actions::CredentialIssuanceAction;
+    use aries_vcx::xyz::ledger::transactions::into_did_doc;
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
     use indy_vdr::pool::{PoolBuilder, PoolTransactions};
     use serde_json::Value;
-    use vdrtools_sys::PoolHandle;
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{sync::Arc, thread, time::Duration};
+    use vdrtools_sys::PoolHandle;
 
     use agency_client::agency_client::AgencyClient;
     use aries_vcx::messages::a2a::A2AMessage;
@@ -31,17 +29,23 @@ mod integration_tests {
         core::profile::{indy_profile::IndySdkProfile, profile::Profile},
         global::{self, settings},
         handlers::connection::connection::Connection,
-        libindy::utils::wallet::{create_and_open_wallet, WalletConfig},
         messages::connection::invite::Invitation,
         plugins::wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet},
         utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
     };
-    use indy_sys::WalletHandle;
+
+    const INDICIO_TEST_GENESIS_PATH: &str =
+        "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn";
+    const INDICIO_TEST_POOL_NAME: &str = "INDICIO_TEST";
 
     #[tokio::test]
     async fn establish_connection() {
         let indy_handle = setup::open_default_indy_handle().await;
-        let indy_profile = IndySdkProfile::new(indy_handle);
+        create_pool_ledger_config(&INDICIO_TEST_POOL_NAME, &INDICIO_TEST_GENESIS_PATH)
+            .await
+            .unwrap();
+        let indy_pool_handle = open_pool_ledger(&INDICIO_TEST_POOL_NAME, None).await.unwrap();
+        let indy_profile = IndySdkProfile::new(indy_handle, indy_pool_handle);
         let profile: Arc<dyn Profile> = Arc::new(indy_profile.clone());
 
         let agency_client = setup::open_default_agency_client(&profile);
@@ -49,12 +53,12 @@ mod integration_tests {
         let invitation = helper::url_to_invitation("http://cloudagent.gmulhearne.di-team.dev.sudoplatform.com:8200?c_i=eyJAdHlwZSI6ICJkaWQ6c292OkJ6Q2JzTlloTXJqSGlxWkRUVUFTSGc7c3BlYy9jb25uZWN0aW9ucy8xLjAvaW52aXRhdGlvbiIsICJAaWQiOiAiNDkyYzVkZGYtNjBiYi00YWM1LThkOGYtOTdlOWU2NGVkMjA0IiwgInJlY2lwaWVudEtleXMiOiBbIjNiOFU2eEJlS1VzRUNlNzN2UGNHdVdhejVTVUVaQVFRaUg5OHVNb2RqVkFXIl0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2Nsb3VkYWdlbnQuZ211bGhlYXJuZS5kaS10ZWFtLmRldi5zdWRvcGxhdGZvcm0uY29tOjgyMDAiLCAibGFiZWwiOiAiZ211bGhlYXJuZSJ9");
         let invitation = Invitation::Pairwise(invitation);
 
-        // todo - move this into_did_doc method
-        let their_did_doc = into_did_doc(PoolHandle(1), &invitation).await.unwrap();
+        let their_did_doc = into_did_doc(&profile, &invitation).await.unwrap();
         let autohop = false; // note that trinsic doesn't understand the ACK, so turn it off when using trinisc
-        let mut conn = Connection::create_with_invite("69", &profile, &agency_client, invitation, their_did_doc, autohop)
-            .await
-            .unwrap();
+        let mut conn =
+            Connection::create_with_invite("69", &profile, &agency_client, invitation, their_did_doc, autohop)
+                .await
+                .unwrap();
         conn.connect(&profile, &agency_client).await.unwrap();
 
         println!("{:?}", conn.get_state());
@@ -92,6 +96,7 @@ mod integration_tests {
     async fn clear_messages() {
         let (conn, _, _, _, agency_client) = setup::setup_with_existing_conn().await;
         helper::clear_connection_messages(&conn, &agency_client).await;
+        ()
     }
 
     #[tokio::test]
@@ -99,7 +104,10 @@ mod integration_tests {
         let (conn, _, mod_profile, indy_profile, agency_client) = setup::setup_with_existing_conn().await;
         let profile = mod_profile;
 
-        println!("{}", profile.inject_anoncreds().prover_get_credentials(None).await.unwrap());
+        println!(
+            "{}",
+            profile.inject_anoncreds().prover_get_credentials(None).await.unwrap()
+        );
         ()
     }
 
@@ -161,7 +169,7 @@ mod integration_tests {
             .send_request(
                 &profile,
                 conn.pairwise_info().pw_did.to_string(),
-                conn.send_message_closure(&profile).unwrap(),
+                conn.send_message_closure(&profile).await.unwrap(),
             )
             .await
             .unwrap();
@@ -186,7 +194,7 @@ mod integration_tests {
             .step(
                 &profile,
                 CredentialIssuanceAction::Credential(issaunce_msg),
-                Some(conn.send_message_closure(&profile).unwrap()),
+                Some(conn.send_message_closure(&profile).await.unwrap()),
             )
             .await
             .unwrap();
@@ -275,7 +283,7 @@ mod integration_tests {
             .unwrap();
 
         prover
-            .send_presentation(&profile, conn.send_message_closure(&profile).unwrap())
+            .send_presentation(&profile, conn.send_message_closure(&profile).await.unwrap())
             .await
             .unwrap();
 
@@ -297,7 +305,7 @@ mod integration_tests {
             .handle_message(
                 &profile,
                 ProverMessages::PresentationAckReceived(pres_ack),
-                Some(conn.send_message_closure(&profile).unwrap()),
+                Some(conn.send_message_closure(&profile).await.unwrap()),
             )
             .await
             .unwrap();
@@ -322,11 +330,13 @@ mod integration_tests {
             },
             global::{self, settings},
             handlers::connection::connection::Connection,
-            libindy::utils::{pool::PoolConfig, wallet::WalletConfig},
+            indy::{ledger::pool::{create_pool_ledger_config, open_pool_ledger}, wallet::WalletConfig},
             plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet,
             utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
         };
-        use indy_sys::WalletHandle;
+        use vdrtools_sys::WalletHandle;
+
+        use crate::integration_tests::{INDICIO_TEST_GENESIS_PATH, INDICIO_TEST_POOL_NAME};
 
         pub async fn open_default_indy_handle() -> WalletHandle {
             let config_wallet = WalletConfig {
@@ -339,7 +349,7 @@ mod integration_tests {
                 rekey: None,
                 rekey_derivation_method: None,
             };
-            aries_vcx::libindy::wallet::open_wallet(&config_wallet).await.unwrap()
+            aries_vcx::indy::wallet::open_wallet(&config_wallet).await.unwrap()
         }
 
         pub fn open_default_agency_client(profile: &Arc<dyn Profile>) -> AgencyClient {
@@ -375,15 +385,17 @@ mod integration_tests {
 
             // set up indy profile
             let indy_handle = open_default_indy_handle().await;
-            let indy_profile: Arc<dyn Profile> = Arc::new(IndySdkProfile::new(indy_handle));
+            create_pool_ledger_config(&INDICIO_TEST_POOL_NAME, &INDICIO_TEST_GENESIS_PATH)
+                .await
+                .unwrap();
+            let indy_pool_handle = open_pool_ledger(&INDICIO_TEST_POOL_NAME, None).await.unwrap();
+            let indy_profile: Arc<dyn Profile> = Arc::new(IndySdkProfile::new(indy_handle, indy_pool_handle));
             // ------
             //set up modular wallet profile
             let indy_wallet = indy_profile.inject_wallet();
             let ledger_pool_config = LedgerPoolConfig {
-            genesis_file_path:
-                "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn"
-                    .to_string(),
-        };
+                genesis_file_path: INDICIO_TEST_GENESIS_PATH.to_string(),
+            };
             let mod_profile: Arc<dyn Profile> =
                 Arc::new(ModularWalletProfile::new(indy_wallet, ledger_pool_config).unwrap());
             // ------
@@ -397,13 +409,6 @@ mod integration_tests {
                 .prover_create_link_secret(settings::DEFAULT_LINK_SECRET_ALIAS)
                 .await
                 .ok();
-            global::pool::open_main_pool(&PoolConfig {
-                genesis_path: settings::DEFAULT_GENESIS_PATH.to_string(),
-                pool_name: None,
-                pool_config: None,
-            })
-            .await
-            .unwrap();
             // ----
             // initialization for modular wallet profile
             Arc::clone(&mod_profile)
@@ -442,7 +447,7 @@ mod integration_tests {
             handlers::connection::connection::Connection,
             messages::{a2a::A2AMessage, connection::invite::PairwiseInvitation},
         };
-        use url::Url;
+        use reqwest::Url;
 
         pub fn url_to_invitation(url: &str) -> PairwiseInvitation {
             let b64_val = Url::parse(url)

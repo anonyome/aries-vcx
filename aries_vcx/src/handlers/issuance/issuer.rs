@@ -179,7 +179,7 @@ impl Issuer {
         self.issuer_sm.find_message_to_handle(messages)
     }
 
-    pub async fn revoke_credential_local(&self, wallet_handle: WalletHandle) -> VcxResult<()> {
+    pub async fn revoke_credential_local(&self, profile: &Arc<dyn Profile>) -> VcxResult<()> {
         let revocation_info: RevocationInfoV1 = self.issuer_sm.get_revocation_info().ok_or(VcxError::from_msg(
             VcxErrorKind::InvalidState,
             "Credential is not revocable, no revocation info has been found.",
@@ -189,7 +189,8 @@ impl Issuer {
             revocation_info.rev_reg_id,
             revocation_info.tails_file,
         ) {
-            revocation_registry::revoke_credential_local(wallet_handle, &tails_file, &rev_reg_id, &cred_rev_id).await?;
+            let anoncreds = Arc::clone(profile).inject_anoncreds();
+            anoncreds.revoke_credential_local(&tails_file, &rev_reg_id, &cred_rev_id).await?;
         } else {
             return Err(VcxError::from_msg(
                 VcxErrorKind::InvalidState,

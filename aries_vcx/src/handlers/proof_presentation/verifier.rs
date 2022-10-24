@@ -6,13 +6,13 @@ use agency_client::agency_client::AgencyClient;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::connection::Connection;
+use crate::xyz::proofs::proof_request::PresentationRequestData;
 use messages::a2a::A2AMessage;
 use messages::proof_presentation::presentation_proposal::PresentationProposal;
 use messages::proof_presentation::presentation_request::PresentationRequest;
 use crate::protocols::proof_presentation::verifier::messages::VerifierMessages;
 use crate::protocols::proof_presentation::verifier::state_machine::{VerifierSM, VerifierState};
 use crate::protocols::SendClosure;
-use crate::indy::proofs::proof_request::PresentationRequestData;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct Verifier {

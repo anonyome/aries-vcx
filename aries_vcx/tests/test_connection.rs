@@ -52,7 +52,6 @@ mod integration_tests {
     #[tokio::test]
     async fn test_oob_connection_bootstrap() {
         use messages::connection::invite::Invitation;
-        use aries_vcx::indy::ledger::transactions::into_did_doc;
         let setup = SetupPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
         let mut consumer = Alice::setup(setup.pool_handle).await;

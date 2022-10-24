@@ -2,8 +2,8 @@
 #[cfg(feature = "temp_gm_tests")]
 mod integration_tests {
     use aries_vcx::core::profile::modular_wallet_profile::{LedgerPoolConfig, ModularWalletProfile};
-    use aries_vcx::libindy;
-    use aries_vcx::libindy::utils::pool::PoolConfig;
+    use aries_vcx::indy::ledger::pool::{create_pool_ledger_config, open_pool_ledger};
+    use aries_vcx::indy::wallet::WalletConfig;
     use aries_vcx::messages::connection::did::Did;
     use aries_vcx::plugins::anoncreds;
     use aries_vcx::plugins::anoncreds::base_anoncreds::BaseAnonCreds;
@@ -19,16 +19,19 @@ mod integration_tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use vdrtools_sys::WalletHandle;
 
     use agency_client::agency_client::AgencyClient;
     use aries_vcx::{
         core::profile::{indy_profile::IndySdkProfile, profile::Profile},
         global::{self, settings},
         handlers::connection::connection::Connection,
-        libindy::utils::wallet::WalletConfig,
         utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
     };
-    use indy_sys::WalletHandle;
+
+    const INDICIO_TEST_GENESIS_PATH: &str =
+        "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn";
+    const INDICIO_TEST_POOL_NAME: &str = "INDICIO_TEST";
 
     async fn open_default_indy_handle() -> WalletHandle {
         let config_wallet = WalletConfig {
@@ -41,30 +44,22 @@ mod integration_tests {
             rekey: None,
             rekey_derivation_method: None,
         };
-        aries_vcx::libindy::wallet::open_wallet(&config_wallet).await.unwrap()
-    }
-
-    async fn indy_global_setup() {
-        global::pool::open_main_pool(&PoolConfig {
-            genesis_path: settings::DEFAULT_GENESIS_PATH.to_string(),
-            pool_name: None,
-            pool_config: None,
-        })
-        .await
-        .unwrap();
+        aries_vcx::indy::wallet::open_wallet(&config_wallet).await.unwrap()
     }
 
     async fn setup_profiles() -> (WalletHandle, IndySdkProfile, Arc<dyn Profile>, Arc<dyn Profile>) {
-        indy_global_setup().await;
         let indy_handle = open_default_indy_handle().await;
-        let _indy_profile = IndySdkProfile::new(indy_handle);
+        create_pool_ledger_config(&INDICIO_TEST_POOL_NAME, &INDICIO_TEST_GENESIS_PATH)
+            .await
+            .unwrap();
+        let indy_pool_handle = open_pool_ledger(&INDICIO_TEST_POOL_NAME, None).await.unwrap();
+        let _indy_profile = IndySdkProfile::new(indy_handle, indy_pool_handle);
         let indy_wallet = _indy_profile.inject_wallet();
         let indy_profile = Arc::new(_indy_profile);
 
         let ledger_pool_config = LedgerPoolConfig {
             genesis_file_path:
-                "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn"
-                    .to_string(),
+                INDICIO_TEST_GENESIS_PATH.to_string(),
         };
         let _mod_profile = ModularWalletProfile::new(indy_wallet, ledger_pool_config).unwrap();
         let mod_profile = Arc::new(_mod_profile);
@@ -95,22 +90,22 @@ mod integration_tests {
 
         // ----------- try with libindy directly
 
-        println!(
-            "DIRECT INDY NYM: {}\n\n\n",
-            aries_vcx::libindy::utils::ledger::get_nym("D6EMVkDnBmuMCtZGwjgR9A")
-                .await
-                .unwrap()
-        );
+        // println!(
+        //     "DIRECT INDY NYM: {}\n\n\n",
+        //     aries_vcx::indy::ledger::transactions::get_nym("D6EMVkDnBmuMCtZGwjgR9A")
+        //         .await
+        //         .unwrap()
+        // );
 
-        println!(
-            "DIRECT INDY CRED DEF: {}\n\n\n",
-            aries_vcx::libindy::utils::ledger::libindy_get_cred_def(
-                indy_handle,
-                "D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction"
-            )
-            .await
-            .unwrap()
-        );
+        // println!(
+        //     "DIRECT INDY CRED DEF: {}\n\n\n",
+        //     aries_vcx::libindy::utils::ledger::libindy_get_cred_def(
+        //         indy_handle,
+        //         "D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction"
+        //     )
+        //     .await
+        //     .unwrap()
+        // );
 
         // try with indy indysdkledger
 
@@ -158,14 +153,8 @@ mod integration_tests {
         // println!("vdr; {:?}\n", vdr_ledger.get_rev_reg_delta_json(rev_id, None, None).await.unwrap());
         // println!("indy; {:?}", indy_sdk_ledger.get_rev_reg_delta_json(rev_id, None, None).await.unwrap());
 
-        println!(
-            "vdr; {}\n",
-            vdr_ledger.get_cred_def(cred_def_id).await.unwrap()
-        );
-        println!(
-            "indy; {}",
-            indy_sdk_ledger.get_cred_def(cred_def_id).await.unwrap()
-        );
+        println!("vdr; {}\n", vdr_ledger.get_cred_def(cred_def_id).await.unwrap());
+        println!("indy; {}", indy_sdk_ledger.get_cred_def(cred_def_id).await.unwrap());
     }
 
     #[tokio::test]
@@ -225,7 +214,10 @@ mod integration_tests {
         // let query = r#"{ "$exists" : ["tag1"] }"#;
         let query = r#"{ "$or": [{"tagName": {"$neq": "."}}, {"$tagName": "."}] }"#;
         // let query = r#"{ "$not" : {"tag2": "."} }"#;
-        let mut records_i = wallet.iterate_wallet_records(xtype, query, r#"{"retrieveTags": true}"#).await.unwrap();
+        let mut records_i = wallet
+            .iterate_wallet_records(xtype, query, r#"{"retrieveTags": true}"#)
+            .await
+            .unwrap();
 
         let xyz = records_i.collect().await.unwrap();
 
