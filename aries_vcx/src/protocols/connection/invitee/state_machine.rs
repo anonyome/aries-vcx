@@ -438,7 +438,6 @@ pub mod unit_tests {
     }
 
     pub mod invitee {
-        use vdrtools_sys::WalletHandle;
 
         use messages::did_doc::test_utils::{_service_endpoint, _did_doc_inlined_recipient_keys};
         use messages::connection::response::{Response, SignedResponse};

@@ -126,8 +126,13 @@ mod integration_tests {
         let pub_did = "D6EMVkDnBmuMCtZGwjgR9A";
 
         println!(
-            "service; {:?}",
+            "VDR service; {:?}",
             vdr_ledger.get_service(&Did::new(pub_did).unwrap()).await.unwrap()
+        );
+
+        println!(
+            "INDYLEDGER service; {:?}",
+            indy_ledger.get_service(&Did::new(pub_did).unwrap()).await.unwrap()
         );
 
         ()

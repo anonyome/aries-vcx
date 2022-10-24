@@ -205,7 +205,6 @@ pub mod test_utils {
 #[cfg(test)]
 #[cfg(feature = "general_test")]
 pub mod unit_tests {
-    use vdrtools_sys::PoolHandle;
 
     use messages::issuance::credential::test_utils::_credential;
     use messages::issuance::credential_offer::test_utils::_credential_offer;

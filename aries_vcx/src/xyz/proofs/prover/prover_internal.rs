@@ -263,7 +263,6 @@ pub fn build_requested_credentials_json(
 #[cfg(feature = "pool_tests")]
 #[cfg(test)]
 pub mod pool_tests {
-    use vdrtools_sys::PoolHandle;
 
     use crate::utils::constants::{CRED_DEF_ID, CRED_REV_ID, LICENCE_CRED_ID, SCHEMA_ID, TAILS_DIR};
     use crate::utils::devsetup::SetupWalletPool;
