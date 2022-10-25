@@ -509,7 +509,7 @@ pub async fn create_credential_request(
 ) -> VcxResult<(String, String, String, String)> {
     let ledger = Arc::clone(profile).inject_ledger();
     let anoncreds = Arc::clone(profile).inject_anoncreds();
-    let cred_def_json = ledger.get_cred_def(cred_def_id).await?;
+    let cred_def_json = ledger.get_cred_def(cred_def_id, None).await?;
 
     let master_secret_id = settings::DEFAULT_LINK_SECRET_ALIAS;
     anoncreds

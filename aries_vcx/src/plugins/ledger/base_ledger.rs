@@ -41,6 +41,7 @@ pub trait BaseLedger: Send + Sync {
     //     version: Schema's version string
     //     ver: Version of the Schema json
     // }
+    // if submitter_did provided - use cache
     async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String>;
 
     // libindy_build_get_cred_def_request - internal

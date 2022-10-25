@@ -60,7 +60,7 @@ pub async fn build_cred_defs_json_prover(
 
     for cred_info in credentials_identifiers {
         if rtn.get(&cred_info.cred_def_id).is_none() {
-            let credential_def = ledger.get_cred_def(&cred_info.cred_def_id)
+            let credential_def = ledger.get_cred_def(&cred_info.cred_def_id, None)
                 .await
                 .map_err(|err| {
                     err.map(
