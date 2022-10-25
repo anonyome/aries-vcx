@@ -270,17 +270,9 @@ impl BaseLedger for IndyVdrLedger {
         Ok(serde_json::to_string(&Schema::SchemaV1(schema))?)
     }
 
-    async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String> {
-        // TODO try from cache first
+    async fn get_cred_def(&self, cred_def_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
+        // todo - try from cache if submitter_did provided
 
-        let fetched_cred_def = self.get_cred_def_no_cache(None, cred_def_id).await?;
-
-        // TODO - store cache
-
-        Ok(fetched_cred_def)
-    }
-
-    async fn get_cred_def_no_cache(&self, submitter_did: Option<&str>, cred_def_id: &str) -> VcxResult<String> {
         let request = self._build_get_cred_def_request(submitter_did, cred_def_id).await?;
 
         let response = self._submit_request(request).await?;
@@ -315,6 +307,8 @@ impl BaseLedger for IndyVdrLedger {
         });
 
         let cred_def_json = serde_json::to_string(&cred_def_value)?;
+
+        // todo - store in cache if submitter_did provided
 
         Ok(cred_def_json)
     }
@@ -390,6 +384,7 @@ impl BaseLedger for IndyVdrLedger {
 
         if let Some(accum_from) = response_value.get("accum_from") {
             let prev_accum = accum_from.try_get("value")?.try_get("accum")?;
+            // to check - should this be 'prevAccum'?
             delta_value["prev_accum"] = prev_accum.to_owned();
         }
 
@@ -430,33 +425,33 @@ impl BaseLedger for IndyVdrLedger {
         Err(unimplemented_method_err("indy_vdr get_rev_reg"))
     }
 
-    async fn get_ledger_txn(&self, submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
+    async fn get_ledger_txn(&self, seq_no: i32, submitter_did: Option<&str>) -> VcxResult<String> {
         Err(unimplemented_method_err("indy_vdr get_ledger_txn"))
     }
 
     // build_schema_request - todo - used in libvcx
 
-    async fn publish_schema(&self, submitter_did: &str, schema_json: &str, endorser_did: Option<String>)  -> VcxResult<()> {
+    async fn publish_schema(&self, schema_json: &str, submitter_did: &str, endorser_did: Option<String>)  -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_schema"))
     }
 
-    async fn publish_cred_def(&self, submitter_did: &str, cred_def_json: &str) -> VcxResult<()> {
+    async fn publish_cred_def(&self, cred_def_json: &str, submitter_did: &str) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_cred_def"))
     }
 
     async fn publish_rev_reg_def(
         &self,
-        submitter_did: &str,
         rev_reg_def: &RevocationRegistryDefinition,
+        submitter_did: &str,
     ) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_rev_reg_def"))
     }
 
     async fn publish_rev_reg_delta(
         &self,
-        submitter_did: &str,
         rev_reg_id: &str,
         rev_reg_entry_json: &str,
+        submitter_did: &str,
     ) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_rev_reg_delta"))
     }

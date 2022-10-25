@@ -62,19 +62,13 @@ impl BaseLedger for IndySdkLedger {
         }
     }
 
-    async fn get_cred_def(&self, cred_def_id: &str) -> VcxResult<String> {
+    async fn get_cred_def(&self, cred_def_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
         indy::ledger::transactions::libindy_get_cred_def(
             self.profile.indy_wallet_handle,
             self.profile.indy_pool_handle,
             cred_def_id,
         )
         .await
-    }
-
-    async fn get_cred_def_no_cache(&self, submitter_did: Option<&str>, cred_def_id: &str) -> VcxResult<String> {
-        indy::ledger::transactions::get_cred_def(self.profile.indy_pool_handle, submitter_did, cred_def_id)
-            .await
-            .map(|(_, json)| json)
     }
 
     async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
@@ -110,20 +104,20 @@ impl BaseLedger for IndySdkLedger {
         indy::ledger::transactions::get_rev_reg(self.profile.indy_pool_handle, rev_reg_id, timestamp).await
     }
 
-    async fn get_ledger_txn(&self, submitter_did: Option<&str>, seq_no: i32) -> VcxResult<String> {
+    async fn get_ledger_txn(&self, seq_no: i32, submitter_did: Option<&str>) -> VcxResult<String> {
         indy::ledger::transactions::get_ledger_txn(
             self.profile.indy_wallet_handle,
             self.profile.indy_pool_handle,
-            submitter_did,
             seq_no,
+            submitter_did,
         )
         .await
     }
 
     async fn publish_schema(
         &self,
-        submitter_did: &str,
         schema_json: &str,
+        submitter_did: &str,
         endorser_did: Option<String>,
     ) -> VcxResult<()> {
         indy::primitives::credential_schema::publish_schema(
@@ -136,7 +130,7 @@ impl BaseLedger for IndySdkLedger {
         .await
     }
 
-    async fn publish_cred_def(&self, submitter_did: &str, cred_def_json: &str) -> VcxResult<()> {
+    async fn publish_cred_def(&self, cred_def_json: &str, submitter_did: &str) -> VcxResult<()> {
         indy::primitives::credential_definition::publish_cred_def(
             self.profile.indy_wallet_handle,
             self.profile.indy_pool_handle,
@@ -148,8 +142,8 @@ impl BaseLedger for IndySdkLedger {
 
     async fn publish_rev_reg_def(
         &self,
-        submitter_did: &str,
         rev_reg_def: &RevocationRegistryDefinition,
+        submitter_did: &str,
     ) -> VcxResult<()> {
         indy::primitives::revocation_registry::publish_rev_reg_def(
             self.profile.indy_wallet_handle,
@@ -162,9 +156,9 @@ impl BaseLedger for IndySdkLedger {
 
     async fn publish_rev_reg_delta(
         &self,
-        submitter_did: &str,
         rev_reg_id: &str,
         rev_reg_entry_json: &str,
+        submitter_did: &str,
     ) -> VcxResult<()> {
         indy::primitives::revocation_registry::publish_rev_reg_delta(
             self.profile.indy_wallet_handle,

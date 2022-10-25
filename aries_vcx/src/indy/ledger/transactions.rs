@@ -661,8 +661,8 @@ pub async fn build_get_txn_request(submitter_did: Option<&str>, seq_no: i32) -> 
 pub async fn get_ledger_txn(
     wallet_handle: WalletHandle,
     pool_handle: PoolHandle,
-    submitter_did: Option<&str>,
     seq_no: i32,
+    submitter_did: Option<&str>,
 ) -> VcxResult<String> {
     trace!(
         "get_ledger_txn >>> submitter_did: {:?}, seq_no: {}",
