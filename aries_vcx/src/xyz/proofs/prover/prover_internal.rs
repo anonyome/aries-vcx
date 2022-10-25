@@ -177,11 +177,12 @@ pub async fn build_rev_states_json(profile: &Arc<dyn Profile>, credentials_ident
 
                 let (rev_reg_id, rev_reg_delta_json, timestamp) = ledger.get_rev_reg_delta_json(rev_reg_id, from, to).await?;
 
-                let rev_state_json = anoncreds.prover_create_revocation_state(
+                let rev_state_json = anoncreds.create_revocation_state(
+                    tails_file,
                     &rev_reg_def_json,
                     &rev_reg_delta_json,
+                    100, // todo - timestamp as 100?
                     cred_rev_id,
-                    tails_file,
                 )
                 .await?;
 

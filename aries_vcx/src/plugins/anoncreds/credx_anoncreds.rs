@@ -407,20 +407,20 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         ))
     }
 
-    async fn prover_create_revocation_state(
+    async fn create_revocation_state(
         &self,
+        tails_file_path: &str,
         rev_reg_def_json: &str,
         rev_reg_delta_json: &str,
+        timestamp: u64,
         cred_rev_id: &str,
-        tails_file: &str,
     ) -> VcxResult<String> {
-        let tails_reader: credx::tails::TailsReader = credx::tails::TailsFileReader::new(tails_file);
+        let tails_reader: credx::tails::TailsReader = credx::tails::TailsFileReader::new(tails_file_path);
         let revoc_reg_def: RevocationRegistryDefinition = serde_json::from_str(rev_reg_def_json)?;
         let rev_reg_delta: RevocationRegistryDelta = serde_json::from_str(rev_reg_delta_json)?;
         let rev_reg_idx: u32 = cred_rev_id
             .parse()
             .map_err(|e| VcxError::from_msg(VcxErrorKind::ParsingError, e))?;
-        let timestamp = 100; // todo - is this ok? matches existing impl
 
         let rev_state = credx::prover::create_or_update_revocation_state(
             tails_reader,

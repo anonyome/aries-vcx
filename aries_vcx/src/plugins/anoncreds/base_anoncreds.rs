@@ -7,7 +7,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     async fn verifier_verify_proof(
         &self,
-        proof_req_json: &str,
+        proof_request_json: &str,
         proof_json: &str,
         schemas_json: &str,
         credential_defs_json: &str,
@@ -22,7 +22,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
         issuer_did: &str,
         schema_json: &str,
         tag: &str,
-        sig_type: Option<&str>,
+        signature_type: Option<&str>,
         config_json: &str,
     ) -> VcxResult<(String, String)>;
 
@@ -62,22 +62,23 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     //  }
     async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String>;
 
-    async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String>;
+    async fn prover_get_credentials_for_proof_req(&self, proof_request_json: &str) -> VcxResult<String>;
 
     async fn prover_create_credential_req(
         &self,
         prover_did: &str,
-        credential_offer_json: &str,
-        credential_def_json: &str,
+        cred_offer_json: &str,
+        cred_def_json: &str,
         master_secret_id: &str,
     ) -> VcxResult<(String, String)>;
 
-    async fn prover_create_revocation_state(
+    async fn create_revocation_state(
         &self,
+        tails_file_path: &str,
         rev_reg_def_json: &str,
         rev_reg_delta_json: &str,
+        timestamp: u64,
         cred_rev_id: &str,
-        tails_file: &str,
     ) -> VcxResult<String>;
 
     // SKIP (unused): libindy_prover_update_revocation_state
@@ -85,7 +86,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     async fn prover_store_credential(
         &self,
         cred_id: Option<&str>,
-        cred_req_meta: &str,
+        cred_req_metadata_json: &str,
         cred_json: &str,
         cred_def_json: &str,
         rev_reg_def_json: Option<&str>,
@@ -93,7 +94,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     async fn prover_delete_credential(&self, cred_id: &str) -> VcxResult<()>;
 
-    async fn prover_create_link_secret(&self, master_secret_id: &str) -> VcxResult<String>;
+    async fn prover_create_link_secret(&self, link_secret_id: &str) -> VcxResult<String>;
 
     // SKIP (internal): libindy_issuer_revoke_credential
     // SKIP (internal): libindy_issuer_merge_revocation_registry_deltas
@@ -132,6 +133,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     //     cred_rev_id: &str,
     // ) -> VcxResult<String>;
     
+    // todo - move?
     async fn revoke_credential_local(
         &self,
         tails_file: &str,
@@ -139,6 +141,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
         cred_rev_id: &str,
     ) -> VcxResult<()>;
     
+    // todo - move?
     async fn publish_local_revocations(&self, submitter_did: &str, rev_reg_id: &str) -> VcxResult<()>;
 
     // SKIP (internal): libindy_to_unqualified

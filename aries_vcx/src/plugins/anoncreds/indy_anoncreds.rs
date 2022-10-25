@@ -132,18 +132,20 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         .await
     }
 
-    async fn prover_create_revocation_state(
+    async fn create_revocation_state(
         &self,
+        tails_file_path: &str,
         rev_reg_def_json: &str,
         rev_reg_delta_json: &str,
+        timestamp: u64,
         cred_rev_id: &str,
-        tails_file: &str,
     ) -> VcxResult<String> {
         indy::proofs::prover::libindy_prover_create_revocation_state(
+            tails_file_path,
             rev_reg_def_json,
             rev_reg_delta_json,
+            timestamp,
             cred_rev_id,
-            tails_file,
         )
         .await
     }
