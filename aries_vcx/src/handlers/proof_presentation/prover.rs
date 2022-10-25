@@ -228,7 +228,7 @@ impl Prover {
         }
         let send_message = connection.send_message_closure(profile).await?;
 
-        let messages = connection.get_messages(profile, agency_client).await?;
+        let messages = connection.get_messages(agency_client).await?;
         if let Some((uid, msg)) = self.find_message_to_handle(messages) {
             self.step(profile, msg.into(), Some(send_message)).await?;
             connection.update_message_status(&uid, agency_client).await?;
@@ -239,22 +239,18 @@ impl Prover {
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils {
-    use std::sync::Arc;
-
     use agency_client::agency_client::AgencyClient;
 
-    use crate::core::profile::profile::Profile;
     use crate::error::prelude::*;
     use crate::handlers::connection::connection::Connection;
     use messages::a2a::A2AMessage;
 
     pub async fn get_proof_request_messages(
-        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         connection: &Connection,
     ) -> VcxResult<String> {
         let presentation_requests: Vec<A2AMessage> = connection
-            .get_messages(profile, agency_client)
+            .get_messages(agency_client)
             .await?
             .into_iter()
             .filter_map(|(_, message)| match message {

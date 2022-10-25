@@ -191,7 +191,7 @@ impl Verifier {
         }
         let send_message = connection.send_message_closure(profile).await?;
 
-        let messages = connection.get_messages(profile, agency_client).await?;
+        let messages = connection.get_messages(agency_client).await?;
         if let Some((uid, msg)) = self.find_message_to_handle(messages) {
             self.step(profile, msg.into(), Some(send_message)).await?;
             connection.update_message_status(&uid, agency_client).await?;

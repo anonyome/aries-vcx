@@ -12,12 +12,9 @@ use crate::global::settings;
 use crate::indy::utils::mocks::pool_mocks::PoolMocks;
 use crate::indy::keys::create_and_store_my_did;
 use messages::connection::did::Did;
-use messages::connection::invite::Invitation;
 use crate::utils;
 use crate::utils::constants::{CRED_DEF_ID, CRED_DEF_JSON, CRED_DEF_REQ, rev_def_json, REV_REG_DELTA_JSON, REV_REG_ID, REV_REG_JSON, REVOC_REG_TYPE, SCHEMA_ID, SCHEMA_JSON, SCHEMA_TXN, SUBMIT_SCHEMA_RESPONSE};
 use crate::utils::random::generate_random_did;
-use messages::did_doc::service_resolvable::ServiceResolvable;
-use messages::did_doc::DidDoc;
 
 pub async fn multisign_request(wallet_handle: WalletHandle, did: &str, request: &str) -> VcxResult<String> {
     ledger::multi_sign_request(wallet_handle, did, request)

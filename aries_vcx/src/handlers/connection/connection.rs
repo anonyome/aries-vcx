@@ -213,14 +213,14 @@ impl Connection {
         self.cloud_agent_info.clone()
     }
 
-    pub async fn remote_did(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
+    pub async fn remote_did(&self) -> VcxResult<String> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.remote_did(),
             SmConnection::Invitee(sm_invitee) => sm_invitee.remote_did().await,
         }
     }
 
-    pub async fn remote_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
+    pub async fn remote_vk(&self) -> VcxResult<String> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.remote_vk(),
             SmConnection::Invitee(sm_invitee) => sm_invitee.remote_vk().await,
@@ -256,14 +256,14 @@ impl Connection {
         }
     }
 
-    pub async fn their_did_doc(&self, profile: &Arc<dyn Profile>) -> Option<DidDoc> {
+    pub async fn their_did_doc(&self) -> Option<DidDoc> {
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => sm_inviter.their_did_doc(),
             SmConnection::Invitee(sm_invitee) => sm_invitee.their_did_doc().await,
         }
     }
 
-    pub async fn bootstrap_did_doc(&self, profile: &Arc<dyn Profile>) -> Option<DidDoc> {
+    pub async fn bootstrap_did_doc(&self) -> Option<DidDoc> {
         match &self.connection_sm {
             SmConnection::Inviter(_sm_inviter) => None, // TODO: Inviter can remember bootstrap agent too, but we don't need it
             SmConnection::Invitee(sm_invitee) => sm_invitee.bootstrap_did_doc().await,
@@ -433,7 +433,7 @@ impl Connection {
     }
 
     pub async fn handle_message(&mut self, message: A2AMessage, profile: &Arc<dyn Profile>) -> VcxResult<()> {
-        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!(
                 "Can't answer message {:?} because counterparty did doc is not available",
@@ -684,8 +684,8 @@ impl Connection {
         }
     }
 
-    pub async fn get_messages(&self, profile: &Arc<dyn Profile>, agency_client: &AgencyClient) -> VcxResult<HashMap<String, A2AMessage>> {
-        let expected_sender_vk = self.get_expected_sender_vk(profile).await?;
+    pub async fn get_messages(&self, agency_client: &AgencyClient) -> VcxResult<HashMap<String, A2AMessage>> {
+        let expected_sender_vk = self.get_expected_sender_vk().await?;
         match &self.connection_sm {
             SmConnection::Inviter(sm_inviter) => Ok(self
                 .cloud_agent_info()
@@ -698,8 +698,8 @@ impl Connection {
         }
     }
 
-    async fn get_expected_sender_vk(&self, profile: &Arc<dyn Profile>) -> VcxResult<String> {
-        self.remote_vk(profile).await.map_err(|_err| {
+    async fn get_expected_sender_vk(&self) -> VcxResult<String> {
+        self.remote_vk().await.map_err(|_err| {
             VcxError::from_msg(
                 VcxErrorKind::NotReady,
                 "Verkey of connection counterparty \
@@ -708,9 +708,9 @@ impl Connection {
         })
     }
 
-    pub async fn get_message_by_id(&self, profile: &Arc<dyn Profile>, msg_id: &str, agency_client: &AgencyClient) -> VcxResult<A2AMessage> {
+    pub async fn get_message_by_id(&self, msg_id: &str, agency_client: &AgencyClient) -> VcxResult<A2AMessage> {
         trace!("Connection: get_message_by_id >>> msg_id: {}", msg_id);
-        let expected_sender_vk = self.get_expected_sender_vk(profile).await?;
+        let expected_sender_vk = self.get_expected_sender_vk().await?;
         self.cloud_agent_info()
             .get_message_by_id(agency_client, msg_id, &expected_sender_vk, self.pairwise_info())
             .await
@@ -718,7 +718,7 @@ impl Connection {
 
     pub async fn send_message_closure(&self, profile: &Arc<dyn Profile>) -> VcxResult<SendClosure> {
         trace!("send_message_closure >>>");
-        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             "Cannot send message: Remote Connection information is not set",
         ))?;
@@ -786,7 +786,7 @@ impl Connection {
                 ));
             }
         };
-        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!("Can't send handshake-reuse to the counterparty, because their did doc is not available"),
         ))?;
@@ -817,7 +817,7 @@ impl Connection {
             query,
             comment
         );
-        let did_doc = self.their_did_doc(profile).await.ok_or(VcxError::from_msg(
+        let did_doc = self.their_did_doc().await.ok_or(VcxError::from_msg(
             VcxErrorKind::NotReady,
             format!("Can't send handshake-reuse to the counterparty, because their did doc is not available"),
         ))?;
@@ -825,7 +825,7 @@ impl Connection {
         Ok(())
     }
 
-    pub async fn get_connection_info(&self, profile: &Arc<dyn Profile>, agency_client: &AgencyClient) -> VcxResult<String> {
+    pub async fn get_connection_info(&self, agency_client: &AgencyClient) -> VcxResult<String> {
         trace!("Connection::get_connection_info >>>");
 
         let agent_info = self.cloud_agent_info();
@@ -840,7 +840,7 @@ impl Connection {
             protocols: Some(self.get_protocols()),
         };
 
-        let remote = match self.their_did_doc(profile).await {
+        let remote = match self.their_did_doc().await {
             Some(did_doc) => Some(SideConnectionInfo {
                 did: did_doc.id.clone(),
                 recipient_keys: did_doc.recipient_keys(),
@@ -868,7 +868,6 @@ impl Connection {
 
     pub async fn download_messages(
         &self,
-        profile: &Arc<dyn Profile>,
         agency_client: &AgencyClient,
         status_codes: Option<Vec<MessageStatusCode>>,
         uids: Option<Vec<String>>,
@@ -889,7 +888,7 @@ impl Connection {
                 Ok(msgs)
             }
             _ => {
-                let expected_sender_vk = self.remote_vk(profile).await?;
+                let expected_sender_vk = self.remote_vk().await?;
                 let msgs = futures::stream::iter(
                     self.cloud_agent_info()
                         .download_encrypted_messages(agency_client, uids, status_codes, self.pairwise_info())
