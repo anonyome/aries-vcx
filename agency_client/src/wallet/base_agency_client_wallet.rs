@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::error::prelude::AgencyClientResult;
+use crate::error::prelude::{AgencyClientResult, AgencyClientError, AgencyClientErrorKind};
 
 #[async_trait]
 pub trait BaseAgencyClientWallet : std::fmt::Debug + Send + Sync {
@@ -17,12 +17,18 @@ pub trait BaseAgencyClientWallet : std::fmt::Debug + Send + Sync {
 #[derive(Debug)]
 pub(crate) struct StubAgencyClientWallet;
 
+#[async_trait]
 impl BaseAgencyClientWallet for StubAgencyClientWallet {
-    fn pack_message< 'life0, 'life1, 'life2, 'life3, 'async_trait>(& 'life0 self,sender_vk:Option< & 'life1 str> ,receiver_keys: & 'life2 str,msg: & 'life3[u8],) ->  core::pin::Pin<Box<dyn core::future::Future<Output = AgencyClientResult<Vec<u8> > > + core::marker::Send+ 'async_trait> >where 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait,Self: 'async_trait {
-        todo!()
+    async fn pack_message(
+        &self,
+        _sender_vk: Option<&str>,
+        _receiver_keys: &str,
+        _msg: &[u8],
+    ) -> AgencyClientResult<Vec<u8>> {
+        Err(AgencyClientError::from_msg(AgencyClientErrorKind::UnknownError, "Error - using a stub method: StubAgencyClientWallet::pack_message"))
     }
 
-    fn unpack_message< 'life0, 'life1, 'async_trait>(& 'life0 self,msg: & 'life1[u8]) ->  core::pin::Pin<Box<dyn core::future::Future<Output = AgencyClientResult<Vec<u8> > > + core::marker::Send+ 'async_trait> >where 'life0: 'async_trait, 'life1: 'async_trait,Self: 'async_trait {
-        todo!()
+    async fn unpack_message(&self, _msg: &[u8]) -> AgencyClientResult<Vec<u8>> {
+        Err(AgencyClientError::from_msg(AgencyClientErrorKind::UnknownError, "Error - using a stub method: StubAgencyClientWallet::unpack_message"))
     }
 }

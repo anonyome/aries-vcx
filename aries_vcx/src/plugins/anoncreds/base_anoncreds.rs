@@ -4,7 +4,6 @@ use crate::error::VcxResult;
 
 #[async_trait]
 pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
-    // SKIP (scope): libindy_verifier_verify_proof
 
     async fn verifier_verify_proof(
         &self,
