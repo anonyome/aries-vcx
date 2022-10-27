@@ -23,10 +23,10 @@ use crate::core::profile::profile::Profile;
 use crate::error::VcxResult;
 use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
-use crate::indy::primitives::revocation_registry::RevocationRegistryDefinition;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 use crate::utils::json::{AsTypeOrDeserializationError, TryGetIndex};
+use crate::xyz::primitives::revocation_registry::RevocationRegistryDefinition;
 
 use super::base_ledger::BaseLedger;
 

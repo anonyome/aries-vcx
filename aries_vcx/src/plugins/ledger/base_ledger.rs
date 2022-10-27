@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    error::VcxResult, indy::primitives::revocation_registry::RevocationRegistryDefinition,
-    messages::connection::did::Did, messages::did_doc::service_aries::AriesService,
+    error::VcxResult,
+    messages::connection::did::Did, messages::did_doc::service_aries::AriesService, xyz::primitives::revocation_registry::RevocationRegistryDefinition,
 };
 
 #[async_trait]

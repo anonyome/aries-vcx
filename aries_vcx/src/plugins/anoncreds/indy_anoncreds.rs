@@ -39,6 +39,25 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         .await
     }
 
+    async fn issuer_create_and_store_revoc_reg(
+        &self,
+        issuer_did: &str,
+        cred_def_id: &str,
+        tails_dir: &str,
+        max_creds: u32,
+        tag: &str,
+    ) -> VcxResult<(String, String, String)> {
+        indy::primitives::revocation_registry::libindy_create_and_store_revoc_reg(
+            self.profile.indy_wallet_handle,
+            issuer_did,
+            cred_def_id,
+            tails_dir,
+            max_creds,
+            tag,
+        )
+        .await
+    }
+
     async fn issuer_create_and_store_credential_def(
         &self,
         issuer_did: &str,

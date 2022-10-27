@@ -15,7 +15,14 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
         rev_regs_json: &str,
     ) -> VcxResult<bool>;
 
-    // SKIP (internal): libindy_create_and_store_revoc_reg
+    async fn issuer_create_and_store_revoc_reg(
+        &self,
+        issuer_did: &str,
+        cred_def_id: &str,
+        tails_dir: &str,
+        max_creds: u32,
+        tag: &str
+    ) -> VcxResult<(String, String, String)>;
 
     async fn issuer_create_and_store_credential_def(
         &self,

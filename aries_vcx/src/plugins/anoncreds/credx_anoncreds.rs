@@ -158,6 +158,17 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         Err(unimplemented_method_err("credx verifier_verify_proof"))
     }
 
+    async fn issuer_create_and_store_revoc_reg(
+        &self,
+        issuer_did: &str,
+        cred_def_id: &str,
+        tails_dir: &str,
+        max_creds: u32,
+        tag: &str
+    ) -> VcxResult<(String, String, String)> {
+        Err(unimplemented_method_err("credx issuer_create_and_store_revoc_reg"))
+    }
+
     async fn issuer_create_and_store_credential_def(
         &self,
         issuer_did: &str,
