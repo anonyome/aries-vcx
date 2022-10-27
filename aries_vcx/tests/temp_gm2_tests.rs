@@ -83,7 +83,7 @@ mod integration_tests {
         println!(
             "VDR CRED DEF: {}\n\n\n",
             vdr_ledger
-                .get_cred_def("D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction")
+                .get_cred_def("D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction", None)
                 .await
                 .unwrap()
         );
@@ -117,7 +117,7 @@ mod integration_tests {
         println!(
             "INDYLEDGER CRED DEF: {}\n\n\n",
             indy_ledger
-                .get_cred_def("D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction")
+                .get_cred_def("D6EMVkDnBmuMCtZGwjgR9A:3:CL:88813:Dummy_Uni_Transaction", None)
                 .await
                 .unwrap()
         );
@@ -158,8 +158,8 @@ mod integration_tests {
         // println!("vdr; {:?}\n", vdr_ledger.get_rev_reg_delta_json(rev_id, None, None).await.unwrap());
         // println!("indy; {:?}", indy_sdk_ledger.get_rev_reg_delta_json(rev_id, None, None).await.unwrap());
 
-        println!("vdr; {}\n", vdr_ledger.get_cred_def(cred_def_id).await.unwrap());
-        println!("indy; {}", indy_sdk_ledger.get_cred_def(cred_def_id).await.unwrap());
+        println!("vdr; {}\n", vdr_ledger.get_cred_def(cred_def_id, None).await.unwrap());
+        println!("indy; {}", indy_sdk_ledger.get_cred_def(cred_def_id, None).await.unwrap());
     }
 
     #[tokio::test]
