@@ -1,11 +1,9 @@
 use vdrtools::did;
 use vdrtools::future::TryFutureExt;
-use vdrtools_sys::{WalletHandle, PoolHandle};
-use serde_json::Value;
+use vdrtools_sys::{WalletHandle};
 
 use crate::error::prelude::*;
 use crate::global::settings;
-use crate::indy::ledger::transactions;
 use crate::indy::utils::mocks::did_mocks::{did_mocks_enabled, DidMocks};
 use crate::utils;
 
