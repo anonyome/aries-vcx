@@ -102,6 +102,7 @@ pub async fn publish_rev_reg_delta(
     Ok(response)
 }
 
+// consider moving out of indy dir
 pub async fn revoke_credential_local(
     wallet_handle: WalletHandle,
     tails_file: &str,
@@ -121,6 +122,7 @@ pub async fn revoke_credential_local(
     set_rev_reg_delta(wallet_handle, rev_reg_id, &new_delta_json).await
 }
 
+// consider moving out of indy dir
 pub async fn publish_local_revocations(wallet_handle: WalletHandle, pool_handle: PoolHandle, submitter_did: &str, rev_reg_id: &str) -> VcxResult<()> {
     if let Some(delta) = get_rev_reg_delta(wallet_handle, rev_reg_id).await {
         publish_rev_reg_delta(wallet_handle, pool_handle, &submitter_did, rev_reg_id, &delta).await?;
