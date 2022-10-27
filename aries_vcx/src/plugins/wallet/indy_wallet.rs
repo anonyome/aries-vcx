@@ -35,8 +35,16 @@ impl BaseWallet for IndySdkWallet {
         indy::keys::create_and_store_my_did(self.wallet_handle, seed, method_name).await
     }
 
-    async fn get_verkey_from_wallet(&self, did: &str) -> VcxResult<String> {
+    async fn key_for_local_did(&self, did: &str) -> VcxResult<String> {
         indy::keys::get_verkey_from_wallet(self.wallet_handle, did).await
+    }
+
+    async fn replace_did_keys_start(&self, target_did: &str) -> VcxResult<String> {
+        indy::keys::libindy_replace_keys_start(self.wallet_handle, target_did).await
+    }
+
+    async fn replace_did_keys_apply(&self, target_did: &str) -> VcxResult<()> {
+        indy::keys::libindy_replace_keys_apply(self.wallet_handle, target_did).await
     }
 
     async fn add_wallet_record(&self, xtype: &str, id: &str, value: &str, tags_json: Option<&str>) -> VcxResult<()> {

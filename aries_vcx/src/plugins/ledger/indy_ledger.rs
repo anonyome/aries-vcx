@@ -40,6 +40,29 @@ impl BaseLedger for IndySdkLedger {
         indy::ledger::transactions::get_nym(self.profile.indy_pool_handle, did).await
     }
 
+    // returns request result as JSON
+    async fn publish_nym(
+        &self,
+        submitter_did: &str,
+        target_did: &str,
+        verkey: Option<&str>,
+        data: Option<&str>,
+        role: Option<&str>,
+    ) -> VcxResult<String> {
+        let nym_request =
+            indy::ledger::transactions::libindy_build_nym_request(submitter_did, target_did, verkey, data, role)
+                .await?;
+        let nym_request = indy::ledger::transactions::append_txn_author_agreement_to_request(&nym_request).await?;
+
+        indy::ledger::transactions::libindy_sign_and_submit_request(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            submitter_did,
+            &nym_request,
+        )
+        .await
+    }
+
     async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
         if let Some(submitter_did) = submitter_did {
             // with cache if possible

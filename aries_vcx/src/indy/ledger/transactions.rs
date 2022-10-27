@@ -10,7 +10,6 @@ use messages::did_doc::service_aries::AriesService;
 use crate::error::prelude::*;
 use crate::global::settings;
 use crate::indy::utils::mocks::pool_mocks::PoolMocks;
-use crate::indy::keys::create_and_store_my_did;
 use messages::connection::did::Did;
 use crate::utils;
 use crate::utils::constants::{CRED_DEF_ID, CRED_DEF_JSON, CRED_DEF_REQ, rev_def_json, REV_REG_DELTA_JSON, REV_REG_ID, REV_REG_JSON, REVOC_REG_TYPE, SCHEMA_ID, SCHEMA_JSON, SCHEMA_TXN, SUBMIT_SCHEMA_RESPONSE};
@@ -423,19 +422,20 @@ pub async fn sign_and_submit_to_ledger(wallet_handle: WalletHandle, pool_handle:
     Ok(response)
 }
 
-pub async fn add_new_did(wallet_handle: WalletHandle, pool_handle: PoolHandle, submitter_did: &str, role: Option<&str>) -> (String, String) {
-    let (did, verkey) = create_and_store_my_did(wallet_handle, None, None).await.unwrap();
-    let mut req_nym = ledger::build_nym_request(&submitter_did, &did, Some(&verkey), None, role)
-        .await
-        .unwrap();
+// todo - bring back in some location with modular profile
+// pub async fn add_new_did(wallet_handle: WalletHandle, pool_handle: PoolHandle, submitter_did: &str, role: Option<&str>) -> (String, String) {
+//     let (did, verkey) = create_and_store_my_did(wallet_handle, None, None).await.unwrap();
+//     let mut req_nym = ledger::build_nym_request(&submitter_did, &did, Some(&verkey), None, role)
+//         .await
+//         .unwrap();
 
-    req_nym = append_txn_author_agreement_to_request(&req_nym).await.unwrap();
+//     req_nym = append_txn_author_agreement_to_request(&req_nym).await.unwrap();
 
-    libindy_sign_and_submit_request(wallet_handle, pool_handle, &submitter_did, &req_nym)
-        .await
-        .unwrap();
-    (did, verkey)
-}
+//     libindy_sign_and_submit_request(wallet_handle, pool_handle, &submitter_did, &req_nym)
+//         .await
+//         .unwrap();
+//     (did, verkey)
+// }
 
 pub async fn libindy_build_revoc_reg_def_request(submitter_did: &str, rev_reg_def_json: &str) -> VcxResult<String> {
     if settings::indy_mocks_enabled() {

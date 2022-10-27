@@ -28,8 +28,16 @@ impl BaseWallet for AgencyClientWallet {
         Err(unimplemented_agency_client_wallet_method("create_and_store_my_did"))
     }
 
-    async fn get_verkey_from_wallet(&self, did: &str) -> VcxResult<String> {
+    async fn key_for_local_did(&self, did: &str) -> VcxResult<String> {
         Err(unimplemented_agency_client_wallet_method("get_verkey_from_wallet"))
+    }
+
+    async fn replace_did_keys_start(&self, target_did: &str) -> VcxResult<String> {
+        Err(unimplemented_agency_client_wallet_method("replace_did_keys_start"))
+    }
+
+    async fn replace_did_keys_apply(&self, target_did: &str) -> VcxResult<()> {
+        Err(unimplemented_agency_client_wallet_method("replace_did_key_apply"))
     }
 
     async fn add_wallet_record(&self, xtype: &str, id: &str, value: &str, tags_json: Option<&str>) -> VcxResult<()> {

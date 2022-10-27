@@ -3,3 +3,4 @@ pub mod credentials;
 pub mod proofs;
 pub mod ledger;
 pub mod primitives;
+pub mod keys;

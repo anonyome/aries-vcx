@@ -3,14 +3,14 @@ use messages::did_doc::service_aries::AriesService;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vdr::ledger::requests::schema::{SchemaV1, AttributeNames, Schema};
+use vdr::ledger::requests::schema::{AttributeNames, Schema, SchemaV1};
 
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::sync::oneshot;
 use vdr::common::error::VdrError;
 use vdr::config::PoolConfig as IndyVdrPoolConfig;
-use vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId, RevocationRegistryId};
+use vdr::ledger::identifiers::{CredentialDefinitionId, RevocationRegistryId, SchemaId};
 use vdr::ledger::requests::author_agreement::{GetTxnAuthorAgreementData, TxnAuthrAgrmtAcceptanceData};
 use vdr::ledger::RequestBuilder;
 use vdr::pool::{PoolBuilder, PoolTransactions};
@@ -109,7 +109,7 @@ impl IndyVdrLedger {
 
         let wallet = self.profile.inject_wallet();
 
-        let signer_verkey = wallet.get_verkey_from_wallet(submitter_did).await?;
+        let signer_verkey = wallet.key_for_local_did(submitter_did).await?;
 
         let signature = self
             .profile
@@ -224,6 +224,18 @@ impl BaseLedger for IndyVdrLedger {
         self._submit_request(request).await
     }
 
+    // returns request result as JSON
+    async fn publish_nym(
+        &self,
+        submitter_did: &str,
+        target_did: &str,
+        verkey: Option<&str>,
+        data: Option<&str>,
+        role: Option<&str>,
+    ) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr publish_nym"))
+    }
+
     async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
         // TODO try from cache first
 
@@ -232,9 +244,7 @@ impl BaseLedger for IndyVdrLedger {
         // let identifier = DidValue::from_str(submitter_did)?;
         let id = SchemaId::from_str(schema_id)?;
 
-        let request = self
-            .request_builder()?
-            .build_get_schema_request(None, &id)?;
+        let request = self.request_builder()?.build_get_schema_request(None, &id)?;
 
         let response = self._submit_request(request).await?;
 
@@ -431,7 +441,12 @@ impl BaseLedger for IndyVdrLedger {
 
     // build_schema_request - todo - used in libvcx
 
-    async fn publish_schema(&self, schema_json: &str, submitter_did: &str, endorser_did: Option<String>)  -> VcxResult<()> {
+    async fn publish_schema(
+        &self,
+        schema_json: &str,
+        submitter_did: &str,
+        endorser_did: Option<String>,
+    ) -> VcxResult<()> {
         Err(unimplemented_method_err("indy_vdr publish_schema"))
     }
 
@@ -460,7 +475,7 @@ impl BaseLedger for IndyVdrLedger {
 fn unimplemented_method_err(method_name: &str) -> VcxError {
     VcxError::from_msg(
         VcxErrorKind::UnimplementedFeature,
-        format!("method called '{}' is not yet implemented in AriesVCX", method_name)
+        format!("method called '{}' is not yet implemented in AriesVCX", method_name),
     )
 }
 

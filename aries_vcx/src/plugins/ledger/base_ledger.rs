@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    error::VcxResult,
-    messages::connection::did::Did, messages::did_doc::service_aries::AriesService, xyz::primitives::revocation_registry::RevocationRegistryDefinition,
+    error::VcxResult, messages::connection::did::Did, messages::did_doc::service_aries::AriesService,
+    xyz::primitives::revocation_registry::RevocationRegistryDefinition,
 };
 
 #[async_trait]
@@ -29,6 +29,16 @@ pub trait BaseLedger: Send + Sync {
 
     // returns request result as JSON
     async fn get_nym(&self, did: &str) -> VcxResult<String>;
+
+    // returns request result as JSON
+    async fn publish_nym(
+        &self,
+        submitter_did: &str,
+        target_did: &str,
+        verkey: Option<&str>,
+        data: Option<&str>,
+        role: Option<&str>,
+    ) -> VcxResult<String>;
 
     // get_role - internal
     // parse_response - internal
@@ -122,7 +132,7 @@ pub trait BaseLedger: Send + Sync {
         endorser_did: Option<String>,
     ) -> VcxResult<()>;
 
-    async fn publish_cred_def(&self, cred_def_json: &str, submitter_did: &str,) -> VcxResult<()>;
+    async fn publish_cred_def(&self, cred_def_json: &str, submitter_did: &str) -> VcxResult<()>;
 
     async fn publish_rev_reg_def(
         &self,
