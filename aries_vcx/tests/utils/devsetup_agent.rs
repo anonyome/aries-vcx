@@ -1,7 +1,11 @@
 #[cfg(test)]
 #[cfg(feature = "test_utils")]
 pub mod test_utils {
-    use vdrtools_sys::{PoolHandle, WalletHandle};
+    use std::sync::Arc;
+
+    use aries_vcx::core::profile::indy_profile::IndySdkProfile;
+    use aries_vcx::core::profile::profile::Profile;
+    use vdrtools_sys::{PoolHandle};
 
     use agency_client::agency_client::AgencyClient;
     use agency_client::api::downloaded_message::DownloadedMessage;
@@ -19,16 +23,11 @@ pub mod test_utils {
     use aries_vcx::handlers::proof_presentation::prover::test_utils::get_proof_request_messages;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
     use aries_vcx::handlers::proof_presentation::verifier::Verifier;
-    use aries_vcx::indy::primitives::credential_definition::CredentialDefConfigBuilder;
-    use aries_vcx::indy::primitives::credential_schema::Schema;
-    use aries_vcx::indy::primitives::credential_definition::CredentialDef;
-    use aries_vcx::indy::wallet::{
-        close_wallet, create_wallet_with_master_secret,
-        delete_wallet, IssuerConfig, wallet_configure_issuer, WalletConfig,
-    };
     use aries_vcx::indy::wallet::open_wallet;
-    use aries_vcx::indy::proofs::proof_request::PresentationRequestData;
-    use aries_vcx::indy::ledger::transactions::into_did_doc;
+    use aries_vcx::indy::wallet::{
+        close_wallet, create_wallet_with_master_secret, delete_wallet, wallet_configure_issuer, IssuerConfig,
+        WalletConfig,
+    };
     use aries_vcx::messages::a2a::A2AMessage;
     use aries_vcx::messages::connection::invite::{Invitation, PublicInvitation};
     use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
@@ -42,6 +41,11 @@ pub mod test_utils {
     use aries_vcx::protocols::proof_presentation::verifier::state_machine::VerifierState;
     use aries_vcx::utils::devsetup::*;
     use aries_vcx::utils::provision::provision_cloud_agent;
+    use aries_vcx::xyz::ledger::transactions::into_did_doc;
+    use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
+    use aries_vcx::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
+    use aries_vcx::xyz::primitives::credential_schema::Schema;
+    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
 
     #[derive(Debug)]
     pub struct VcxAgencyMessage {
@@ -104,6 +108,7 @@ pub mod test_utils {
     }
 
     pub struct Faber {
+        pub profile: Arc<dyn Profile>,
         pub is_active: bool,
         pub config_wallet: WalletConfig,
         pub config_agency: AgencyClientConfig,
@@ -114,8 +119,8 @@ pub mod test_utils {
         pub issuer_credential: Issuer,
         pub verifier: Verifier,
         pub agent: PublicAgent,
-        pub wallet_handle: WalletHandle,
-        pub pool_handle: PoolHandle,
+        // pub wallet_handle: WalletHandle,
+        // pub pool_handle: PoolHandle,
         pub agency_client: AgencyClient,
     }
 
@@ -141,21 +146,25 @@ pub mod test_utils {
             };
             create_wallet_with_master_secret(&config_wallet).await.unwrap();
             let wallet_handle = open_wallet(&config_wallet).await.unwrap();
+
+            let indy_profile = IndySdkProfile::new(wallet_handle, pool_handle);
+            let profile: Arc<dyn Profile> = Arc::new(indy_profile);
+
             let config_issuer = wallet_configure_issuer(wallet_handle, enterprise_seed).await.unwrap();
             init_issuer_config(&config_issuer).unwrap();
             let mut agency_client = AgencyClient::new();
-            let config_agency = provision_cloud_agent(&mut agency_client, wallet_handle, &config_provision_agent)
+            let config_agency =
+                provision_cloud_agent(&mut agency_client, profile.inject_wallet(), &config_provision_agent)
+                    .await
+                    .unwrap();
+            let connection = Connection::create("faber", &profile, &agency_client, true)
                 .await
                 .unwrap();
-            let connection = Connection::create("faber", todo!(), &agency_client, true)
-                .await
-                .unwrap();
-            let agent = PublicAgent::create(todo!(), &agency_client, "faber", &config_issuer.institution_did)
+            let agent = PublicAgent::create(&profile, &agency_client, "faber", &config_issuer.institution_did)
                 .await
                 .unwrap();
             let faber = Faber {
-                wallet_handle,
-                pool_handle,
+                profile,
                 agency_client,
                 is_active: false,
                 config_wallet,
@@ -172,13 +181,19 @@ pub mod test_utils {
         }
 
         pub async fn create_schema(&mut self) {
-            let data = vec!["name","date","degree", "empty_param"].iter().map(|s| s.to_string()).collect();
+            let data = vec!["name", "date", "degree", "empty_param"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
             let name: String = aries_vcx::utils::random::generate_random_schema_name();
             let version: String = String::from("1.0");
 
-            self.schema = Schema::create("", &self.config_issuer.institution_did, &name, &version, &data)
-                .await.unwrap()
-                .publish(self.wallet_handle, self.pool_handle, None).await.unwrap();
+            self.schema = Schema::create(&self.profile, "", &self.config_issuer.institution_did, &name, &version, &data)
+                .await
+                .unwrap()
+                .publish(&self.profile, None)
+                .await
+                .unwrap();
         }
 
         pub async fn create_nonrevocable_credential_definition(&mut self) {
@@ -189,12 +204,17 @@ pub mod test_utils {
                 .build()
                 .unwrap();
 
-            self.cred_def = CredentialDef::create(self.wallet_handle, self.pool_handle, String::from("test_cred_def"), config, false)
-                .await
-                .unwrap()
-                .publish_cred_def(self.wallet_handle, self.pool_handle)
-                .await
-                .unwrap();
+            self.cred_def = CredentialDef::create(
+                &self.profile,
+                String::from("test_cred_def"),
+                config,
+                false,
+            )
+            .await
+            .unwrap()
+            .publish_cred_def(&self.profile)
+            .await
+            .unwrap();
         }
 
         pub async fn create_presentation_request(&self) -> Verifier {
@@ -205,7 +225,7 @@ pub mod test_utils {
                 {"name": "empty_param", "restrictions": {"attr::empty_param::value": ""}}
             ])
             .to_string();
-            let presentation_request_data = PresentationRequestData::create("1")
+            let presentation_request_data = PresentationRequestData::create(&self.profile, "1")
                 .await
                 .unwrap()
                 .set_requested_attributes_as_string(requested_attrs)
@@ -214,12 +234,9 @@ pub mod test_utils {
         }
 
         pub async fn create_invite(&mut self) -> String {
+            self.connection.connect(&self.profile, &self.agency_client).await.unwrap();
             self.connection
-                .connect(todo!(), &self.agency_client)
-                .await
-                .unwrap();
-            self.connection
-                .find_message_and_update_state(todo!(), &self.agency_client)
+                .find_message_and_update_state(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(
@@ -239,7 +256,7 @@ pub mod test_utils {
 
         pub async fn update_state(&mut self, expected_state: u32) {
             self.connection
-                .find_message_and_update_state(todo!(), &self.agency_client)
+                .find_message_and_update_state(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -247,28 +264,25 @@ pub mod test_utils {
 
         pub async fn handle_messages(&mut self) {
             self.connection
-                .find_and_handle_message(todo!(), &self.agency_client)
+                .find_and_handle_message(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
         }
 
         pub async fn respond_messages(&mut self, expected_state: u32) {
             self.connection
-                .find_and_handle_message(todo!(), &self.agency_client)
+                .find_and_handle_message(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
         }
 
         pub async fn ping(&mut self) {
-            self.connection.send_ping(todo!(), None).await.unwrap();
+            self.connection.send_ping(&self.profile, None).await.unwrap();
         }
 
         pub async fn discovery_features(&mut self) {
-            self.connection
-                .send_discovery_query(todo!(), None, None)
-                .await
-                .unwrap();
+            self.connection.send_discovery_query(&self.profile, None, None).await.unwrap();
         }
 
         pub async fn connection_info(&mut self) -> serde_json::Value {
@@ -293,15 +307,15 @@ pub mod test_utils {
             };
             self.issuer_credential = Issuer::create("alice_degree").unwrap();
             self.issuer_credential
-                .build_credential_offer_msg(self.wallet_handle, offer_info, None)
+                .build_credential_offer_msg(&self.profile, offer_info, None)
                 .await
                 .unwrap();
             self.issuer_credential
-                .send_credential_offer(self.connection.send_message_closure(todo!()).await.unwrap())
+                .send_credential_offer(self.connection.send_message_closure(&self.profile).await.unwrap())
                 .await
                 .unwrap();
             self.issuer_credential
-                .update_state(todo!(), &self.agency_client, &self.connection)
+                .update_state(&self.profile, &self.agency_client, &self.connection)
                 .await
                 .unwrap();
             assert_eq!(IssuerState::OfferSent, self.issuer_credential.get_state());
@@ -309,20 +323,20 @@ pub mod test_utils {
 
         pub async fn send_credential(&mut self) {
             self.issuer_credential
-                .update_state(todo!(), &self.agency_client, &self.connection)
+                .update_state(&self.profile, &self.agency_client, &self.connection)
                 .await
                 .unwrap();
             assert_eq!(IssuerState::RequestReceived, self.issuer_credential.get_state());
 
             self.issuer_credential
                 .send_credential(
-                    self.wallet_handle,
-                    self.connection.send_message_closure(todo!()).await.unwrap(),
+                    &self.profile,
+                    self.connection.send_message_closure(&self.profile).await.unwrap(),
                 )
                 .await
                 .unwrap();
             self.issuer_credential
-                .update_state(self.wallet_handle, &self.agency_client, &self.connection)
+                .update_state(&self.profile, &self.agency_client, &self.connection)
                 .await
                 .unwrap();
             assert_eq!(IssuerState::CredentialSent, self.issuer_credential.get_state());
@@ -333,11 +347,15 @@ pub mod test_utils {
             assert_eq!(VerifierState::PresentationRequestSet, self.verifier.get_state());
 
             self.verifier
-                .send_presentation_request(self.connection.send_message_closure(todo!()).await.unwrap())
+                .send_presentation_request(self.connection.send_message_closure(&self.profile).await.unwrap())
                 .await
                 .unwrap();
             self.verifier
-                .update_state(self.wallet_handle, self.pool_handle, &self.agency_client, &self.connection)
+                .update_state(
+                    &self.profile,
+                    &self.agency_client,
+                    &self.connection,
+                )
                 .await
                 .unwrap();
 
@@ -354,7 +372,11 @@ pub mod test_utils {
 
         pub async fn update_proof_state(&mut self, expected_state: VerifierState, expected_status: u32) {
             self.verifier
-                .update_state(self.wallet_handle, self.pool_handle, &self.agency_client, &self.connection)
+                .update_state(
+                    &self.profile,
+                    &self.agency_client,
+                    &self.connection,
+                )
                 .await
                 .unwrap();
             assert_eq!(expected_state, self.verifier.get_state());
@@ -363,14 +385,15 @@ pub mod test_utils {
     }
 
     pub struct Alice {
+        pub profile: Arc<dyn Profile>,
         pub is_active: bool,
         pub config_wallet: WalletConfig,
         pub config_agency: AgencyClientConfig,
         pub connection: Connection,
         pub credential: Holder,
         pub prover: Prover,
-        pub wallet_handle: WalletHandle,
-        pub pool_handle: PoolHandle,
+        // pub wallet_handle: WalletHandle,
+        // pub pool_handle: PoolHandle,
         pub agency_client: AgencyClient,
     }
 
@@ -395,16 +418,19 @@ pub mod test_utils {
             };
             create_wallet_with_master_secret(&config_wallet).await.unwrap();
             let wallet_handle = open_wallet(&config_wallet).await.unwrap();
+
+            let indy_profile = IndySdkProfile::new(wallet_handle, pool_handle);
+            let profile: Arc<dyn Profile> = Arc::new(indy_profile);
+
             let mut agency_client = AgencyClient::new();
-            let config_agency = provision_cloud_agent(&mut agency_client, wallet_handle, &config_provision_agent)
+            let config_agency = provision_cloud_agent(&mut agency_client, profile.inject_wallet(), &config_provision_agent)
                 .await
                 .unwrap();
-            let connection = Connection::create("tmp_empoty", todo!(), &agency_client, true)
+            let connection = Connection::create("tmp_empoty", &profile, &agency_client, true)
                 .await
                 .unwrap();
             let alice = Alice {
-                wallet_handle,
-                pool_handle,
+                profile,
                 agency_client,
                 is_active: false,
                 config_wallet,
@@ -418,23 +444,13 @@ pub mod test_utils {
 
         pub async fn accept_invite(&mut self, invite: &str) {
             let invite: Invitation = serde_json::from_str(invite).unwrap();
-            let ddo = into_did_doc(self.pool_handle, &invite).await.unwrap();
-            self.connection = Connection::create_with_invite(
-                "faber",
-                todo!(),
-                &self.agency_client,
-                invite,
-                ddo,
-                true,
-            )
-            .await
-            .unwrap();
-            self.connection
-                .connect(todo!(), &self.agency_client)
+            let ddo = into_did_doc(&self.profile, &invite).await.unwrap();
+            self.connection = Connection::create_with_invite("faber", &self.profile, &self.agency_client, invite, ddo, true)
                 .await
                 .unwrap();
+            self.connection.connect(&self.profile, &self.agency_client).await.unwrap();
             self.connection
-                .find_message_and_update_state(todo!(), &self.agency_client)
+                .find_message_and_update_state(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(
@@ -445,7 +461,7 @@ pub mod test_utils {
 
         pub async fn update_state(&mut self, expected_state: u32) {
             self.connection
-                .find_message_and_update_state(todo!(), &self.agency_client)
+                .find_message_and_update_state(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -453,14 +469,14 @@ pub mod test_utils {
 
         pub async fn handle_messages(&mut self) {
             self.connection
-                .find_and_handle_message(todo!(), &self.agency_client)
+                .find_and_handle_message(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
         }
 
         pub async fn respond_messages(&mut self, expected_state: u32) {
             self.connection
-                .find_and_handle_message(todo!(), &self.agency_client)
+                .find_and_handle_message(&self.profile, &self.agency_client)
                 .await
                 .unwrap();
             assert_eq!(expected_state, u32::from(self.connection.get_state()));
@@ -503,10 +519,9 @@ pub mod test_utils {
             let pw_did = self.connection.pairwise_info().pw_did.to_string();
             self.credential
                 .send_request(
-                    self.wallet_handle,
-                    self.pool_handle,
+                    &self.profile,
                     pw_did,
-                    self.connection.send_message_closure(todo!()).await.unwrap(),
+                    self.connection.send_message_closure(&self.profile).await.unwrap(),
                 )
                 .await
                 .unwrap();
@@ -515,7 +530,11 @@ pub mod test_utils {
 
         pub async fn accept_credential(&mut self) {
             self.credential
-                .update_state(self.wallet_handle, self.pool_handle, &self.agency_client, &self.connection)
+                .update_state(
+                    &self.profile,
+                    &self.agency_client,
+                    &self.connection,
+                )
                 .await
                 .unwrap();
             assert_eq!(HolderState::Finished, self.credential.get_state());
@@ -567,7 +586,7 @@ pub mod test_utils {
         }
 
         pub async fn get_credentials_for_presentation(&mut self) -> serde_json::Value {
-            let credentials = self.prover.retrieve_credentials(self.wallet_handle).await.unwrap();
+            let credentials = self.prover.retrieve_credentials(&self.profile).await.unwrap();
             let credentials: std::collections::HashMap<String, serde_json::Value> =
                 serde_json::from_str(&credentials).unwrap();
 
@@ -590,16 +609,19 @@ pub mod test_utils {
             let credentials = self.get_credentials_for_presentation().await;
 
             self.prover
-                .generate_presentation(self.wallet_handle, self.pool_handle, credentials.to_string(), String::from("{}"))
+                .generate_presentation(
+                    &self.profile,
+                    credentials.to_string(),
+                    String::from("{}"),
+                )
                 .await
                 .unwrap();
             assert_eq!(ProverState::PresentationPrepared, self.prover.get_state());
 
             self.prover
                 .send_presentation(
-                    self.wallet_handle,
-                    self.pool_handle,
-                    self.connection.send_message_closure(todo!()).await.unwrap(),
+                    &self.profile,
+                    self.connection.send_message_closure(&self.profile).await.unwrap(),
                 )
                 .await
                 .unwrap();
@@ -608,7 +630,11 @@ pub mod test_utils {
 
         pub async fn ensure_presentation_verified(&mut self) {
             self.prover
-                .update_state(self.wallet_handle, self.pool_handle, &self.agency_client, &self.connection)
+                .update_state(
+                    &self.profile,
+                    &self.agency_client,
+                    &self.connection,
+                )
                 .await
                 .unwrap();
             assert_eq!(
@@ -620,8 +646,9 @@ pub mod test_utils {
 
     impl Drop for Faber {
         fn drop(&mut self) {
-            futures::executor::block_on(close_wallet(self.wallet_handle))
-                .unwrap_or_else(|_| error!("Failed to close Faber's wallet while dropping Faber"));
+            // todo - do we need some close wallet functionality in BaseWallet?
+            // futures::executor::block_on(close_wallet(self.wallet_handle))
+            //     .unwrap_or_else(|_| error!("Failed to close Faber's wallet while dropping Faber"));
             futures::executor::block_on(delete_wallet(&self.config_wallet))
                 .unwrap_or_else(|_| error!("Failed to delete Faber's wallet while dropping"));
         }
@@ -629,8 +656,9 @@ pub mod test_utils {
 
     impl Drop for Alice {
         fn drop(&mut self) {
-            futures::executor::block_on(close_wallet(self.wallet_handle))
-                .unwrap_or_else(|_| error!("Failed to close Alice's wallet while dropping Alice"));
+            // todo - do we need some close wallet functionality in BaseWallet?
+            // futures::executor::block_on(close_wallet(self.wallet_handle))
+            //     .unwrap_or_else(|_| error!("Failed to close Alice's wallet while dropping Alice"));
             futures::executor::block_on(delete_wallet(&self.config_wallet))
                 .unwrap_or_else(|_| error!("Failed to delete Alice's wallet while dropping"));
         }
