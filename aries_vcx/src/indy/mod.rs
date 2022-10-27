@@ -9,5 +9,3 @@ pub(crate) mod wallet_non_secrets;
 pub(crate) mod anoncreds;
 pub mod ledger; // temporarily left public due to pool set up utils
 pub(crate) mod primitives;
-#[cfg(feature = "test_utils")]
-pub mod test_utils;

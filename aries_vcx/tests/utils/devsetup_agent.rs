@@ -119,8 +119,6 @@ pub mod test_utils {
         pub issuer_credential: Issuer,
         pub verifier: Verifier,
         pub agent: PublicAgent,
-        // pub wallet_handle: WalletHandle,
-        // pub pool_handle: PoolHandle,
         pub agency_client: AgencyClient,
     }
 

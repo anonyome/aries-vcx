@@ -11,8 +11,6 @@ use crate::xyz::primitives::credential_definition::CredentialDef;
 use crate::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
 use crate::xyz::primitives::revocation_registry::RevocationRegistry;
 
-// TODO - consider moving to xyz
-
 pub async fn create_schema(profile: &Arc<dyn Profile>, attr_list: &str, submitter_did: &str) -> (String, String) {
     let data = attr_list.to_string();
     let schema_name: String = crate::utils::random::generate_random_schema_name();
@@ -24,11 +22,6 @@ pub async fn create_schema(profile: &Arc<dyn Profile>, attr_list: &str, submitte
         .unwrap()
 }
 
-// pub async fn create_schema_req(schema_json: &str, submitter_did: &str) -> String {
-//     let request = libindy_build_schema_request(submitter_did, schema_json).await.unwrap();
-//     append_txn_author_agreement_to_request(&request).await.unwrap()
-// }
-
 pub async fn create_and_write_test_schema(
     profile: &Arc<dyn Profile>,
     submitter_did: &str,
@@ -36,9 +29,6 @@ pub async fn create_and_write_test_schema(
 ) -> (String, String) {
     let (schema_id, schema_json) = create_schema(profile, attr_list, submitter_did).await;
     let ledger = Arc::clone(profile).inject_ledger();
-    // let req = create_schema_req(&schema_json, submitter_did).await;
-    // let response = sign_and_submit_to_ledger(wallet_handle, pool_handle, submitter_did, &req).await.unwrap();
-    // check_response(&response).unwrap();
     let _response = ledger.publish_schema(&schema_json, submitter_did, None).await.unwrap();
     thread::sleep(Duration::from_millis(1000));
     (schema_id, schema_json)

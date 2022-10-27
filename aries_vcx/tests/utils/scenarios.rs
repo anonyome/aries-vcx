@@ -5,8 +5,7 @@ pub mod test_utils {
     use std::time::Duration;
 
     use aries_vcx::core::profile::profile::Profile;
-    use aries_vcx::indy::test_utils::create_and_store_credential_def;
-    // use vdrtools_sys::{PoolHandle, WalletHandle};
+    use aries_vcx::xyz::test_utils::create_and_store_credential_def;
     use serde_json::{json, Value};
 
     use aries_vcx::handlers::connection::connection::{Connection, ConnectionState};
@@ -17,19 +16,12 @@ pub mod test_utils {
     use aries_vcx::handlers::proof_presentation::prover::test_utils::get_proof_request_messages;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
     use aries_vcx::handlers::proof_presentation::verifier::Verifier;
-    use aries_vcx::xyz::primitives::revocation_registry::RevocationRegistry;
-    use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
-    // use aries_vcx::indy::test_utils::create_and_store_credential_def;
-    use aries_vcx::xyz::ledger::transactions::{into_did_doc};
-    use aries_vcx::xyz::primitives;
     use aries_vcx::messages::connection::invite::Invitation;
     use aries_vcx::messages::issuance::credential_offer::{CredentialOffer, OfferInfo};
     use aries_vcx::messages::issuance::credential_proposal::{CredentialProposal, CredentialProposalData};
     use aries_vcx::messages::mime_type::MimeType;
     use aries_vcx::messages::proof_presentation::presentation_proposal::{Attribute, PresentationProposalData};
     use aries_vcx::messages::proof_presentation::presentation_request::PresentationRequest;
-    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
-    use aries_vcx::xyz::proofs::proof_request_internal::AttrInfo;
     use aries_vcx::protocols::connection::invitee::state_machine::InviteeState;
     use aries_vcx::protocols::connection::inviter::state_machine::InviterState;
     use aries_vcx::protocols::issuance::holder::state_machine::HolderState;
@@ -39,6 +31,11 @@ pub mod test_utils {
     use aries_vcx::utils::constants::{DEFAULT_PROOF_NAME, TAILS_DIR, TEST_TAILS_URL};
     use aries_vcx::utils::filters::{filter_credential_offers_by_comment, filter_proof_requests_by_name};
     use aries_vcx::utils::get_temp_dir_path;
+    use aries_vcx::xyz::ledger::transactions::into_did_doc;
+    use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
+    use aries_vcx::xyz::primitives::revocation_registry::RevocationRegistry;
+    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
+    use aries_vcx::xyz::proofs::proof_request_internal::AttrInfo;
 
     use crate::utils::devsetup_agent::test_utils::{Alice, Faber};
     use crate::utils::test_macros::ProofStateType;
@@ -438,19 +435,13 @@ pub mod test_utils {
 
         info!("send_credential >>> storing credential");
         assert_eq!(thread_id, holder_credential.get_thread_id().unwrap());
-        assert_eq!(
-            holder_credential.is_revokable(&alice.profile).await.unwrap(),
-            revokable
-        );
+        assert_eq!(holder_credential.is_revokable(&alice.profile).await.unwrap(), revokable);
         holder_credential
             .update_state(&alice.profile, &alice.agency_client, consumer_to_issuer)
             .await
             .unwrap();
         assert_eq!(HolderState::Finished, holder_credential.get_state());
-        assert_eq!(
-            holder_credential.is_revokable(&alice.profile).await.unwrap(),
-            revokable
-        );
+        assert_eq!(holder_credential.is_revokable(&alice.profile).await.unwrap(), revokable);
         assert_eq!(thread_id, holder_credential.get_thread_id().unwrap());
 
         if revokable {
@@ -541,7 +532,7 @@ pub mod test_utils {
     pub async fn reject_proof_proposal(faber: &mut Faber, connection: &Connection) -> Verifier {
         let mut verifier = Verifier::create("1").unwrap();
         verifier
-            .update_state(&faber.profile,&faber.agency_client, connection)
+            .update_state(&faber.profile, &faber.agency_client, connection)
             .await
             .unwrap();
         assert_eq!(verifier.get_state(), VerifierState::PresentationProposalReceived);
@@ -682,26 +673,28 @@ pub mod test_utils {
         );
     }
 
-    pub async fn revoke_credential_and_publish_accumulator(faber: &mut Faber, issuer_credential: &Issuer, rev_reg_id: &str) {
+    pub async fn revoke_credential_and_publish_accumulator(
+        faber: &mut Faber,
+        issuer_credential: &Issuer,
+        rev_reg_id: &str,
+    ) {
         revoke_credential_local(faber, issuer_credential, &rev_reg_id).await;
         let anoncreds = Arc::clone(&faber.profile).inject_anoncreds();
-        anoncreds.publish_local_revocations(&faber.config_issuer.institution_did, &rev_reg_id).await.unwrap();
+        anoncreds
+            .publish_local_revocations(&faber.config_issuer.institution_did, &rev_reg_id)
+            .await
+            .unwrap();
     }
 
     pub async fn revoke_credential_local(faber: &mut Faber, issuer_credential: &Issuer, rev_reg_id: &str) {
         let ledger = Arc::clone(&faber.profile).inject_ledger();
-        let (_, delta, timestamp) = ledger.get_rev_reg_delta_json(&rev_reg_id, None, None)
-            .await
-            .unwrap();
+        let (_, delta, timestamp) = ledger.get_rev_reg_delta_json(&rev_reg_id, None, None).await.unwrap();
         info!("revoking credential locally");
-        issuer_credential
-            .revoke_credential_local(&faber.profile)
+        issuer_credential.revoke_credential_local(&faber.profile).await.unwrap();
+        let (_, delta_after_revoke, _) = ledger
+            .get_rev_reg_delta_json(rev_reg_id, Some(timestamp + 1), None)
             .await
             .unwrap();
-        let (_, delta_after_revoke, _) =
-            ledger.get_rev_reg_delta_json( rev_reg_id, Some(timestamp + 1), None)
-                .await
-                .unwrap();
         assert_ne!(delta, delta_after_revoke); // They will not equal as we have saved the delta in cache
     }
 
@@ -729,14 +722,15 @@ pub mod test_utils {
 
     pub async fn publish_revocation(institution: &mut Faber, rev_reg_id: String) {
         let anoncreds = Arc::clone(&institution.profile).inject_anoncreds();
-        anoncreds.publish_local_revocations(&institution.config_issuer.institution_did, rev_reg_id.as_str())
+        anoncreds
+            .publish_local_revocations(&institution.config_issuer.institution_did, rev_reg_id.as_str())
             .await
             .unwrap();
     }
 
     pub async fn _create_address_schema(
         profile: &Arc<dyn Profile>,
-        institution_did: &str
+        institution_did: &str,
     ) -> (
         String,
         String,
@@ -867,7 +861,13 @@ pub mod test_utils {
         cred_def_id: &str,
         request_name: Option<&str>,
     ) -> Verifier {
-        let _requested_attrs = requested_attrs(&institution.config_issuer.institution_did, &schema_id, &cred_def_id, None, None);
+        let _requested_attrs = requested_attrs(
+            &institution.config_issuer.institution_did,
+            &schema_id,
+            &cred_def_id,
+            None,
+            None,
+        );
         let requested_attrs_string = serde_json::to_string(&_requested_attrs).unwrap();
         send_proof_request(
             institution,
@@ -1025,16 +1025,10 @@ pub mod test_utils {
         let public_invite: Invitation = serde_json::from_str(&public_invite_json).unwrap();
         let ddo = into_did_doc(&alice.profile, &public_invite).await.unwrap();
 
-        let mut consumer_to_institution = Connection::create_with_invite(
-            "institution",
-            todo!(),
-            &alice.agency_client,
-            public_invite,
-            ddo,
-            true,
-        )
-        .await
-        .unwrap();
+        let mut consumer_to_institution =
+            Connection::create_with_invite("institution", todo!(), &alice.agency_client, public_invite, ddo, true)
+                .await
+                .unwrap();
         consumer_to_institution
             .connect(todo!(), &alice.agency_client)
             .await
@@ -1051,10 +1045,9 @@ pub mod test_utils {
 
     pub async fn create_connected_connections(alice: &mut Alice, faber: &mut Faber) -> (Connection, Connection) {
         debug!("Institution is going to create connection.");
-        let mut institution_to_consumer =
-            Connection::create("consumer", todo!(), &faber.agency_client, true)
-                .await
-                .unwrap();
+        let mut institution_to_consumer = Connection::create("consumer", todo!(), &faber.agency_client, true)
+            .await
+            .unwrap();
         institution_to_consumer
             .connect(todo!(), &faber.agency_client)
             .await
@@ -1063,16 +1056,10 @@ pub mod test_utils {
 
         debug!("Consumer is going to accept connection invitation.");
         let ddo = into_did_doc(&alice.profile, &details).await.unwrap();
-        let mut consumer_to_institution = Connection::create_with_invite(
-            "institution",
-            todo!(),
-            &alice.agency_client,
-            details.clone(),
-            ddo,
-            true,
-        )
-        .await
-        .unwrap();
+        let mut consumer_to_institution =
+            Connection::create_with_invite("institution", todo!(), &alice.agency_client, details.clone(), ddo, true)
+                .await
+                .unwrap();
 
         consumer_to_institution
             .connect(todo!(), &alice.agency_client)
