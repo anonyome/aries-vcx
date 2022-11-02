@@ -304,6 +304,8 @@ mod integration_tests {
 #[cfg(test)]
 #[cfg(feature = "agency_pool_tests")]
 mod tests {
+    use aries_vcx::indy::ledger::pool::test_utils::{open_test_pool, delete_test_pool};
+    use aries_vcx::xyz::test_utils::create_and_store_nonrevocable_credential_def;
     use serde_json::Value;
 
     use aries_vcx::handlers::issuance::holder::Holder;
@@ -315,6 +317,7 @@ mod tests {
     use aries_vcx::protocols::issuance::issuer::state_machine::IssuerState;
     use aries_vcx::protocols::proof_presentation::prover::state_machine::ProverState;
     use aries_vcx::utils::devsetup::*;
+    use vdrtools_sys::PoolHandle;
 
     use crate::utils::devsetup_agent::test_utils::{Alice, Faber, PayloadKinds};
     use crate::utils::scenarios::test_utils::{
@@ -376,8 +379,7 @@ mod tests {
         info!("test_proof_should_be_validated :: verifier :: going to verify proof");
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -431,8 +433,7 @@ mod tests {
         info!("test_proof_with_predicates_should_be_validated :: verifier :: going to verify proof");
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -505,7 +506,7 @@ mod tests {
             create_connected_connections(&mut consumer2, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _rev_reg_id) =
-            _create_address_schema(issuer.wallet_handle, issuer.pool_handle, &issuer.config_issuer.institution_did).await;
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
         let _credential_handle1 = _exchange_credential(
@@ -543,7 +544,7 @@ mod tests {
         .await;
         prover_select_credentials_and_send_proof(&mut consumer1, &consumer1_to_verifier, None, None).await;
         proof_verifier
-            .update_state(verifier.wallet_handle, verifier.pool_handle, &verifier.agency_client, &verifier_to_consumer1)
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer1)
             .await
             .unwrap();
         assert_eq!(
@@ -562,7 +563,7 @@ mod tests {
         .await;
         prover_select_credentials_and_send_proof(&mut consumer2, &consumer2_to_verifier, None, None).await;
         proof_verifier
-            .update_state(verifier.wallet_handle, verifier.pool_handle, &verifier.agency_client, &verifier_to_consumer2)
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer2)
             .await
             .unwrap();
         assert_eq!(
@@ -595,7 +596,7 @@ mod tests {
         .await;
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, request_name1, None).await;
         proof_verifier
-            .update_state(verifier.wallet_handle, verifier.pool_handle, &verifier.agency_client, &verifier_to_consumer)
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -614,7 +615,7 @@ mod tests {
         .await;
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, request_name2, None).await;
         proof_verifier
-            .update_state(verifier.wallet_handle, verifier.pool_handle, &verifier.agency_client, &verifier_to_consumer)
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -632,7 +633,7 @@ mod tests {
             create_connected_connections(&mut consumer, &mut institution).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let (address1, address, city, state, zip) = attr_names();
         let credential_data = json!({address1.clone(): "5th Avenue", address.clone(): "Suite 1234", city.clone(): "NYC", state.clone(): "NYS", zip.clone(): "84712"}).to_string();
         let _credential_handle = _exchange_credential(
@@ -659,8 +660,7 @@ mod tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_institution, request_name1, None).await;
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -683,8 +683,7 @@ mod tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_institution, request_name2, None).await;
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -715,7 +714,7 @@ mod tests {
         }
         let attrs_list = attrs_list.to_string();
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def) =
-            create_and_store_nonrevocable_credential_def(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did, &attrs_list).await;
+            create_and_store_nonrevocable_credential_def(&institution.profile, &institution.config_issuer.institution_did, &attrs_list).await;
         let mut credential_data = json!({});
         for i in 1..number_of_attributes {
             credential_data[format!("key{}", i)] = Value::String(format!("value{}", i));
@@ -782,7 +781,7 @@ mod tests {
         let mut prover = create_proof(&mut consumer, &consumer_to_issuer, None).await;
         info!("test_real_proof :: retrieving matching credentials");
 
-        let retrieved_credentials = prover.retrieve_credentials(consumer.wallet_handle).await.unwrap();
+        let retrieved_credentials = prover.retrieve_credentials(&consumer.profile).await.unwrap();
         let selected_credentials = retrieved_to_selected_credentials_simple(&retrieved_credentials, false);
 
         info!("test_real_proof :: generating and sending proof");
@@ -800,8 +799,7 @@ mod tests {
         info!("test_real_proof :: AS INSTITUTION VALIDATE PROOF");
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &issuer_to_consumer,
             )
@@ -825,7 +823,7 @@ mod tests {
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _rev_reg_id) =
-            _create_address_schema(issuer.wallet_handle, issuer.pool_handle, &issuer.config_issuer.institution_did).await;
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let (req1, req2) = (Some("request1"), Some("request2"));
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
@@ -864,7 +862,7 @@ mod tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req1, Some(&credential_data1))
             .await;
         proof_verifier
-            .update_state(verifier.wallet_handle, verifier.pool_handle, &verifier.agency_client, &verifier_to_consumer)
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -883,7 +881,7 @@ mod tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req2, Some(&credential_data2))
             .await;
         proof_verifier
-            .update_state(verifier.wallet_handle, verifier.pool_handle, &verifier.agency_client, &verifier_to_consumer)
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -901,7 +899,7 @@ mod tests {
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections(&mut consumer, &mut institution).await;
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, _cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let tails_file = rev_reg.get_tails_dir();
 
         _exchange_credential_with_proposal(
@@ -927,7 +925,7 @@ mod tests {
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections(&mut consumer, &mut institution).await;
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, _cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let tails_file = rev_reg.get_tails_dir();
 
         let mut holder = send_cred_proposal(
@@ -944,7 +942,7 @@ mod tests {
         assert_eq!(IssuerState::OfferSent, issuer.get_state());
         issuer
             .update_state(
-                institution.wallet_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -962,7 +960,7 @@ mod tests {
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections(&mut consumer, &mut institution).await;
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, _cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let tails_file = rev_reg.get_tails_dir();
 
         let mut holder = send_cred_proposal(
@@ -1019,7 +1017,7 @@ mod tests {
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections(&mut consumer, &mut institution).await;
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, _cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let tails_file = rev_reg.get_tails_dir();
 
         _exchange_credential_with_proposal(
@@ -1058,7 +1056,7 @@ mod tests {
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections(&mut consumer, &mut institution).await;
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, _cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let tails_file = rev_reg.get_tails_dir();
 
         _exchange_credential_with_proposal(
@@ -1087,7 +1085,7 @@ mod tests {
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections(&mut consumer, &mut institution).await;
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, _cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(institution.wallet_handle, institution.pool_handle, &institution.config_issuer.institution_did).await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let tails_file = rev_reg.get_tails_dir();
 
         _exchange_credential_with_proposal(
@@ -1212,10 +1210,9 @@ mod tests {
                 alice
                     .credential
                     .send_request(
-                        alice.wallet_handle,
-                        alice.pool_handle,
+                        &alice.profile,
                         pw_did,
-                        alice.connection.send_message_closure(alice.wallet_handle).await.unwrap(),
+                        alice.connection.send_message_closure(&alice.profile).await.unwrap(),
                     )
                     .await
                     .unwrap();
@@ -1238,7 +1235,7 @@ mod tests {
 
                 alice
                     .prover
-                    .generate_presentation(alice.wallet_handle, alice.pool_handle, credentials.to_string(), String::from("{}"))
+                    .generate_presentation(&alice.profile, credentials.to_string(), String::from("{}"))
                     .await
                     .unwrap();
                 assert_eq!(ProverState::PresentationPrepared, alice.prover.get_state());
@@ -1246,9 +1243,8 @@ mod tests {
                 alice
                     .prover
                     .send_presentation(
-                        alice.wallet_handle,
-                        alice.pool_handle,
-                        alice.connection.send_message_closure(alice.wallet_handle).await.unwrap(),
+                        &alice.profile,
+                        alice.connection.send_message_closure(&alice.profile).await.unwrap(),
                     )
                     .await
                     .unwrap();
@@ -1305,10 +1301,9 @@ mod tests {
                 alice
                     .credential
                     .send_request(
-                        alice.wallet_handle,
-                        alice.pool_handle,
+                        &alice.profile,
                         pw_did,
-                        alice.connection.send_message_closure(alice.wallet_handle).await.unwrap(),
+                        alice.connection.send_message_closure(&alice.profile).await.unwrap(),
                     )
                     .await
                     .unwrap();
@@ -1338,7 +1333,7 @@ mod tests {
 
                 alice
                     .prover
-                    .generate_presentation(alice.wallet_handle, alice.pool_handle, credentials.to_string(), String::from("{}"))
+                    .generate_presentation(&alice.profile, credentials.to_string(), String::from("{}"))
                     .await
                     .unwrap();
                 assert_eq!(ProverState::PresentationPrepared, alice.prover.get_state());
@@ -1346,9 +1341,8 @@ mod tests {
                 alice
                     .prover
                     .send_presentation(
-                        alice.wallet_handle,
-                        alice.pool_handle,
-                    alice.connection.send_message_closure(alice.wallet_handle).await.unwrap(),
+                        &alice.profile,
+                    alice.connection.send_message_closure(&alice.profile).await.unwrap(),
                 )
                 .await
                 .unwrap();
