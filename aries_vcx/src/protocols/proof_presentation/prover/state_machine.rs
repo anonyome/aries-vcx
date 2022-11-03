@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::Arc;
 
-use vdrtools_sys::{WalletHandle, PoolHandle};
-
+use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::problem_report::ProblemReport;
@@ -249,8 +249,7 @@ impl ProverSM {
 
     pub async fn step(
         self,
-        wallet_handle: WalletHandle,
-        pool_handle: PoolHandle,
+        profile: &Arc<dyn Profile>,
         message: ProverMessages,
         send_message: Option<SendClosure>,
     ) -> VcxResult<ProverSM> {
@@ -299,7 +298,7 @@ impl ProverSM {
                     self.set_presentation(presentation)?
                 }
                 ProverMessages::PreparePresentation((credentials, self_attested_attrs)) => {
-                    self.generate_presentation(wallet_handle, pool_handle, credentials, self_attested_attrs).await?
+                    self.generate_presentation(profile, credentials, self_attested_attrs).await?
                 },
                 ProverMessages::RejectPresentationRequest(reason) => {
                     let send_message = send_message.ok_or(VcxError::from_msg(

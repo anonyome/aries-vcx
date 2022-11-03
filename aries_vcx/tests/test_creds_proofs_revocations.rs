@@ -82,8 +82,7 @@ mod integration_tests {
         info!("test_basic_revocation :: verifier :: going to verify proof");
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -174,8 +173,7 @@ mod integration_tests {
 
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -202,8 +200,7 @@ mod integration_tests {
 
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )
@@ -316,8 +313,7 @@ mod integration_tests {
 
         verifier1
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer1,
             )
@@ -325,8 +321,7 @@ mod integration_tests {
             .unwrap();
         verifier2
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer2,
             )
@@ -334,8 +329,7 @@ mod integration_tests {
             .unwrap();
         verifier3
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer3,
             )
@@ -396,8 +390,7 @@ mod integration_tests {
 
         verifier1
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer1,
             )
@@ -405,8 +398,7 @@ mod integration_tests {
             .unwrap();
         verifier2
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer2,
             )
@@ -414,8 +406,7 @@ mod integration_tests {
             .unwrap();
         verifier3
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer3,
             )
@@ -491,7 +482,7 @@ mod integration_tests {
         let mut prover = create_proof(&mut consumer, &consumer_to_institution, None).await;
         info!("test_revoked_credential_might_still_work :: retrieving matching credentials");
 
-        let retrieved_credentials = prover.retrieve_credentials(consumer.wallet_handle).await.unwrap();
+        let retrieved_credentials = prover.retrieve_credentials(&consumer.profile).await.unwrap();
         info!(
             "test_revoked_credential_might_still_work :: prover :: based on proof, retrieved credentials: {}",
             &retrieved_credentials
@@ -515,8 +506,7 @@ mod integration_tests {
         info!("test_revoked_credential_might_still_work :: verifier :: going to verify proof");
         verifier
             .update_state(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.agency_client,
                 &institution_to_consumer,
             )

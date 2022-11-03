@@ -1,9 +1,10 @@
 use std::clone::Clone;
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::Arc;
 
-use vdrtools_sys::WalletHandle;
-
+use crate::core::profile::profile::Profile;
+use crate::xyz::signing::decode_signed_connection_response;
 use messages::did_doc::DidDoc;
 use crate::error::prelude::*;
 use crate::handlers::util::verify_thread_id;
@@ -21,7 +22,7 @@ use crate::protocols::connection::invitee::states::invited::InvitedState;
 use crate::protocols::connection::invitee::states::requested::RequestedState;
 use crate::protocols::connection::invitee::states::responded::RespondedState;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
-use crate::indy::signing::decode_signed_connection_response;
+use crate::plugins::wallet::base_wallet::BaseWallet;
 
 #[derive(Clone)]
 pub struct SmConnectionInvitee {
@@ -208,21 +209,20 @@ impl SmConnectionInvitee {
                     .set_service_endpoint(service_endpoint.to_string())
                     .set_keys(recipient_keys, routing_keys)
                     .set_out_time();
+                let request_id = request.id.0.clone();
                 let (request, thread_id) = match &state.invitation {
                     Invitation::Public(_) => (
                         request
-                            .clone()
                             .set_parent_thread_id(&self.thread_id)
                             .set_thread_id_matching_id(),
-                        request.id.0.clone(),
+                            request_id,
                     ),
                     Invitation::Pairwise(_) => (request.set_thread_id(&self.thread_id), self.get_thread_id()),
                     Invitation::OutOfBand(invite) => (
                         request
-                            .clone()
                             .set_parent_thread_id(&invite.id.0)
                             .set_thread_id_matching_id(),
-                        request.id.0.clone(),
+                            request_id,
                     ),
                 };
                 Ok((request, thread_id))
@@ -247,7 +247,7 @@ impl SmConnectionInvitee {
     // todo: extract response validation to different function
     async fn _send_ack<F, T>(
         &self,
-        wallet_handle: WalletHandle,
+        wallet: &Arc<dyn BaseWallet>,
         did_doc: &DidDoc,
         request: &Request,
         response: &SignedResponse,
@@ -255,7 +255,7 @@ impl SmConnectionInvitee {
         send_message: F,
     ) -> VcxResult<Response>
     where
-        F: Fn(WalletHandle, String, DidDoc, A2AMessage) -> T,
+        F: Fn(Arc<dyn BaseWallet>, String, DidDoc, A2AMessage) -> T,
         T: Future<Output = VcxResult<()>>,
     {
         let remote_vk: String = did_doc.recipient_keys().get(0).cloned().ok_or(VcxError::from_msg(
@@ -263,7 +263,9 @@ impl SmConnectionInvitee {
             "Cannot handle response: remote verkey not found",
         ))?;
 
-        let response = decode_signed_connection_response(response.clone(), &remote_vk).await?;
+        // let response = response.clone().decode(wallet, &remote_vk).await?;
+        // let response = decode_signed_connection_response()
+        let response = decode_signed_connection_response(wallet, response.clone(), &remote_vk).await?;
 
         if !response.from_thread(&request.get_thread_id()) {
             return Err(VcxError::from_msg(
@@ -278,7 +280,7 @@ impl SmConnectionInvitee {
         let message = self.build_connection_ack_msg()?.to_a2a_message();
 
         send_message(
-            wallet_handle,
+            Arc::clone(wallet),
             pairwise_info.pw_vk.clone(),
             response.connection.did_doc.clone(),
             message,
@@ -308,13 +310,13 @@ impl SmConnectionInvitee {
 
     pub async fn send_connection_request<F, T>(
         self,
-        wallet_handle: WalletHandle,
+        profile: &Arc<dyn Profile>,
         routing_keys: Vec<String>,
         service_endpoint: String,
         send_message: F,
     ) -> VcxResult<Self>
     where
-        F: Fn(WalletHandle, String, DidDoc, A2AMessage) -> T,
+        F: Fn(Arc<dyn BaseWallet>, String, DidDoc, A2AMessage) -> T,
         T: Future<Output = VcxResult<()>>,
     {
         let (state, thread_id) = match self.state {
@@ -323,13 +325,15 @@ impl SmConnectionInvitee {
                     .ok_or(VcxError::from_msg(VcxErrorKind::InvalidState, "Missing did doc"))?;
                 let (request, thread_id) = self.build_connection_request_msg(routing_keys, service_endpoint)?;
                 send_message(
-                    wallet_handle,
+                    profile.inject_wallet(),
                     self.pairwise_info.pw_vk.clone(),
                     ddo.clone(),
                     request.to_a2a_message(),
                 )
                 .await?;
+
                 (InviteeFullState::Requested((state.clone(), request, ddo).into()), thread_id)
+                // (InviteeFullState::Requested((state.clone(), request, profile).into()), thread_id)
             }
             _ => (self.state.clone(), self.get_thread_id()),
         };
@@ -358,15 +362,15 @@ impl SmConnectionInvitee {
     }
 
     // todo: send ack is validaiting connection response, should be moved to handle_connection_response
-    pub async fn handle_send_ack<F, T>(self, wallet_handle: WalletHandle, send_message: &F) -> VcxResult<Self>
+    pub async fn handle_send_ack<F, T>(self, wallet: &Arc<dyn BaseWallet>, send_message: &F) -> VcxResult<Self>
     where
-        F: Fn(WalletHandle, String, DidDoc, A2AMessage) -> T,
+        F: Fn(Arc<dyn BaseWallet>, String, DidDoc, A2AMessage) -> T,
         T: Future<Output = VcxResult<()>>,
     {
         let state = match self.state {
             InviteeFullState::Responded(ref state) => match self
                 ._send_ack(
-                    wallet_handle,
+                    wallet,
                     &state.did_doc,
                     &state.request,
                     &state.response,
@@ -383,7 +387,7 @@ impl SmConnectionInvitee {
                         .set_thread_id(&self.thread_id)
                         .set_out_time();
                     send_message(
-                        wallet_handle,
+                        Arc::clone(wallet),
                         self.pairwise_info.pw_vk.clone(),
                         state.did_doc.clone(),
                         problem_report.to_a2a_message(),
@@ -426,7 +430,6 @@ pub mod unit_tests {
     
     use crate::test::source_id;
     use crate::utils::devsetup::SetupMocks;
-    use crate::indy::signing::sign_connection_response;
 
     use super::*;
 
@@ -435,7 +438,6 @@ pub mod unit_tests {
     }
 
     pub mod invitee {
-        use vdrtools_sys::WalletHandle;
 
         use messages::did_doc::test_utils::{_service_endpoint, _did_doc_inlined_recipient_keys};
         use messages::connection::response::{Response, SignedResponse};

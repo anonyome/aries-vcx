@@ -6,24 +6,22 @@ use vdrtools_sys::{PoolHandle, WalletHandle};
 
 use agency_client::agency_client::AgencyClient;
 use agency_client::configuration::AgentProvisionConfig;
-use agency_client::testing::mocking::{AgencyMockDecrypted, disable_agency_mocks, enable_agency_mocks};
+use agency_client::testing::mocking::{disable_agency_mocks, enable_agency_mocks, AgencyMockDecrypted};
 
 use crate::global::settings;
 use crate::global::settings::init_issuer_config;
 use crate::global::settings::{disable_indy_mocks, enable_indy_mocks, set_test_configs};
+use crate::indy::ledger::pool::test_utils::{create_test_ledger_config, delete_test_pool, open_test_pool};
+use crate::indy::ledger::pool::{PoolConfig, create_pool_ledger_config, open_pool_ledger, delete};
 use crate::indy::utils::mocks::did_mocks::DidMocks;
 use crate::indy::utils::mocks::pool_mocks::PoolMocks;
-use crate::indy::ledger::pool::test_utils::{
-    create_test_ledger_config, delete_test_pool, open_test_pool,
-};
-use crate::indy::ledger::pool::PoolConfig;
+use crate::indy::wallet::open_wallet;
 use crate::indy::wallet::{
-    close_wallet, create_and_open_wallet, create_indy_wallet,
-    create_wallet_with_master_secret, delete_wallet,
+    close_wallet, create_and_open_wallet, create_indy_wallet, create_wallet_with_master_secret, delete_wallet,
     wallet_configure_issuer, WalletConfig,
 };
-use crate::indy::wallet::open_wallet;
 use crate::utils;
+use crate::utils::constants::POOL;
 use crate::utils::file::write_file;
 use crate::utils::get_temp_dir_path;
 use crate::utils::provision::provision_cloud_agent;
@@ -34,7 +32,7 @@ pub struct SetupEmpty;
 pub struct SetupDefaults;
 
 pub struct SetupMocks {
-    pub institution_did: String
+    pub institution_did: String,
 }
 
 pub struct SetupIndyMocks;
@@ -57,13 +55,13 @@ pub struct SetupWalletPoolAgency {
     pub agency_client: AgencyClient,
     pub institution_did: String,
     pub wallet_handle: WalletHandle,
-    pub pool_handle: PoolHandle
+    pub pool_handle: PoolHandle,
 }
 
 pub struct SetupWalletPool {
     pub institution_did: String,
     pub wallet_handle: WalletHandle,
-    pub pool_handle: PoolHandle
+    pub pool_handle: PoolHandle,
 }
 
 pub struct SetupInstitutionWallet {
@@ -72,7 +70,7 @@ pub struct SetupInstitutionWallet {
 }
 
 pub struct SetupPool {
-    pub pool_handle: PoolHandle
+    pub pool_handle: PoolHandle,
 }
 
 fn reset_global_state() {
@@ -217,9 +215,7 @@ impl SetupPoolConfig {
             pool_config: None,
         };
 
-        SetupPoolConfig {
-            pool_config,
-        }
+        SetupPoolConfig { pool_config }
     }
 }
 
@@ -261,7 +257,7 @@ impl SetupWalletPoolAgency {
             agency_client,
             institution_did,
             wallet_handle,
-            pool_handle
+            pool_handle,
         }
     }
 }
@@ -289,7 +285,7 @@ impl SetupWalletPool {
         SetupWalletPool {
             institution_did,
             wallet_handle,
-            pool_handle
+            pool_handle,
         }
     }
 }
@@ -331,11 +327,17 @@ impl SetupPool {
                 .unwrap(),
         )
         .unwrap();
-        let pool_handle = open_test_pool().await;
+        // TODO - GM - REVERT BELOW AFTER WE FIX LOCAL POOL ENVIRONMENT
+        // let pool_handle = open_test_pool().await;
+        delete(POOL).await.ok();
+        const INDICIO_TEST_GENESIS_PATH: &str =
+            "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis/vpc_genesis.txn";
+        create_pool_ledger_config(POOL, &INDICIO_TEST_GENESIS_PATH)
+            .await
+            .unwrap();
+        let pool_handle = open_pool_ledger(POOL, None).await.unwrap();
         debug!("SetupPool init >> completed");
-        SetupPool {
-            pool_handle
-        }
+        SetupPool { pool_handle }
     }
 }
 
@@ -398,7 +400,7 @@ pub async fn setup_issuer_wallet_and_agency_client() -> (String, WalletHandle, A
     let config_issuer = wallet_configure_issuer(wallet_handle, enterprise_seed).await.unwrap();
     init_issuer_config(&config_issuer).unwrap();
     let mut agency_client = AgencyClient::new();
-    provision_cloud_agent(&mut agency_client, wallet_handle, &config_provision_agent)
+    provision_cloud_agent(&mut agency_client, todo!(), &config_provision_agent)
         .await
         .unwrap();
 
