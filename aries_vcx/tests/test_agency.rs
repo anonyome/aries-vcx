@@ -37,16 +37,16 @@ mod integration_tests {
         let (alice_to_faber, faber_to_alice) = create_connected_connections(&mut consumer, &mut institution).await;
 
         faber_to_alice
-            .send_generic_message(institution.wallet_handle, "Hello Alice")
+            .send_generic_message(&institution.profile, "Hello Alice")
             .await
             .unwrap();
         faber_to_alice
-            .send_generic_message(institution.wallet_handle, "How are you Alice?")
+            .send_generic_message(&institution.profile, "How are you Alice?")
             .await
             .unwrap();
 
         alice_to_faber
-            .send_generic_message(consumer.wallet_handle, "Hello Faber")
+            .send_generic_message(&consumer.profile, "Hello Faber")
             .await
             .unwrap();
 
@@ -130,7 +130,7 @@ mod integration_tests {
 
         info!("test_connection_send_works:: Test if Send Message works");
         {
-            faber.connection.send_message_closure(faber.wallet_handle).await.unwrap()(message.to_a2a_message())
+            faber.connection.send_message_closure(&faber.profile).await.unwrap()(message.to_a2a_message())
                 .await
                 .unwrap();
         }
@@ -180,7 +180,7 @@ mod integration_tests {
             let basic_message = r#"Hi there"#;
             faber
                 .connection
-                .send_generic_message(faber.wallet_handle, basic_message)
+                .send_generic_message(&faber.profile, basic_message)
                 .await
                 .unwrap();
 
@@ -205,7 +205,7 @@ mod integration_tests {
         {
             let credential_offer = aries_vcx::messages::issuance::credential_offer::test_utils::_credential_offer();
 
-            faber.connection.send_message_closure(faber.wallet_handle).await.unwrap()(credential_offer.to_a2a_message())
+            faber.connection.send_message_closure(&faber.profile).await.unwrap()(credential_offer.to_a2a_message())
                 .await
                 .unwrap();
 
@@ -239,11 +239,11 @@ mod integration_tests {
             create_connected_connections(&mut consumer2, &mut institution).await;
 
         consumer1_to_institution
-            .send_generic_message(consumer1.wallet_handle, "Hello Institution from consumer1")
+            .send_generic_message(&consumer1.profile, "Hello Institution from consumer1")
             .await
             .unwrap();
         consumer2_to_institution
-            .send_generic_message(consumer2.wallet_handle, "Hello Institution from consumer2")
+            .send_generic_message(&consumer2.profile, "Hello Institution from consumer2")
             .await
             .unwrap();
 
@@ -289,15 +289,15 @@ mod integration_tests {
         let (alice_to_faber, faber_to_alice) = create_connected_connections(&mut alice, &mut faber).await;
 
         faber_to_alice
-            .send_generic_message(faber.wallet_handle, "Hello 1")
+            .send_generic_message(&faber.profile, "Hello 1")
             .await
             .unwrap();
         faber_to_alice
-            .send_generic_message(faber.wallet_handle, "Hello 2")
+            .send_generic_message(&faber.profile, "Hello 2")
             .await
             .unwrap();
         faber_to_alice
-            .send_generic_message(faber.wallet_handle, "Hello 3")
+            .send_generic_message(&faber.profile, "Hello 3")
             .await
             .unwrap();
 
@@ -366,11 +366,11 @@ mod integration_tests {
             create_connected_connections(&mut consumer2, &mut institution).await;
 
         consumer1_to_institution
-            .send_generic_message(consumer1.wallet_handle, "Hello Institution from consumer1")
+            .send_generic_message(&consumer1.profile, "Hello Institution from consumer1")
             .await
             .unwrap();
         consumer2_to_institution
-            .send_generic_message(consumer2.wallet_handle, "Hello Institution from consumer2")
+            .send_generic_message(&consumer2.profile, "Hello Institution from consumer2")
             .await
             .unwrap();
 
@@ -388,10 +388,14 @@ mod integration_tests {
     }
 
     #[cfg(feature = "agency_pool_tests")]
-    #[tokio::test]
     async fn test_update_agent_webhook() {
+        use aries_vcx::plugins::wallet::indy_wallet::IndySdkWallet;
+        use std::sync::Arc;
+        use aries_vcx::plugins::wallet::base_wallet::BaseWallet;
+        use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
+
         let _setup = SetupPool::init().await;
-        let wallet_config = WalletConfig {
+        let wallet_config = aries_vcx::indy::wallet::WalletConfig {
             wallet_name: format!("wallet_{}", uuid::Uuid::new_v4().to_string()),
             wallet_key: settings::DEFAULT_WALLET_KEY.into(),
             wallet_key_derivation: settings::WALLET_KDF_RAW.into(),
@@ -402,19 +406,19 @@ mod integration_tests {
             rekey_derivation_method: None,
         };
 
-        create_indy_wallet(&wallet_config).await.unwrap();
-        let wallet_handle = open_wallet(&wallet_config).await.unwrap();
+        let wallet_handle = aries_vcx::indy::wallet::create_and_open_wallet(&wallet_config).await.unwrap();
+        let wallet: Arc<dyn BaseWallet> = Arc::new(IndySdkWallet::new(wallet_handle));
         let mut client = AgencyClient::new();
         let agency_url = "http://localhost:8080";
         let agency_did = "VsKV7grR1BUE29mG2Fm2kX";
         let agency_vk = "Hezce2UWMZ3wUhVkh2LfKSs8nDzWwzs2Win7EzNN3YaR";
-        let (my_did, my_vk) = create_and_store_my_did(wallet_handle, None, None).await.unwrap();
+        let (my_did, my_vk) = wallet.create_and_store_my_did(None, None).await.unwrap();
         client
-            .provision_cloud_agent(wallet_handle, &my_did, &my_vk, agency_did, agency_vk, agency_url)
+            .provision_cloud_agent(wallet.to_base_agency_client_wallet(), &my_did, &my_vk, agency_did, agency_vk, agency_url)
             .await
             .unwrap();
         let config = client.get_config().unwrap();
-        let client = client.configure(wallet_handle, &config).unwrap();
+        let client = client.configure(wallet.to_base_agency_client_wallet(), &config).unwrap();
         client.update_agent_webhook("https://example.org").await.unwrap();
         close_wallet(wallet_handle).await.unwrap();
     }

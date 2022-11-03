@@ -79,7 +79,6 @@ impl ServiceCredentialsHolder {
         let mut holder = Holder::create("")?;
         holder
             .send_proposal(
-                &self.profile,
                 proposal_data,
                 connection.send_message_closure(&self.profile).await?,
             )

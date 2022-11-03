@@ -1,6 +1,10 @@
 #[cfg(test)]
 #[cfg(feature = "test_utils")]
 pub mod test_utils {
+    use std::sync::Arc;
+
+    use aries_vcx::core::profile::indy_profile::IndySdkProfile;
+    use aries_vcx::core::profile::profile::Profile;
     use aries_vcx::handlers::revocation_notification::receiver::RevocationNotificationReceiver;
     use aries_vcx::handlers::revocation_notification::sender::RevocationNotificationSender;
     use aries_vcx::protocols::revocation_notification::sender::state_machine::SenderConfigBuilder;
@@ -48,6 +52,7 @@ pub mod test_utils {
     use aries_vcx::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
     use aries_vcx::xyz::primitives::credential_schema::Schema;
     use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
+    use vdrtools_sys::PoolHandle;
 
     #[derive(Debug)]
     pub struct VcxAgencyMessage {
@@ -394,7 +399,7 @@ pub mod test_utils {
                 .cred_rev_id(self.issuer_credential.get_rev_id().unwrap())
                 .build()
                 .unwrap();
-            let send_message = self.connection.send_message_closure(self.wallet_handle).await.unwrap();
+            let send_message = self.connection.send_message_closure(&self.profile).await.unwrap();
             self.rev_not_sender = self.rev_not_sender
                 .clone()
                 .send_revocation_notification(config, send_message)
@@ -673,8 +678,8 @@ pub mod test_utils {
 
         pub async fn receive_revocation_notification(&mut self, rev_not: RevocationNotification) {
             let rev_reg_id = self.credential.get_rev_reg_id().unwrap();
-            let cred_rev_id = self.credential.get_cred_rev_id(self.wallet_handle).await.unwrap();
-            let send_message = self.connection.send_message_closure(self.wallet_handle).await.unwrap();
+            let cred_rev_id = self.credential.get_cred_rev_id(&self.profile).await.unwrap();
+            let send_message = self.connection.send_message_closure(&self.profile).await.unwrap();
             let rev_not_receiver = RevocationNotificationReceiver::build(rev_reg_id, cred_rev_id)
                 .handle_revocation_notification(rev_not, send_message).await.unwrap();
             self.rev_not_receiver = Some(rev_not_receiver);

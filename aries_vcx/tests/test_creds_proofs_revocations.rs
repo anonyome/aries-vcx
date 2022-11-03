@@ -43,7 +43,7 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(!issuer_credential.is_revoked(&institution.profile).await.unwrap());
 
         let time_before_revocation = time::get_time().sec as u64;
         info!("test_basic_revocation :: verifier :: Going to revoke credential");
@@ -51,7 +51,7 @@ mod integration_tests {
         thread::sleep(Duration::from_millis(2000));
         let time_after_revocation = time::get_time().sec as u64;
 
-        assert!(issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(issuer_credential.is_revoked(&institution.profile).await.unwrap());
 
         let _requested_attrs = requested_attrs(
             &institution.config_issuer.institution_did,
@@ -111,13 +111,13 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(!issuer_credential.is_revoked(&institution.profile).await.unwrap());
 
         info!("test_revocation_notification :: verifier :: Going to revoke credential");
         revoke_credential_and_publish_accumulator(&mut institution, &issuer_credential, &rev_reg.rev_reg_id).await;
         thread::sleep(Duration::from_millis(2000));
 
-        assert!(issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(issuer_credential.is_revoked(&institution.profile).await.unwrap());
         let config = aries_vcx::protocols::revocation_notification::sender::state_machine::SenderConfigBuilder::default()
             .ack_on(vec![messages::ack::please_ack::AckOn::Receipt])
             .rev_reg_id(issuer_credential.get_rev_reg_id().unwrap())
@@ -125,7 +125,7 @@ mod integration_tests {
             .comment(None)
             .build()
             .unwrap();
-        let send_message = institution_to_consumer.send_message_closure(institution.wallet_handle).await.unwrap();
+        let send_message = institution_to_consumer.send_message_closure(&institution.profile).await.unwrap();
         aries_vcx::handlers::revocation_notification::sender::RevocationNotificationSender::build()
             .clone()
             .send_revocation_notification(config, send_message)
@@ -159,7 +159,7 @@ mod integration_tests {
         .await;
 
         revoke_credential_local(&mut institution, &issuer_credential, &rev_reg.rev_reg_id).await;
-        assert!(!issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(!issuer_credential.is_revoked(&institution.profile).await.unwrap());
         let request_name1 = Some("request1");
         let mut verifier = verifier_create_proof_and_send_request(
             &mut institution,
@@ -184,7 +184,7 @@ mod integration_tests {
             ProofStateType::ProofValidated
         );
 
-        assert!(!issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(!issuer_credential.is_revoked(&institution.profile).await.unwrap());
 
         publish_revocation(&mut institution, rev_reg.rev_reg_id.clone()).await;
         let request_name2 = Some("request2");
@@ -211,7 +211,7 @@ mod integration_tests {
             ProofStateType::ProofInvalid
         );
 
-        assert!(issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(issuer_credential.is_revoked(&institution.profile).await.unwrap());
     }
 
     #[cfg(feature = "agency_pool_tests")]
@@ -232,8 +232,7 @@ mod integration_tests {
         // Issue and send three credentials of the same schema
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, rev_reg_id) =
             _create_address_schema(
-                institution.wallet_handle,
-                institution.pool_handle,
+                &institution.profile,
                 &institution.config_issuer.institution_did,
             )
             .await;
@@ -277,9 +276,9 @@ mod integration_tests {
 
         revoke_credential_local(&mut institution, &issuer_credential1, &rev_reg.rev_reg_id).await;
         revoke_credential_local(&mut institution, &issuer_credential2, &rev_reg.rev_reg_id).await;
-        assert!(!issuer_credential1.is_revoked(institution.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(institution.pool_handle).await.unwrap());
-        assert!(!issuer_credential3.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&institution.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&institution.profile).await.unwrap());
+        assert!(!issuer_credential3.is_revoked(&institution.profile).await.unwrap());
 
         // Revoke two locally and verify their are all still valid
         let request_name1 = Some("request1");
@@ -352,9 +351,9 @@ mod integration_tests {
         publish_revocation(&mut institution, rev_reg_id.clone().unwrap()).await;
         thread::sleep(Duration::from_millis(2000));
 
-        assert!(issuer_credential1.is_revoked(institution.pool_handle).await.unwrap());
-        assert!(issuer_credential2.is_revoked(institution.pool_handle).await.unwrap());
-        assert!(!issuer_credential3.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(issuer_credential1.is_revoked(&institution.profile).await.unwrap());
+        assert!(issuer_credential2.is_revoked(&institution.profile).await.unwrap());
+        assert!(!issuer_credential3.is_revoked(&institution.profile).await.unwrap());
 
         let request_name2 = Some("request2");
         let mut verifier1 = verifier_create_proof_and_send_request(
@@ -443,7 +442,7 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential.is_revoked(institution.pool_handle).await.unwrap());
+        assert!(!issuer_credential.is_revoked(&institution.profile).await.unwrap());
 
         thread::sleep(Duration::from_millis(1000));
         let time_before_revocation = time::get_time().sec as u64;
@@ -531,8 +530,7 @@ mod integration_tests {
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, rev_reg_id) =
             _create_address_schema(
-                issuer.wallet_handle,
-                issuer.pool_handle,
+                &issuer.profile,
                 &issuer.config_issuer.institution_did,
             )
             .await;
@@ -563,8 +561,8 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
 
         revoke_credential_and_publish_accumulator(&mut issuer, &issuer_credential1, &rev_reg_id.unwrap()).await;
 
@@ -580,8 +578,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -604,8 +601,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -616,8 +612,8 @@ mod integration_tests {
             ProofStateType::ProofValidated
         );
 
-        assert!(issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
     }
 
     #[tokio::test]
@@ -633,8 +629,7 @@ mod integration_tests {
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, rev_reg_id) =
             _create_address_schema(
-                issuer.wallet_handle,
-                issuer.pool_handle,
+                &issuer.profile,
                 &issuer.config_issuer.institution_did,
             )
             .await;
@@ -665,8 +660,8 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
 
         revoke_credential_and_publish_accumulator(&mut issuer, &issuer_credential2, &rev_reg_id.unwrap()).await;
 
@@ -682,8 +677,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -706,8 +700,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -718,8 +711,8 @@ mod integration_tests {
             ProofStateType::ProofInvalid
         );
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
     }
 
     #[tokio::test]
@@ -734,8 +727,7 @@ mod integration_tests {
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) = _create_address_schema(
-            issuer.wallet_handle,
-            issuer.pool_handle,
+            &issuer.profile,
             &issuer.config_issuer.institution_did,
         )
         .await;
@@ -779,8 +771,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -803,8 +794,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -815,8 +805,8 @@ mod integration_tests {
             ProofStateType::ProofValidated
         );
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
     }
 
     #[tokio::test]
@@ -831,8 +821,7 @@ mod integration_tests {
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) = _create_address_schema(
-            issuer.wallet_handle,
-            issuer.pool_handle,
+            &issuer.profile,
             &issuer.config_issuer.institution_did,
         )
         .await;
@@ -864,8 +853,8 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
 
         revoke_credential_and_publish_accumulator(&mut issuer, &issuer_credential1, &rev_reg.rev_reg_id).await;
 
@@ -881,8 +870,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -905,8 +893,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -917,8 +904,8 @@ mod integration_tests {
             ProofStateType::ProofValidated
         );
 
-        assert!(issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
     }
 
     #[tokio::test]
@@ -933,8 +920,7 @@ mod integration_tests {
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) = _create_address_schema(
-            issuer.wallet_handle,
-            issuer.pool_handle,
+            &issuer.profile,
             &issuer.config_issuer.institution_did,
         )
         .await;
@@ -966,8 +952,8 @@ mod integration_tests {
         )
         .await;
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(!issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(!issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
 
         revoke_credential_and_publish_accumulator(&mut issuer, &issuer_credential2, &rev_reg_2.rev_reg_id).await;
 
@@ -983,8 +969,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -1007,8 +992,7 @@ mod integration_tests {
             .await;
         proof_verifier
             .update_state(
-                verifier.wallet_handle,
-                verifier.pool_handle,
+                &verifier.profile,
                 &verifier.agency_client,
                 &verifier_to_consumer,
             )
@@ -1019,7 +1003,7 @@ mod integration_tests {
             ProofStateType::ProofInvalid
         );
 
-        assert!(!issuer_credential1.is_revoked(issuer.pool_handle).await.unwrap());
-        assert!(issuer_credential2.is_revoked(issuer.pool_handle).await.unwrap());
+        assert!(!issuer_credential1.is_revoked(&issuer.profile).await.unwrap());
+        assert!(issuer_credential2.is_revoked(&issuer.profile).await.unwrap());
     }
 }

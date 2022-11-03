@@ -348,8 +348,6 @@ mod tests {
     use aries_vcx::handlers::issuance::holder::Holder;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
     use aries_vcx::handlers::proof_presentation::verifier::Verifier;
-    use aries_vcx::indy::ledger::pool::test_utils::{delete_test_pool, open_test_pool};
-    use aries_vcx::indy::test_utils::create_and_store_nonrevocable_credential_def;
     use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
     use aries_vcx::messages::proof_presentation::presentation_request::PresentationRequest;
     use aries_vcx::protocols::issuance::holder::state_machine::HolderState;
@@ -1249,12 +1247,11 @@ mod tests {
             alice
                 .credential
                 .send_request(
-                    alice.wallet_handle,
-                    alice.pool_handle,
+                    &alice.profile,
                     pw_did,
                     alice
                         .connection
-                        .send_message_closure(alice.wallet_handle)
+                        .send_message_closure(&alice.profile)
                         .await
                         .unwrap(),
                 )
@@ -1280,8 +1277,7 @@ mod tests {
             alice
                 .prover
                 .generate_presentation(
-                    alice.wallet_handle,
-                    alice.pool_handle,
+                    &alice.profile,
                     credentials.to_string(),
                     String::from("{}"),
                 )
@@ -1294,7 +1290,7 @@ mod tests {
                 .send_presentation(
                     alice
                         .connection
-                        .send_message_closure(alice.wallet_handle)
+                        .send_message_closure(&alice.profile)
                         .await
                         .unwrap(),
                 )
@@ -1357,7 +1353,7 @@ mod tests {
                     pw_did,
                     alice
                         .connection
-                        .send_message_closure(alice.wallet_handle)
+                        .send_message_closure(&alice.profile)
                         .await
                         .unwrap(),
                 )
@@ -1390,8 +1386,7 @@ mod tests {
             alice
                 .prover
                 .generate_presentation(
-                    alice.wallet_handle,
-                    alice.pool_handle,
+                    &alice.profile,
                     credentials.to_string(),
                     String::from("{}"),
                 )
@@ -1404,7 +1399,7 @@ mod tests {
                 .send_presentation(
                     alice
                         .connection
-                        .send_message_closure(alice.wallet_handle)
+                        .send_message_closure(&alice.profile)
                         .await
                         .unwrap(),
                 )

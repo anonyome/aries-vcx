@@ -302,7 +302,7 @@ mod integration_tests {
             .unwrap();
 
         prover
-            .send_presentation(&profile, conn.send_message_closure(&profile).await.unwrap())
+            .send_presentation(conn.send_message_closure(&profile).await.unwrap())
             .await
             .unwrap();
 

@@ -7,7 +7,6 @@ pub mod test_utils {
     use aries_vcx::core::profile::profile::Profile;
     use aries_vcx::xyz::test_utils::create_and_store_credential_def;
     use serde_json::{json, Value};
-    use vdrtools_sys::{PoolHandle, WalletHandle};
 
     use aries_vcx::handlers::connection::connection::{Connection, ConnectionState};
     use aries_vcx::handlers::issuance::holder::test_utils::get_credential_offer_messages;
@@ -252,7 +251,6 @@ pub mod test_utils {
         assert_eq!(HolderState::Initial, holder.get_state());
         holder
             .send_proposal(
-                &alice.profile,
                 proposal,
                 connection.send_message_closure(&alice.profile).await.unwrap(),
             )
@@ -289,7 +287,6 @@ pub mod test_utils {
             .add_credential_preview_data(&zip, "42000", MimeType::Plain);
         holder
             .send_proposal(
-                &alice.profile,
                 proposal,
                 connection.send_message_closure(&alice.profile).await.unwrap(),
             )
@@ -393,7 +390,6 @@ pub mod test_utils {
         assert_eq!(HolderState::OfferReceived, holder.get_state());
         holder
             .decline_offer(
-                &alice.profile,
                 Some("Have a nice day"),
                 connection.send_message_closure(&alice.profile).await.unwrap(),
             )
@@ -463,7 +459,6 @@ pub mod test_utils {
         let mut prover = Prover::create("1").unwrap();
         prover
             .send_proposal(
-                &alice.profile,
                 proposal_data,
                 connection.send_message_closure(&alice.profile).await.unwrap(),
             )
@@ -492,7 +487,6 @@ pub mod test_utils {
         }
         prover
             .send_proposal(
-                &alice.profile,
                 proposal_data,
                 connection.send_message_closure(&alice.profile).await.unwrap(),
             )
@@ -539,7 +533,6 @@ pub mod test_utils {
         assert_eq!(verifier.get_state(), VerifierState::PresentationProposalReceived);
         verifier
             .decline_presentation_proposal(
-                &faber.profile,
                 connection.send_message_closure(&faber.profile).await.unwrap(),
                 "I don't like Alices",
             )
@@ -788,7 +781,7 @@ pub mod test_utils {
             true,
         )
         .await;
-        assert!(!holder_credential.is_revoked(consumer.wallet_handle, consumer.pool_handle).await.unwrap());
+        assert!(!holder_credential.is_revoked(&consumer.profile).await.unwrap());
         issuer_credential
     }
 

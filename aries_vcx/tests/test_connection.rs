@@ -305,27 +305,4 @@ mod integration_tests {
         warn!("faber_connection_info: {}", faber_connection_info);
         assert!(faber_connection_info["their"]["protocols"].as_array().unwrap().len() > 0);
     }
-
-    #[tokio::test]
-    async fn faber_alice_connection() {
-        let setup = SetupPool::init().await;
-
-        // let x: Option<i32> = None;
-        // x.unwrap();
-        let mut faber = Faber::setup(setup.pool_handle).await;
-        let mut alice = Alice::setup(setup.pool_handle).await;
-
-         // Connection
-        let invite = faber.create_invite().await;
-        alice.accept_invite(&invite).await;
-
-        faber.update_state(3).await;
-        alice.update_state(4).await;
-        faber.update_state(4).await;
-    }
-
-    #[tokio::test]
-    async fn pool_test() {
-        let setup = SetupPool::init().await;
-    }
 }

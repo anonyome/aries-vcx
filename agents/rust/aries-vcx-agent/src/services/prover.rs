@@ -115,7 +115,6 @@ impl ServiceProver {
         let mut prover = Prover::create("")?;
         prover
             .send_proposal(
-                &self.profile,
                 proposal,
                 connection.send_message_closure(&self.profile).await?,
             )
@@ -150,7 +149,6 @@ impl ServiceProver {
             .await?;
         prover
             .send_presentation(
-                &self.profile,
                 connection.send_message_closure(&self.profile).await?,
             )
             .await?;
