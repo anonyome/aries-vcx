@@ -8,6 +8,7 @@ use std::fmt;
 use std::sync::Arc;
 use crate::global::settings;
 
+
 macro_rules! enum_number {
     ($name:ident { $($variant:ident = $value:expr, )* }) => {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -116,7 +117,6 @@ async fn _try_get_cred_def_from_ledger(ledger: &Arc<dyn BaseLedger>, issuer_did:
         )),
     }
 }
-
 impl CredentialDef {
     pub async fn create(
         profile: &Arc<dyn Profile>,

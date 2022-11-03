@@ -8,6 +8,7 @@ use crate::core::profile::profile::Profile;
 
 use crate::error::{VcxError, VcxErrorKind, VcxResult};
 use crate::xyz::credentials::encoding::encode_attributes;
+use crate::xyz::credentials::is_cred_revoked;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::issuance::credential::Credential;
 use messages::issuance::credential_offer::{CredentialOffer, OfferInfo};
@@ -206,11 +207,11 @@ impl IssuerSM {
         }
     }
 
-    pub async fn is_revoked(&self, pool_handle: PoolHandle) -> VcxResult<bool> {
+    pub async fn is_revoked(&self, profile: &Arc<dyn Profile>) -> VcxResult<bool> {
         if self.is_revokable() {
             let rev_reg_id = self.get_rev_reg_id()?;
             let rev_id = self.get_rev_id()?;
-            is_cred_revoked(pool_handle, &rev_reg_id, &rev_id).await
+            is_cred_revoked(profile, &rev_reg_id, &rev_id).await
         } else {
             Err(VcxError::from_msg(VcxErrorKind::InvalidState, "Unable to check revocation status - this credential is not revokable"))
         }
@@ -403,11 +404,11 @@ impl IssuerSM {
         Ok(Self { state, ..self })
     }
 
-    pub async fn send_credential(self, wallet_handle: WalletHandle, send_message: SendClosure) -> VcxResult<Self> {
+    pub async fn send_credential(self, profile: &Arc<dyn Profile>, send_message: SendClosure) -> VcxResult<Self> {
         let state = match self.state {
             IssuerFullState::RequestReceived(state_data) => {
                 match _create_credential(
-                    wallet_handle,
+                    profile,
                     &state_data.request,
                     &state_data.rev_reg_id,
                     &state_data.tails_file,
@@ -474,7 +475,7 @@ impl IssuerSM {
                     VcxErrorKind::InvalidState,
                     "Attempted to call undefined send_message callback",
                 ))?;
-                self.send_credential(wallet_handle, send_message).await?
+                self.send_credential(profile, send_message).await?
             }
             CredentialIssuanceAction::CredentialAck(ack) => self.receive_ack(ack)?,
             CredentialIssuanceAction::ProblemReport(problem_report) => self.receive_problem_report(problem_report)?,

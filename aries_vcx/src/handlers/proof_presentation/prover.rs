@@ -83,7 +83,6 @@ impl Prover {
 
     pub async fn send_proposal(
         &mut self,
-        profile: &Arc<dyn Profile>,
         proposal_data: PresentationProposalData,
         send_message: SendClosure,
     ) -> VcxResult<()> {
@@ -163,7 +162,6 @@ impl Prover {
 
     pub async fn decline_presentation_request(
         &mut self,
-        profile: &Arc<dyn Profile>,
         send_message: SendClosure,
         reason: Option<String>,
         proposal: Option<String>,

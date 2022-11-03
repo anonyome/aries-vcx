@@ -236,8 +236,8 @@ impl Issuer {
         self.issuer_sm.is_revokable()
     }
 
-    pub async fn is_revoked(&self, pool_handle: PoolHandle) -> VcxResult<bool> {
-        self.issuer_sm.is_revoked(pool_handle).await
+    pub async fn is_revoked(&self, profile: &Arc<dyn Profile>) -> VcxResult<bool> {
+        self.issuer_sm.is_revoked(profile).await
     }
 
     pub async fn step(

@@ -336,6 +336,10 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         Ok(serde_json::to_string(&presentation)?)
     }
 
+    async fn prover_get_credential(&self, cred_id: &str) -> VcxResult<String> {
+        todo!()
+    }
+
     async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String> {
         // TODO - convert filter_json to wql query;
         let query = "{}";
@@ -636,7 +640,7 @@ fn _format_attribute_as_marker_tag_name(attribute_name: &str) -> String {
 fn unimplemented_method_err(method_name: &str) -> VcxError {
     VcxError::from_msg(
         VcxErrorKind::UnimplementedFeature,
-        format!("method called '{}' is not yet implemented in AriesVCX", method_name)
+        format!("method '{}' is not yet implemented in AriesVCX", method_name)
     )
 }
 

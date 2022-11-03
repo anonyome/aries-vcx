@@ -67,6 +67,9 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     //    "issuer_did": string, (Optional)
     //    "cred_def_id": string, (Optional)
     //  }
+
+    async fn prover_get_credential(&self, cred_id: &str) -> VcxResult<String>;
+
     async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String>;
 
     async fn prover_get_credentials_for_proof_req(&self, proof_request_json: &str) -> VcxResult<String>;

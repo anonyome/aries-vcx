@@ -188,12 +188,12 @@ impl VerifierSM {
         Ok(Self { state, thread_id, ..self })
     }
 
-    pub async fn verify_presentation(self, wallet_handle: WalletHandle, pool_handle: PoolHandle, presentation: Presentation, send_message: SendClosure) -> VcxResult<Self> {
+    pub async fn verify_presentation(self, profile: &Arc<dyn Profile>, presentation: Presentation, send_message: SendClosure) -> VcxResult<Self> {
         verify_thread_id(&self.thread_id, &VerifierMessages::VerifyPresentation(presentation.clone()))?;
         let state = match self.state {
             VerifierFullState::PresentationRequestSent(state) => {
                 let verification_result = state
-                    .verify_presentation(wallet_handle, pool_handle, &presentation, &self.thread_id)
+                    .verify_presentation(profile, &presentation, &self.thread_id)
                     .await;
                 let ack = build_verification_ack(&self.thread_id);
                 send_message(A2AMessage::PresentationAck(ack)).await?;

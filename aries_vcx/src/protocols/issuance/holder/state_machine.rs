@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
 
 use crate::error::prelude::*;
 use crate::global::settings;
+use crate::xyz::credentials::{get_cred_rev_id, is_cred_revoked};
 use messages::a2a::{A2AMessage, MessageId};
 use messages::ack::Ack;
 use messages::issuance::credential::Credential;
@@ -12,6 +14,7 @@ use messages::issuance::credential_ack::CredentialAck;
 use messages::issuance::credential_offer::CredentialOffer;
 use messages::issuance::credential_proposal::{CredentialProposal, CredentialProposalData};
 use messages::issuance::credential_request::CredentialRequest;
+use messages::problem_report::ProblemReport;
 use messages::status::Status;
 use crate::protocols::common::build_problem_report_msg;
 use crate::protocols::issuance::actions::CredentialIssuanceAction;
@@ -185,7 +188,7 @@ impl HolderSM {
                     VcxErrorKind::InvalidState,
                     "Attempted to call undefined send_message callback",
                 ))?;
-                self.send_request(wallet_handle, pool_handle, my_pw_did, send_message).await?
+                self.send_request(profile, my_pw_did, send_message).await?
             },
             CredentialIssuanceAction::CredentialOfferReject(comment) => {
                 let send_message = send_message.ok_or(VcxError::from_msg(
@@ -199,7 +202,7 @@ impl HolderSM {
                     VcxErrorKind::InvalidState,
                     "Attempted to call undefined send_message callback",
                 ))?;
-                self.receive_credential(wallet_handle, pool_handle, credential, send_message).await?
+                self.receive_credential(profile, credential, send_message).await?
             }
             CredentialIssuanceAction::ProblemReport(problem_report) => {
                 self.receive_problem_report(problem_report)?
@@ -244,10 +247,10 @@ impl HolderSM {
         Ok(Self { state, ..self })
     }
 
-    pub async fn send_request(self, wallet_handle: WalletHandle, pool_handle: PoolHandle, my_pw_did: String, send_message: SendClosure) -> VcxResult<Self> {
+    pub async fn send_request(self, profile: &Arc<dyn Profile>, my_pw_did: String, send_message: SendClosure) -> VcxResult<Self> {
         let state = match self.state {
             HolderFullState::OfferReceived(state_data) => {
-                match _make_credential_request(wallet_handle, pool_handle, self.thread_id.clone(), my_pw_did, &state_data.offer).await {
+                match _make_credential_request(profile, self.thread_id.clone(), my_pw_did, &state_data.offer).await {
                     Ok((cred_request, req_meta, cred_def_json)) => {
                         send_message(cred_request.to_a2a_message()).await?;
                         HolderFullState::RequestSent((state_data, req_meta, cred_def_json).into())
@@ -283,12 +286,11 @@ impl HolderSM {
         Ok(Self { state, ..self })
     }
 
-    pub async fn receive_credential(self, wallet_handle: WalletHandle, pool_handle: PoolHandle, credential: Credential, send_message: SendClosure) -> VcxResult<Self> {
+    pub async fn receive_credential(self, profile: &Arc<dyn Profile>, credential: Credential, send_message: SendClosure) -> VcxResult<Self> {
         let state = match self.state {
             HolderFullState::RequestSent(state_data) => {
                 match _store_credential(
-                    wallet_handle,
-                    pool_handle,
+                    profile,
                     &credential,
                     &state_data.req_meta,
                     &state_data.cred_def_json,
@@ -452,8 +454,8 @@ impl HolderSM {
         if self.is_revokable(profile).await? {
             let rev_reg_id = self.get_rev_reg_id()?;
             let cred_id = self.get_cred_id()?;
-            let rev_id = get_cred_rev_id(wallet_handle, &cred_id).await?;
-            is_cred_revoked(pool_handle, &rev_reg_id, &rev_id).await
+            let rev_id = get_cred_rev_id(profile, &cred_id).await?;
+            is_cred_revoked(profile, &rev_reg_id, &rev_id).await
         } else {
             Err(VcxError::from_msg(VcxErrorKind::InvalidState, "Unable to check revocation status - this credential is not revokable"))
         }

@@ -175,7 +175,6 @@ impl Verifier {
 
     pub async fn decline_presentation_proposal<'a>(
         &'a mut self,
-        profile: &Arc<dyn Profile>,
         send_message: SendClosure,
         reason: &'a str,
     ) -> VcxResult<()> {

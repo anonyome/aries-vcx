@@ -156,10 +156,10 @@ impl ProverSM {
         Ok(Self { state, ..self })
     }
 
-    pub async fn generate_presentation(self, wallet_handle: WalletHandle, pool_handle: PoolHandle, credentials: String, self_attested_attrs: String) -> VcxResult<Self> {
+    pub async fn generate_presentation(self,profile: &Arc<dyn Profile>, credentials: String, self_attested_attrs: String) -> VcxResult<Self> {
         let state = match self.state {
             ProverFullState::PresentationRequestReceived(state) => {
-                match state.build_presentation(wallet_handle, pool_handle, &credentials, &self_attested_attrs).await {
+                match state.build_presentation(profile, &credentials, &self_attested_attrs).await {
                     Ok(presentation) => {
                         let presentation = build_presentation_msg(&self.thread_id, presentation)?;
                         ProverFullState::PresentationPrepared((state, presentation).into())
