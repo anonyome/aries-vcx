@@ -22,17 +22,17 @@ mod integration_tests {
     use aries_vcx::global::settings;
     use aries_vcx::messages::a2a::A2AMessage;
     use aries_vcx::messages::ack::test_utils::_ack;
-    use aries_vcx::utils::devsetup::SetupPool;
+    use aries_vcx::utils::devsetup::SetupIndyPool;
 
-    use crate::utils::devsetup_agent::test_utils::{Alice, Faber};
+    use crate::utils::devsetup_agent::test_utils::{Alice, Faber, create_test_alice_instance};
     use crate::utils::scenarios::test_utils::create_connected_connections;
 
     #[tokio::test]
     #[cfg(feature = "agency_pool_tests")]
     async fn test_send_and_download_messages() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer = Alice::setup(setup.pool_handle).await;
+        let mut consumer = create_test_alice_instance(&setup).await;
 
         let (alice_to_faber, faber_to_alice) = create_connected_connections(&mut consumer, &mut institution).await;
 
@@ -114,9 +114,9 @@ mod integration_tests {
     #[tokio::test]
     #[cfg(feature = "agency_pool_tests")]
     async fn test_connection_send_works() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut faber = Faber::setup(setup.pool_handle).await;
-        let mut alice = Alice::setup(setup.pool_handle).await;
+        let mut alice = create_test_alice_instance(&setup).await;
 
         let invite = faber.create_invite().await;
         alice.accept_invite(&invite).await;
@@ -229,10 +229,11 @@ mod integration_tests {
     #[cfg(feature = "agency_pool_tests")]
     #[tokio::test]
     async fn test_download_messages() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer1 = Alice::setup(setup.pool_handle).await;
-        let mut consumer2 = Alice::setup(setup.pool_handle).await;
+        let mut consumer1 = create_test_alice_instance(&setup).await;
+        let mut consumer2 = create_test_alice_instance(&setup).await;
+
         let (consumer1_to_institution, institution_to_consumer1) =
             create_connected_connections(&mut consumer1, &mut institution).await;
         let (consumer2_to_institution, institution_to_consumer2) =
@@ -283,9 +284,10 @@ mod integration_tests {
     #[cfg(feature = "agency_pool_tests")]
     #[tokio::test]
     async fn test_update_agency_messages() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut faber = Faber::setup(setup.pool_handle).await;
-        let mut alice = Alice::setup(setup.pool_handle).await;
+        let mut alice = create_test_alice_instance(&setup).await;
+
         let (alice_to_faber, faber_to_alice) = create_connected_connections(&mut alice, &mut faber).await;
 
         faber_to_alice
@@ -356,10 +358,11 @@ mod integration_tests {
     #[cfg(feature = "agency_pool_tests")]
     #[tokio::test]
     async fn test_download_messages_from_multiple_connections() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer1 = Alice::setup(setup.pool_handle).await;
-        let mut consumer2 = Alice::setup(setup.pool_handle).await;
+        let mut consumer1 = create_test_alice_instance(&setup).await;
+        let mut consumer2 = create_test_alice_instance(&setup).await;
+
         let (consumer1_to_institution, institution_to_consumer1) =
             create_connected_connections(&mut consumer1, &mut institution).await;
         let (consumer2_to_institution, institution_to_consumer2) =
@@ -389,12 +392,12 @@ mod integration_tests {
 
     #[cfg(feature = "agency_pool_tests")]
     async fn test_update_agent_webhook() {
+        use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
+        use aries_vcx::plugins::wallet::base_wallet::BaseWallet;
         use aries_vcx::plugins::wallet::indy_wallet::IndySdkWallet;
         use std::sync::Arc;
-        use aries_vcx::plugins::wallet::base_wallet::BaseWallet;
-        use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
 
-        let _setup = SetupPool::init().await;
+        let _setup = SetupIndyPool::init().await;
         let wallet_config = aries_vcx::indy::wallet::WalletConfig {
             wallet_name: format!("wallet_{}", uuid::Uuid::new_v4().to_string()),
             wallet_key: settings::DEFAULT_WALLET_KEY.into(),
@@ -406,7 +409,9 @@ mod integration_tests {
             rekey_derivation_method: None,
         };
 
-        let wallet_handle = aries_vcx::indy::wallet::create_and_open_wallet(&wallet_config).await.unwrap();
+        let wallet_handle = aries_vcx::indy::wallet::create_and_open_wallet(&wallet_config)
+            .await
+            .unwrap();
         let wallet: Arc<dyn BaseWallet> = Arc::new(IndySdkWallet::new(wallet_handle));
         let mut client = AgencyClient::new();
         let agency_url = "http://localhost:8080";
@@ -414,11 +419,20 @@ mod integration_tests {
         let agency_vk = "Hezce2UWMZ3wUhVkh2LfKSs8nDzWwzs2Win7EzNN3YaR";
         let (my_did, my_vk) = wallet.create_and_store_my_did(None, None).await.unwrap();
         client
-            .provision_cloud_agent(wallet.to_base_agency_client_wallet(), &my_did, &my_vk, agency_did, agency_vk, agency_url)
+            .provision_cloud_agent(
+                wallet.to_base_agency_client_wallet(),
+                &my_did,
+                &my_vk,
+                agency_did,
+                agency_vk,
+                agency_url,
+            )
             .await
             .unwrap();
         let config = client.get_config().unwrap();
-        let client = client.configure(wallet.to_base_agency_client_wallet(), &config).unwrap();
+        let client = client
+            .configure(wallet.to_base_agency_client_wallet(), &config)
+            .unwrap();
         client.update_agent_webhook("https://example.org").await.unwrap();
         close_wallet(wallet_handle).await.unwrap();
     }

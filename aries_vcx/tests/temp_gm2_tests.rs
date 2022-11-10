@@ -1,5 +1,5 @@
 #[cfg(test)]
-#[cfg(feature = "temp_gm_tests")]
+#[cfg(feature = "modular_deps")]
 mod integration_tests {
     use aries_vcx::core::profile::modular_wallet_profile::{LedgerPoolConfig, ModularWalletProfile};
     use aries_vcx::indy::ledger::pool::{create_pool_ledger_config, open_pool_ledger};

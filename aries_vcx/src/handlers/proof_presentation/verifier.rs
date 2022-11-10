@@ -207,24 +207,22 @@ impl Verifier {
 #[cfg(test)]
 #[cfg(feature = "general_test")]
 mod unit_tests {
+    use crate::core::profile::indy_profile::IndySdkProfile;
     use crate::utils::constants::{REQUESTED_ATTRS, REQUESTED_PREDICATES};
     use crate::utils::devsetup::*;
     use crate::utils::mockdata::mock_settings::MockBuilder;
     use messages::a2a::A2AMessage;
     use messages::proof_presentation::presentation::test_utils::_presentation;
+    use vdrtools_sys::WalletHandle;
 
     use super::*;
 
-    fn _dummy_wallet_handle() -> WalletHandle {
-        WalletHandle(0)
-    }
-
-    fn _dummy_pool_handle() -> PoolHandle {
-        0
+    fn _dummy_profile() -> Arc<dyn Profile> {
+        Arc::new(IndySdkProfile::new(WalletHandle(0), 0))
     }
 
     async fn _verifier() -> Verifier {
-        let presentation_request_data = PresentationRequestData::create("1")
+        let presentation_request_data = PresentationRequestData::create(&_dummy_profile(), "1")
             .await
             .unwrap()
             .set_requested_attributes_as_string(REQUESTED_ATTRS.to_owned())
@@ -248,8 +246,7 @@ mod unit_tests {
         async fn to_finished_state(&mut self) {
             self.to_presentation_request_sent_state().await;
             self.step(
-                _dummy_wallet_handle(),
-                _dummy_pool_handle(),
+                &_dummy_profile(),
                 VerifierMessages::VerifyPresentation(_presentation()),
                 _send_message(),
             )

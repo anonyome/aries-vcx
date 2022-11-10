@@ -44,8 +44,7 @@ impl IndyVdrLedgerPool {
         let txns = PoolTransactions::from_json_file(config.genesis_file_path)?;
 
         let runner = PoolBuilder::from(vdr_config)
-            .transactions(txns)
-            .unwrap()
+            .transactions(txns)?
             .into_runner()?;
 
         Ok(IndyVdrLedgerPool { runner })
@@ -91,8 +90,9 @@ impl IndyVdrLedger {
             }),
         )?;
 
-        // todo no unwrap from recv error
-        let send_req_result: VdrSendRequestResult = recv.await.unwrap();
+        let send_req_result: VdrSendRequestResult = recv.await.map_err(|e| {
+           VcxError::from_msg(VcxErrorKind::InvalidState, e) 
+        })?;
         let (result, _) = send_req_result?;
 
         let reply = match result {
@@ -507,34 +507,34 @@ fn _get_response_json_data_field(response_json: &str) -> VcxResult<Value> {
 }
 
 impl From<VdrError> for VcxError {
-    fn from(vdr_error: VdrError) -> Self {
-        match vdr_error.kind() {
-            // TODO - finish
+    fn from(err: VdrError) -> Self {
+        match err.kind() {
+            // TODO - work on error kind conversion
             indy_vdr::common::error::VdrErrorKind::Config => {
-                VcxError::from_msg(VcxErrorKind::InvalidConfiguration, vdr_error)
+                VcxError::from_msg(VcxErrorKind::InvalidConfiguration, err)
             }
             indy_vdr::common::error::VdrErrorKind::Connection => {
-                VcxError::from_msg(VcxErrorKind::PoolLedgerConnect, vdr_error)
+                VcxError::from_msg(VcxErrorKind::PoolLedgerConnect, err)
             }
             indy_vdr::common::error::VdrErrorKind::FileSystem(_) => {
-                VcxError::from_msg(VcxErrorKind::IOError, vdr_error)
+                VcxError::from_msg(VcxErrorKind::IOError, err)
             }
             indy_vdr::common::error::VdrErrorKind::Input => {
-                VcxError::from_msg(VcxErrorKind::InvalidIndyVdrInput, vdr_error)
+                VcxError::from_msg(VcxErrorKind::InvalidInput, err)
             }
-            indy_vdr::common::error::VdrErrorKind::Resource => todo!(),
-            indy_vdr::common::error::VdrErrorKind::Unavailable => todo!(),
-            indy_vdr::common::error::VdrErrorKind::Unexpected => todo!(),
-            indy_vdr::common::error::VdrErrorKind::Incompatible => todo!(),
-            indy_vdr::common::error::VdrErrorKind::PoolNoConsensus => todo!(),
-            indy_vdr::common::error::VdrErrorKind::PoolRequestFailed(_) => todo!(),
-            indy_vdr::common::error::VdrErrorKind::PoolTimeout => todo!(),
+            indy_vdr::common::error::VdrErrorKind::Resource => VcxError::from_msg(VcxErrorKind::UnknownError, err),
+            indy_vdr::common::error::VdrErrorKind::Unavailable => VcxError::from_msg(VcxErrorKind::UnknownError, err),
+            indy_vdr::common::error::VdrErrorKind::Unexpected => VcxError::from_msg(VcxErrorKind::UnknownError, err),
+            indy_vdr::common::error::VdrErrorKind::Incompatible => VcxError::from_msg(VcxErrorKind::UnknownError, err),
+            indy_vdr::common::error::VdrErrorKind::PoolNoConsensus => VcxError::from_msg(VcxErrorKind::UnknownError, err),
+            indy_vdr::common::error::VdrErrorKind::PoolRequestFailed(_) => VcxError::from_msg(VcxErrorKind::PoolLedgerConnect, err),
+            indy_vdr::common::error::VdrErrorKind::PoolTimeout => VcxError::from_msg(VcxErrorKind::UnknownError, err),
         }
     }
 }
 
 impl From<ValidationError> for VcxError {
     fn from(err: ValidationError) -> Self {
-        VcxError::from_msg(VcxErrorKind::InvalidIndyVdrInput, err)
+        VcxError::from_msg(VcxErrorKind::InvalidInput, err)
     }
 }

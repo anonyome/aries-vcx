@@ -88,7 +88,7 @@ impl BaseAnonCreds for IndySdkAnonCreds {
         cred_req_json: &str,
         cred_values_json: &str,
         rev_reg_id: Option<String>,
-        tails_file: Option<String>,
+        tails_dir: Option<String>,
     ) -> VcxResult<(String, Option<String>, Option<String>)> {
         indy::credentials::issuer::libindy_issuer_create_credential(
             self.profile.indy_wallet_handle,
@@ -96,7 +96,7 @@ impl BaseAnonCreds for IndySdkAnonCreds {
             cred_req_json,
             cred_values_json,
             rev_reg_id,
-            tails_file,
+            tails_dir,
         )
         .await
     }
@@ -157,14 +157,14 @@ impl BaseAnonCreds for IndySdkAnonCreds {
 
     async fn create_revocation_state(
         &self,
-        tails_file_path: &str,
+        tails_dir: &str,
         rev_reg_def_json: &str,
         rev_reg_delta_json: &str,
         timestamp: u64,
         cred_rev_id: &str,
     ) -> VcxResult<String> {
         indy::proofs::prover::libindy_prover_create_revocation_state(
-            tails_file_path,
+            tails_dir,
             rev_reg_def_json,
             rev_reg_delta_json,
             timestamp,
@@ -217,18 +217,18 @@ impl BaseAnonCreds for IndySdkAnonCreds {
     // // todo - think about moving this to somewhere else as it aggregates other calls
     // async fn revoke_credential_and_publish(
     //     &self,
-    //     tails_file: &str,
+    //     tails_dir: &str,
     //     rev_reg_id: &str,
     //     cred_rev_id: &str,
     // ) -> VcxResult<String> {
-    //     libindy_anoncreds::revoke_credential(self.profile.indy_wallet_handle, tails_file, rev_reg_id, cred_rev_id).await
+    //     libindy_anoncreds::revoke_credential(self.profile.indy_wallet_handle, tails_dir, rev_reg_id, cred_rev_id).await
     // }
 
     // todo - think about moving this to somewhere else as it aggregates other calls
-    async fn revoke_credential_local(&self, tails_file: &str, rev_reg_id: &str, cred_rev_id: &str) -> VcxResult<()> {
+    async fn revoke_credential_local(&self, tails_dir: &str, rev_reg_id: &str, cred_rev_id: &str) -> VcxResult<()> {
         indy::primitives::revocation_registry::revoke_credential_local(
             self.profile.indy_wallet_handle,
-            tails_file,
+            tails_dir,
             rev_reg_id,
             cred_rev_id,
         )

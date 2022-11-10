@@ -4,9 +4,12 @@ pub mod test_utils {
     use std::sync::Arc;
 
     use aries_vcx::core::profile::indy_profile::IndySdkProfile;
+    use aries_vcx::core::profile::modular_wallet_profile::{ModularWalletProfile, LedgerPoolConfig};
     use aries_vcx::core::profile::profile::Profile;
     use aries_vcx::handlers::revocation_notification::receiver::RevocationNotificationReceiver;
     use aries_vcx::handlers::revocation_notification::sender::RevocationNotificationSender;
+    use aries_vcx::plugins::wallet::base_wallet::BaseWallet;
+    use aries_vcx::plugins::wallet::indy_wallet::IndySdkWallet;
     use aries_vcx::protocols::revocation_notification::sender::state_machine::SenderConfigBuilder;
     use messages::ack::please_ack::AckOn;
     use messages::revocation_notification::revocation_ack::RevocationAck;
@@ -52,7 +55,7 @@ pub mod test_utils {
     use aries_vcx::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
     use aries_vcx::xyz::primitives::credential_schema::Schema;
     use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
-    use vdrtools_sys::PoolHandle;
+    use vdrtools_sys::{PoolHandle, WalletHandle};
 
     #[derive(Debug)]
     pub struct VcxAgencyMessage {
@@ -425,13 +428,24 @@ pub mod test_utils {
         pub credential: Holder,
         pub rev_not_receiver: Option<RevocationNotificationReceiver>,
         pub prover: Prover,
-        // pub wallet_handle: WalletHandle,
-        // pub pool_handle: PoolHandle,
         pub agency_client: AgencyClient,
     }
 
+    pub async fn create_test_alice_instance(setup: &SetupIndyPool) -> Alice {
+        let (alice_profile, alice_wallet_config) = if cfg!(feature = "modular_deps") {
+            let genesis_file_path = setup.genesis_file_path.clone();
+            let config = LedgerPoolConfig { genesis_file_path };
+            println!("using modular-based profile");
+            Alice::setup_modular_profile(config).await
+        } else {
+            println!("using indy-based profile");
+            Alice::setup_indy_profile(setup.pool_handle).await
+        };
+        Alice::setup(alice_profile, alice_wallet_config).await
+    }
+
     impl Alice {
-        pub async fn setup(pool_handle: PoolHandle) -> Alice {
+        async fn setup_indy_wallet() -> (WalletHandle, WalletConfig) {
             settings::reset_config_values();
             let config_wallet = WalletConfig {
                 wallet_name: format!("alice_wallet_{}", uuid::Uuid::new_v4().to_string()),
@@ -443,18 +457,39 @@ pub mod test_utils {
                 rekey: None,
                 rekey_derivation_method: None,
             };
+            create_wallet_with_master_secret(&config_wallet).await.unwrap();
+            let wallet_handle = open_wallet(&config_wallet).await.unwrap();
+
+            (wallet_handle, config_wallet)
+        }
+
+        pub async fn setup_modular_profile(ledger_pool_config: LedgerPoolConfig) -> (Arc<dyn Profile>, WalletConfig) {
+            let (wallet_handle, config_wallet) = Alice::setup_indy_wallet().await;
+
+            let wallet: Arc<dyn BaseWallet> = Arc::new(IndySdkWallet::new(wallet_handle));
+
+            let profile = Arc::new(ModularWalletProfile::new(wallet, ledger_pool_config).unwrap());
+
+            // set up anoncreds link/master secret
+            Arc::clone(&profile).inject_anoncreds().prover_create_link_secret(settings::DEFAULT_LINK_SECRET_ALIAS).await.unwrap();
+
+            (profile, config_wallet)
+        }
+
+        pub async fn setup_indy_profile(pool_handle: PoolHandle) -> (Arc<dyn Profile>, WalletConfig) {
+            let (wallet_handle, config_wallet) = Alice::setup_indy_wallet().await;
+
+            let indy_profile = IndySdkProfile::new(wallet_handle, pool_handle);
+            (Arc::new(indy_profile), config_wallet)
+        }
+
+        pub async fn setup(profile: Arc<dyn Profile>, config_wallet: WalletConfig) -> Alice {
             let config_provision_agent = AgentProvisionConfig {
                 agency_did: AGENCY_DID.to_string(),
                 agency_verkey: AGENCY_VERKEY.to_string(),
                 agency_endpoint: AGENCY_ENDPOINT.to_string(),
                 agent_seed: None,
             };
-            create_wallet_with_master_secret(&config_wallet).await.unwrap();
-            let wallet_handle = open_wallet(&config_wallet).await.unwrap();
-
-            let indy_profile = IndySdkProfile::new(wallet_handle, pool_handle);
-            let profile: Arc<dyn Profile> = Arc::new(indy_profile);
-
             let mut agency_client = AgencyClient::new();
             let config_agency = provision_cloud_agent(&mut agency_client, profile.inject_wallet(), &config_provision_agent)
                 .await

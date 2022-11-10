@@ -1,11 +1,14 @@
 #[cfg(test)]
-#[cfg(feature = "temp_gm_tests")]
+#[cfg(feature = "modular_deps")]
 mod integration_tests {
     use agency_client::configuration::AgentProvisionConfig;
     use aries_vcx::core::profile::modular_wallet_profile::{LedgerPoolConfig, ModularWalletProfile};
+    use aries_vcx::error::{VcxError, VcxResult};
     use aries_vcx::handlers::issuance::holder::Holder;
     use aries_vcx::handlers::proof_presentation::prover::Prover;
+    use aries_vcx::indy::ledger::pool::test_utils::open_test_pool;
     use aries_vcx::indy::ledger::pool::{create_pool_ledger_config, open_pool_ledger};
+    use aries_vcx::indy::wallet::WalletConfig;
     use aries_vcx::messages::issuance::credential::Credential;
     use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
     use aries_vcx::messages::proof_presentation::presentation_ack::PresentationAck;
@@ -16,13 +19,15 @@ mod integration_tests {
     use aries_vcx::protocols::issuance::actions::CredentialIssuanceAction;
     use aries_vcx::utils::provision::provision_cloud_agent;
     use aries_vcx::xyz::ledger::transactions::into_did_doc;
+    use futures::executor::block_on;
+    use futures::{Future, FutureExt};
     use indy_vdr::config::PoolConfig as IndyVdrPoolConfig;
     use indy_vdr::pool::{PoolBuilder, PoolTransactions};
     use serde_json::Value;
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{sync::Arc, thread, time::Duration};
-    use vdrtools_sys::PoolHandle;
+    use vdrtools_sys::{PoolHandle, WalletHandle};
 
     use agency_client::agency_client::AgencyClient;
     use aries_vcx::messages::a2a::A2AMessage;
@@ -35,6 +40,8 @@ mod integration_tests {
         plugins::wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet},
         utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
     };
+
+    use self::setup::{open_default_indy_handle, setup_with_existing_conn};
 
     const INDICIO_TEST_GENESIS_PATH: &str =
         "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis.txn";
@@ -106,7 +113,6 @@ mod integration_tests {
         let (conn, _, mod_profile, indy_profile, agency_client) = setup::setup_with_existing_conn().await;
         let profile = mod_profile;
 
-        
         println!(
             "{}",
             profile.inject_anoncreds().prover_get_credentials(None).await.unwrap()
@@ -349,7 +355,10 @@ mod integration_tests {
             },
             global::{self, settings},
             handlers::connection::connection::Connection,
-            indy::{ledger::pool::{create_pool_ledger_config, open_pool_ledger}, wallet::WalletConfig},
+            indy::{
+                ledger::pool::{create_pool_ledger_config, open_pool_ledger},
+                wallet::WalletConfig,
+            },
             plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet,
             utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
         };

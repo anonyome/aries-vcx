@@ -176,7 +176,8 @@ impl Issuer {
     }
 
     pub fn get_state(&self) -> IssuerState {
-        self.issuer_sm.get_state()
+        let x = self.issuer_sm.get_state();
+        x
     }
 
     pub fn get_source_id(&self) -> VcxResult<String> {

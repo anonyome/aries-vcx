@@ -46,7 +46,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
         cred_req_json: &str,
         cred_values_json: &str,
         rev_reg_id: Option<String>,
-        tails_file: Option<String>,
+        tails_dir: Option<String>,
     ) -> VcxResult<(String, Option<String>, Option<String>)>;
 
     async fn prover_create_proof(
@@ -84,7 +84,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
 
     async fn create_revocation_state(
         &self,
-        tails_file_path: &str,
+        tails_dir: &str,
         rev_reg_def_json: &str,
         rev_reg_delta_json: &str,
         timestamp: u64,
@@ -146,7 +146,7 @@ pub trait BaseAnonCreds: std::fmt::Debug + Send + Sync {
     // todo - move?
     async fn revoke_credential_local(
         &self,
-        tails_file: &str,
+        tails_dir: &str,
         rev_reg_id: &str,
         cred_rev_id: &str,
     ) -> VcxResult<()>;

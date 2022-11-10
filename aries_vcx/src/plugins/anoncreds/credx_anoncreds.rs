@@ -1,4 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::{
     core::profile::profile::Profile,
@@ -112,7 +116,6 @@ impl IndyCredxAnonCreds {
         restrictions: Option<&Value>,
         attr_name: &str,
     ) -> VcxResult<Vec<(String, CredxCredential)>> {
-
         let attr_marker_tag_name = _format_attribute_as_marker_tag_name(attr_name);
 
         let wql_attr_query = json!({
@@ -125,13 +128,10 @@ impl IndyCredxAnonCreds {
             match restrictions {
                 Value::Array(mut arr) => {
                     arr.push(wql_attr_query);
-                    json!({
-                    "$and": arr
-                })},
-                Value::Object(obj) => json!({
-                    "$and": vec![wql_attr_query, Value::Object(obj.to_owned())]
-                }),
-                _ => wql_attr_query
+                    json!({ "$and": arr })
+                }
+                Value::Object(obj) => json!({ "$and": vec![wql_attr_query, Value::Object(obj.to_owned())] }),
+                _ => wql_attr_query,
             }
         } else {
             wql_attr_query
@@ -145,7 +145,6 @@ impl IndyCredxAnonCreds {
 
 #[async_trait]
 impl BaseAnonCreds for IndyCredxAnonCreds {
-
     async fn verifier_verify_proof(
         &self,
         proof_req_json: &str,
@@ -164,7 +163,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         cred_def_id: &str,
         tails_dir: &str,
         max_creds: u32,
-        tag: &str
+        tag: &str,
     ) -> VcxResult<(String, String, String)> {
         Err(unimplemented_method_err("credx issuer_create_and_store_revoc_reg"))
     }
@@ -180,21 +179,17 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         Err(unimplemented_method_err("credx issuer_create_and_store_credential_def"))
     }
 
-    async fn issuer_create_credential_offer(
-        &self, 
-        cred_def_id: &str,
-    ) -> VcxResult<String> {
+    async fn issuer_create_credential_offer(&self, cred_def_id: &str) -> VcxResult<String> {
         Err(unimplemented_method_err("credx issuer_create_credential_offer"))
     }
-    
-    
+
     async fn issuer_create_credential(
         &self,
         cred_offer_json: &str,
         cred_req_json: &str,
         cred_values_json: &str,
         rev_reg_id: Option<String>,
-        tails_file: Option<String>,
+        tails_dir: Option<String>,
     ) -> VcxResult<(String, Option<String>, Option<String>)> {
         Err(unimplemented_method_err("credx issuer_create_credential"))
     }
@@ -248,67 +243,73 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
                 Option<u64>,
                 Option<CredentialRevocationState>,
                 Vec<(String, bool)>,
+                Vec<String>,
             ),
         > = HashMap::new();
 
+        // add cred data and referent details for each requested attribute
         for (reft, detail) in requested_attributes.try_as_object()?.iter() {
             let _cred_id = detail.try_get("cred_id")?;
             let cred_id = _cred_id.try_as_str()?;
 
             let revealed = detail.try_get("revealed")?.try_as_bool()?;
 
-            if let Some((_, _, _, attr_refts_revealed)) = proof_details_by_cred_id.get_mut(cred_id) {
+            if let Some((_, _, _, req_attr_refts_revealed, _)) = proof_details_by_cred_id.get_mut(cred_id) {
                 // mapping made for this credential already, add reft and its revealed status
-                attr_refts_revealed.push((reft.to_string(), revealed));
+                req_attr_refts_revealed.push((reft.to_string(), revealed));
             } else {
                 let credential = self._get_credential(&cred_id).await?;
 
-                // get rev state if timestamp and cred_rev_reg_id exist, add it to cache
-                let timestamp = detail.get("timestamp").and_then(|timestamp| timestamp.as_u64());
-                let cred_rev_reg_id = credential.rev_reg_id.as_ref().map(|id| id.0.to_string());
-
-                let rev_state = if let (Some(timestamp), Some(cred_rev_reg_id)) = (timestamp, cred_rev_reg_id) {
-                    let rev_state = rev_states
-                        .as_ref()
-                        .and_then(|_rev_states| _rev_states.get(cred_rev_reg_id.to_string()));
-                    let rev_state = rev_state.ok_or(VcxError::from_msg(
-                        VcxErrorKind::InvalidJson,
-                        format!(
-                            "No revocation states provided for credential '{}' with rev_reg_id '{}'",
-                            cred_id, cred_rev_reg_id
-                        ),
-                    ))?;
-
-                    let rev_state = rev_state.get(timestamp.to_string()).ok_or(VcxError::from_msg(
-                        VcxErrorKind::InvalidJson,
-                        format!(
-                            "No revocation states provided for credential '{}' with rev_reg_id '{}' at timestamp '{}'",
-                            cred_id, cred_rev_reg_id, timestamp
-                        ),
-                    ))?;
-
-                    let rev_state: CredentialRevocationState = serde_json::from_value(rev_state.clone())?;
-                    Some(rev_state)
-                } else {
-                    None
-                };
+                let (timestamp, rev_state) = get_rev_state(cred_id, &credential, detail, rev_states.as_ref())?;
 
                 proof_details_by_cred_id.insert(
                     cred_id.to_string(),
-                    (credential, timestamp, rev_state, vec![(reft.to_string(), revealed)]),
+                    (
+                        credential,
+                        timestamp,
+                        rev_state,
+                        vec![(reft.to_string(), revealed)],
+                        vec![],
+                    ),
                 );
             }
         }
 
-        // TODO future - predicates and self attested
+        // add cred data and referent details for each requested predicate
+        for (reft, detail) in requested_predicates.try_as_object()?.iter() {
+            let _cred_id = detail.try_get("cred_id")?;
+            let cred_id = _cred_id.try_as_str()?;
 
-        for (_cred_id, (credential, timestamp, rev_state, attr_refts_revealed)) in proof_details_by_cred_id.iter() {
-            let mut add_cred = present_credentials.add_credential(&credential, *timestamp, rev_state.as_ref());
+            if let Some((_, _, _, _, req_preds_refts)) = proof_details_by_cred_id.get_mut(cred_id) {
+                // mapping made for this credential already, add reft
+                req_preds_refts.push(reft.to_string());
+            } else {
+                let credential = self._get_credential(&cred_id).await?;
 
-            for (referent, revealed) in attr_refts_revealed {
-                add_cred.add_requested_attribute(referent, *revealed);
+                let (timestamp, rev_state) = get_rev_state(cred_id, &credential, detail, rev_states.as_ref())?;
+
+                proof_details_by_cred_id.insert(
+                    cred_id.to_string(),
+                    (credential, timestamp, rev_state, vec![], vec![reft.to_string()]),
+                );
             }
         }
+
+        for (_cred_id, (credential, timestamp, rev_state, req_attr_refts_revealed, req_preds_refts)) in
+            proof_details_by_cred_id.iter()
+        {
+            let mut add_cred = present_credentials.add_credential(&credential, *timestamp, rev_state.as_ref());
+
+            for (referent, revealed) in req_attr_refts_revealed {
+                add_cred.add_requested_attribute(referent, *revealed);
+            }
+
+            for referent in req_preds_refts {
+                add_cred.add_requested_predicate(referent);
+            }
+        }
+
+        // TODO future self attested
 
         let link_secret = self.get_link_secret(link_secret_id).await?;
 
@@ -337,7 +338,11 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     async fn prover_get_credential(&self, cred_id: &str) -> VcxResult<String> {
-        todo!()
+        let cred = self._get_credential(cred_id).await?;
+
+        let cred_info = _make_cred_info(cred_id, &cred)?;
+
+        Ok(serde_json::to_string(&cred_info)?)
     }
 
     async fn prover_get_credentials(&self, filter_json: Option<&str>) -> VcxResult<String> {
@@ -362,17 +367,34 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         let requested_attributes = (&proof_req_v).try_get("requested_attributes")?;
         let requested_attributes = requested_attributes.try_as_object()?;
         let requested_predicates = (&proof_req_v).try_get("requested_predicates")?;
-        let _requested_predicates = requested_predicates.try_as_object()?;
+        let requested_predicates = requested_predicates.try_as_object()?;
+
+        let mut referents: HashSet<String> = HashSet::new();
+        requested_attributes.iter().for_each(|(k, _)| {
+            referents.insert(k.to_string());
+        });
+        requested_predicates.iter().for_each(|(k, _)| {
+            referents.insert(k.to_string());
+        });
 
         let mut cred_by_attr: Value = json!({});
 
-        for (item_referent, requested_attr_val) in requested_attributes {
-            let _attr_name = requested_attr_val.try_get("name")?;
+        for reft in referents {
+            let requested_val = requested_attributes
+                .get(&reft)
+                .or_else(|| requested_predicates.get(&reft))
+                .ok_or(VcxError::from_msg(
+                    // should not happen
+                    VcxErrorKind::InvalidState,
+                    format!("Unknown referent: {}", reft),
+                ))?;
+
+            let _attr_name = requested_val.try_get("name")?;
             let _attr_name = _attr_name.try_as_str()?;
             let attr_name = _normalize_attr_name(_attr_name);
 
-            let non_revoked = requested_attr_val.get("non_revoked");
-            let restrictions = requested_attr_val.get("restrictions");
+            let non_revoked = requested_val.get("non_revoked"); // note that aca-py askar fetches from proof_req json
+            let restrictions = requested_val.get("restrictions");
 
             let credx_creds = self
                 ._get_credentials_for_proof_req_for_attr_name(restrictions, &attr_name)
@@ -387,10 +409,32 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
                 }))
             }
 
-            cred_by_attr[ATTRS][item_referent] = Value::Array(credentials_json);
+            cred_by_attr[ATTRS][reft] = Value::Array(credentials_json);
         }
 
-        // TODO - predicates
+        // for (item_referent, requested_attr_val) in requested_attributes {
+        //     let _attr_name = requested_attr_val.try_get("name")?;
+        //     let _attr_name = _attr_name.try_as_str()?;
+        //     let attr_name = _normalize_attr_name(_attr_name);
+
+        //     let non_revoked = requested_attr_val.get("non_revoked");
+        //     let restrictions = requested_attr_val.get("restrictions");
+
+        //     let credx_creds = self
+        //         ._get_credentials_for_proof_req_for_attr_name(restrictions, &attr_name)
+        //         .await?;
+
+        //     let mut credentials_json = vec![];
+
+        //     for (cred_id, credx_cred) in credx_creds {
+        //         credentials_json.push(json!({
+        //             "cred_info": _make_cred_info(&cred_id, &credx_cred)?,
+        //             "interval": non_revoked
+        //         }))
+        //     }
+
+        //     cred_by_attr[ATTRS][item_referent] = Value::Array(credentials_json);
+        // }
 
         Ok(serde_json::to_string(&cred_by_attr)?)
     }
@@ -424,14 +468,18 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
 
     async fn create_revocation_state(
         &self,
-        tails_file_path: &str,
+        tails_dir: &str,
         rev_reg_def_json: &str,
         rev_reg_delta_json: &str,
         timestamp: u64,
         cred_rev_id: &str,
     ) -> VcxResult<String> {
-        let tails_reader: credx::tails::TailsReader = credx::tails::TailsFileReader::new(tails_file_path);
         let revoc_reg_def: RevocationRegistryDefinition = serde_json::from_str(rev_reg_def_json)?;
+        let tails_file_hash = match revoc_reg_def.borrow() {
+            RevocationRegistryDefinition::RevocationRegistryDefinitionV1(r) => &r.value.tails_hash,
+        };
+        let tails_file_path = format!("{}/{}", tails_dir, tails_file_hash);
+        let tails_reader: credx::tails::TailsReader = credx::tails::TailsFileReader::new(&tails_file_path);
         let rev_reg_delta: RevocationRegistryDelta = serde_json::from_str(rev_reg_delta_json)?;
         let rev_reg_idx: u32 = cred_rev_id
             .parse()
@@ -494,17 +542,18 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
                 "Could not process credential.cred_def_id as parts.",
             ))?;
 
-        let rev_reg_id = &credential.rev_reg_id.as_ref().map(|v| &v.0);
-
         let mut tags = json!({
             "schema_id": schema_id.0,
             "schema_issuer_did": schema_issuer_did.0,
             "schema_name": schema_name,
             "schema_version": schema_version,
             "issuer_did": issuer_did.0,
-            "cred_def_id": cred_def_id.0,
-            "rev_reg_id": rev_reg_id
+            "cred_def_id": cred_def_id.0
         });
+
+        if let Some(rev_reg_id) = &credential.rev_reg_id {
+            tags["rev_reg_id"] = serde_json::Value::String(rev_reg_id.0.to_string())
+        }
 
         for (raw_attr_name, attr_value) in credential.values.0.iter() {
             let attr_name = _normalize_attr_name(raw_attr_name);
@@ -545,9 +594,8 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             ));
         }
 
-        // tODO - no unwrap
         let secret = credx::prover::create_master_secret()?;
-        let ms_decimal = secret.value.value().unwrap().to_dec().unwrap();
+        let ms_decimal = secret.value.value()?.to_dec()?;
 
         wallet
             .add_wallet_record(CATEGORY_LINK_SECRET, link_secret_id, &ms_decimal, None)
@@ -573,15 +621,10 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     // todo - think about moving this to somewhere else as it aggregates other calls
-    async fn revoke_credential_local(
-        &self,
-        tails_file: &str,
-        rev_reg_id: &str,
-        cred_rev_id: &str,
-    ) -> VcxResult<()> {
+    async fn revoke_credential_local(&self, tails_dir: &str, rev_reg_id: &str, cred_rev_id: &str) -> VcxResult<()> {
         Err(unimplemented_method_err("credx revoke_credential_local"))
     }
-    
+
     // todo - think about moving this to somewhere else as it aggregates other calls
     async fn publish_local_revocations(&self, submitter_did: &str, rev_reg_id: &str) -> VcxResult<()> {
         Err(unimplemented_method_err("credx publish_local_revocations"))
@@ -591,6 +634,43 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         let nonce = credx::verifier::generate_nonce()?;
         Ok(serde_json::to_string(&nonce)?)
     }
+}
+
+fn get_rev_state(
+    cred_id: &str,
+    credential: &CredxCredential,
+    detail: &Value,
+    rev_states: Option<&Value>,
+) -> VcxResult<(Option<u64>, Option<CredentialRevocationState>)> {
+    let timestamp = detail.get("timestamp").and_then(|timestamp| timestamp.as_u64());
+    let cred_rev_reg_id = credential.rev_reg_id.as_ref().map(|id| id.0.to_string());
+    let rev_state = if let (Some(timestamp), Some(cred_rev_reg_id)) = (timestamp, cred_rev_reg_id) {
+        let rev_state = rev_states
+            .as_ref()
+            .and_then(|_rev_states| _rev_states.get(cred_rev_reg_id.to_string()));
+        let rev_state = rev_state.ok_or(VcxError::from_msg(
+            VcxErrorKind::InvalidJson,
+            format!(
+                "No revocation states provided for credential '{}' with rev_reg_id '{}'",
+                cred_id, cred_rev_reg_id
+            ),
+        ))?;
+
+        let rev_state = rev_state.get(timestamp.to_string()).ok_or(VcxError::from_msg(
+            VcxErrorKind::InvalidJson,
+            format!(
+                "No revocation states provided for credential '{}' with rev_reg_id '{}' at timestamp '{}'",
+                cred_id, cred_rev_reg_id, timestamp
+            ),
+        ))?;
+
+        let rev_state: CredentialRevocationState = serde_json::from_value(rev_state.clone())?;
+        Some(rev_state)
+    } else {
+        None
+    };
+
+    Ok((timestamp, rev_state))
 }
 
 fn _normalize_attr_name(name: &str) -> String {
@@ -640,21 +720,22 @@ fn _format_attribute_as_marker_tag_name(attribute_name: &str) -> String {
 fn unimplemented_method_err(method_name: &str) -> VcxError {
     VcxError::from_msg(
         VcxErrorKind::UnimplementedFeature,
-        format!("method '{}' is not yet implemented in AriesVCX", method_name)
+        format!("method '{}' is not yet implemented in AriesVCX", method_name),
     )
 }
 
 impl From<CredxError> for VcxError {
     fn from(err: CredxError) -> Self {
         match err.kind() {
-            credx::ErrorKind::Input => todo!(),
-            credx::ErrorKind::IOError => todo!(),
-            credx::ErrorKind::InvalidState => todo!(),
-            credx::ErrorKind::Unexpected => todo!(),
-            credx::ErrorKind::CredentialRevoked => todo!(),
-            credx::ErrorKind::InvalidUserRevocId => todo!(),
-            credx::ErrorKind::ProofRejected => todo!(),
-            credx::ErrorKind::RevocationRegistryFull => todo!(),
+            // TODO - could work on error kind conversion
+            credx::ErrorKind::Input => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
+            credx::ErrorKind::IOError => VcxError::from_msg(VcxErrorKind::IOError, err),
+            credx::ErrorKind::InvalidState => VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ErrorKind::Unexpected => VcxError::from_msg(VcxErrorKind::UnknownError, err),
+            credx::ErrorKind::CredentialRevoked => VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ErrorKind::InvalidUserRevocId => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
+            credx::ErrorKind::ProofRejected => VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ErrorKind::RevocationRegistryFull => VcxError::from_msg(VcxErrorKind::InvalidState, err),
         }
     }
 }
@@ -662,14 +743,14 @@ impl From<CredxError> for VcxError {
 impl From<UrsaCryptoError> for VcxError {
     fn from(err: UrsaCryptoError) -> Self {
         match err.kind() {
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidState => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidStructure => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidParam(_) => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::IOError => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::ProofRejected => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::RevocationAccumulatorIsFull => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidRevocationAccumulatorIndex => todo!(),
-            credx::ursa::errors::UrsaCryptoErrorKind::CredentialRevoked => todo!(),
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidState =>VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidStructure => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidParam(_) => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::IOError => VcxError::from_msg(VcxErrorKind::IOError, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::ProofRejected => VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::RevocationAccumulatorIsFull => VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidRevocationAccumulatorIndex => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::CredentialRevoked => VcxError::from_msg(VcxErrorKind::InvalidState, err),
         }
     }
 }

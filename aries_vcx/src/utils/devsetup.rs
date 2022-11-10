@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use std::fs;
-use std::sync::Once;
+use std::sync::{Once, Arc};
 
 use vdrtools_sys::{PoolHandle, WalletHandle};
 
@@ -20,8 +20,10 @@ use crate::indy::wallet::{
     close_wallet, create_and_open_wallet, create_indy_wallet, create_wallet_with_master_secret, delete_wallet,
     wallet_configure_issuer, WalletConfig,
 };
+use crate::plugins::wallet::base_wallet::BaseWallet;
+use crate::plugins::wallet::indy_wallet::IndySdkWallet;
 use crate::utils;
-use crate::utils::constants::POOL;
+use crate::utils::constants::{POOL, GENESIS_PATH};
 use crate::utils::file::write_file;
 use crate::utils::get_temp_dir_path;
 use crate::utils::provision::provision_cloud_agent;
@@ -69,8 +71,9 @@ pub struct SetupInstitutionWallet {
     pub wallet_handle: WalletHandle,
 }
 
-pub struct SetupPool {
+pub struct SetupIndyPool {
     pub pool_handle: PoolHandle,
+    pub genesis_file_path: String
 }
 
 fn reset_global_state() {
@@ -315,33 +318,27 @@ impl Drop for SetupInstitutionWallet {
     }
 }
 
-impl SetupPool {
-    pub async fn init() -> SetupPool {
+impl SetupIndyPool {
+    pub async fn init() -> SetupIndyPool {
         debug!("SetupPool init >> going to setup agency environment");
         init_test_logging();
 
+        let genesis_file_path = utils::get_temp_dir_path(GENESIS_PATH)
+        .to_str()
+        .unwrap().to_string();
         settings::set_config_value(
             settings::CONFIG_GENESIS_PATH,
-            utils::get_temp_dir_path(settings::DEFAULT_GENESIS_PATH)
-                .to_str()
-                .unwrap(),
+            &genesis_file_path,
         )
         .unwrap();
-        // TODO - GM - REVERT BELOW AFTER WE FIX LOCAL POOL ENVIRONMENT
-        // let pool_handle = open_test_pool().await;
-        delete(POOL).await.ok();
-        const INDICIO_TEST_GENESIS_PATH: &str =
-            "/Users/gmulhearne/Documents/dev/platform/di-edge-agent/edge-agent-core/aries-vcx/aries_vcx/genesis/vpc_genesis.txn";
-        create_pool_ledger_config(POOL, &INDICIO_TEST_GENESIS_PATH)
-            .await
-            .unwrap();
-        let pool_handle = open_pool_ledger(POOL, None).await.unwrap();
+
+        let pool_handle = open_test_pool().await;
         debug!("SetupPool init >> completed");
-        SetupPool { pool_handle }
+        SetupIndyPool { pool_handle, genesis_file_path }
     }
 }
 
-impl Drop for SetupPool {
+impl Drop for SetupIndyPool {
     fn drop(&mut self) {
         futures::executor::block_on(delete_test_pool(self.pool_handle));
         reset_global_state();
@@ -400,7 +397,10 @@ pub async fn setup_issuer_wallet_and_agency_client() -> (String, WalletHandle, A
     let config_issuer = wallet_configure_issuer(wallet_handle, enterprise_seed).await.unwrap();
     init_issuer_config(&config_issuer).unwrap();
     let mut agency_client = AgencyClient::new();
-    provision_cloud_agent(&mut agency_client, todo!(), &config_provision_agent)
+
+    let wallet: Arc<dyn BaseWallet> = Arc::new(IndySdkWallet::new(wallet_handle));
+
+    provision_cloud_agent(&mut agency_client, wallet, &config_provision_agent)
         .await
         .unwrap();
 

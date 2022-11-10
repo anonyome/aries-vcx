@@ -10,18 +10,19 @@ pub mod utils;
 #[cfg(feature = "agency_pool_tests")]
 mod integration_tests {
     use aries_vcx::agency_client::MessageStatusCode;
+    use aries_vcx::core::profile::modular_wallet_profile::LedgerPoolConfig;
     use aries_vcx::handlers::connection::connection::ConnectionState;
     use aries_vcx::handlers::out_of_band::receiver::OutOfBandReceiver;
     use aries_vcx::handlers::out_of_band::sender::OutOfBandSender;
-    use aries_vcx::messages::out_of_band::{GoalCode, HandshakeProtocol};
     use aries_vcx::messages::a2a::A2AMessage;
+    use aries_vcx::messages::did_doc::service_resolvable::ServiceResolvable;
+    use aries_vcx::messages::out_of_band::{GoalCode, HandshakeProtocol};
     use aries_vcx::protocols::connection::invitee::state_machine::InviteeState;
     use aries_vcx::utils::devsetup::*;
     use aries_vcx::utils::mockdata::mockdata_proof::REQUESTED_ATTRIBUTES;
-    use aries_vcx::messages::did_doc::service_resolvable::ServiceResolvable;
     use aries_vcx::xyz::ledger::transactions::into_did_doc;
 
-    use crate::utils::devsetup_agent::test_utils::{Alice, Faber};
+    use crate::utils::devsetup_agent::test_utils::{Faber, create_test_alice_instance};
     use crate::utils::scenarios::test_utils::{
         connect_using_request_sent_to_public_agent, create_connected_connections,
         create_connected_connections_via_public_invite, create_proof_request,
@@ -31,9 +32,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_establish_connection_via_public_invite() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer = Alice::setup(setup.pool_handle).await;
+        let mut consumer = create_test_alice_instance(&setup).await;
 
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections_via_public_invite(&mut consumer, &mut institution).await;
@@ -53,9 +54,9 @@ mod integration_tests {
     #[tokio::test]
     async fn test_oob_connection_bootstrap() {
         use messages::connection::invite::Invitation;
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer = Alice::setup(setup.pool_handle).await;
+        let mut consumer = create_test_alice_instance(&setup).await;
 
         let request_sender = create_proof_request(&mut institution, REQUESTED_ATTRIBUTES, "[]", "{}", None).await;
 
@@ -141,9 +142,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_oob_connection_reuse() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer = Alice::setup(setup.pool_handle).await;
+        let mut consumer = create_test_alice_instance(&setup).await;
 
         let (consumer_to_institution, institution_to_consumer) =
             create_connected_connections_via_public_invite(&mut consumer, &mut institution).await;
@@ -174,9 +175,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_oob_connection_handshake_reuse() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer = Alice::setup(setup.pool_handle).await;
+        let mut consumer = create_test_alice_instance(&setup).await;
 
         let (mut consumer_to_institution, mut institution_to_consumer) =
             create_connected_connections_via_public_invite(&mut consumer, &mut institution).await;
@@ -261,9 +262,9 @@ mod integration_tests {
 
     #[tokio::test]
     pub async fn test_two_enterprise_connections() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
         let mut institution = Faber::setup(setup.pool_handle).await;
-        let mut consumer1 = Alice::setup(setup.pool_handle).await;
+        let mut consumer1 = create_test_alice_instance(&setup).await;
 
         let (_faber, _alice) = create_connected_connections(&mut consumer1, &mut institution).await;
         let (_faber, _alice) = create_connected_connections(&mut consumer1, &mut institution).await;
@@ -271,10 +272,10 @@ mod integration_tests {
 
     #[tokio::test]
     async fn aries_demo_handle_connection_related_messages() {
-        let setup = SetupPool::init().await;
+        let setup = SetupIndyPool::init().await;
 
         let mut faber = Faber::setup(setup.pool_handle).await;
-        let mut alice = Alice::setup(setup.pool_handle).await;
+        let mut alice = create_test_alice_instance(&setup).await;
 
         // Connection
         let invite = faber.create_invite().await;
