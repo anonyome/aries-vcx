@@ -22,7 +22,7 @@ mod integration_tests {
     use vdrtools_sys::WalletHandle;
 
     use agency_client::agency_client::AgencyClient;
-    use aries_vcx::{
+    use aries_vcx::{ 
         core::profile::{indy_profile::IndySdkProfile, profile::Profile},
         global::{self, settings},
         handlers::connection::connection::Connection,
