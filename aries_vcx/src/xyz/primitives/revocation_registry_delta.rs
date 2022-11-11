@@ -60,7 +60,7 @@ impl RevocationRegistryDelta {
 #[cfg(feature = "pool_tests")]
 pub mod integration_tests {
     use super::*;
-    use crate::{indy::test_utils::create_and_store_credential_def, utils::devsetup::SetupWalletPool};
+    use crate::{indy::test_utils::create_and_store_credential_def, utils::devsetup::SetupIndyWalletPool};
 
     #[tokio::test]
     async fn test_create_rev_reg_delta_from_ledger() {

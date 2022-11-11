@@ -9,7 +9,7 @@ mod integration_tests {
     use crate::indy::primitives::revocation_registry::{self, publish_local_revocations};
     use crate::indy::test_utils::create_and_store_credential;
     use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
-    use crate::utils::devsetup::SetupWalletPool;
+    use crate::utils::devsetup::SetupIndyWalletPool;
 
     #[tokio::test]
     async fn test_prover_get_credential() {

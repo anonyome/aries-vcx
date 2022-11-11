@@ -785,7 +785,7 @@ mod test {
 #[cfg(feature = "pool_tests")]
 pub mod integration_tests {
     use crate::indy::ledger::transactions::get_ledger_txn;
-    use crate::utils::devsetup::SetupWalletPool;
+    use crate::utils::devsetup::SetupIndyWalletPool;
 
     #[tokio::test]
     async fn test_get_txn() {

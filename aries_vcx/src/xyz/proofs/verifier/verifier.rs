@@ -52,7 +52,7 @@ pub async fn validate_indy_proof(
 #[cfg(test)]
 #[cfg(feature = "pool_tests")]
 pub mod unit_tests {
-    use crate::utils::devsetup::SetupWalletPool;
+    use crate::utils::devsetup::SetupIndyWalletPool;
     use crate::utils;
 
     use super::*;

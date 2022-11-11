@@ -266,7 +266,7 @@ pub fn build_requested_credentials_json(
 pub mod pool_tests {
 
     use crate::utils::constants::{CRED_DEF_ID, CRED_REV_ID, LICENCE_CRED_ID, SCHEMA_ID, TAILS_DIR};
-    use crate::utils::devsetup::SetupWalletPool;
+    use crate::utils::devsetup::SetupIndyWalletPool;
     use crate::utils::get_temp_dir_path;
 
     fn _dummy_pool_handle() -> PoolHandle {

@@ -30,7 +30,7 @@ pub mod integration_tests {
         create_indy_proof, create_proof_with_predicate,
     };
     use crate::indy::proofs::verifier::verifier_libindy::libindy_verifier_verify_proof;
-    use crate::utils::devsetup::SetupWalletPool;
+    use crate::utils::devsetup::SetupIndyWalletPool;
 
     #[tokio::test]
     async fn test_prover_verify_proof() {

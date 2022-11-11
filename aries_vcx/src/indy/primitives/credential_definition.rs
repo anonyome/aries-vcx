@@ -57,7 +57,7 @@ pub mod integration_tests {
     use crate::indy::primitives::revocation_registry::{generate_rev_reg, publish_rev_reg_def, publish_rev_reg_delta};
     use crate::indy::test_utils::create_and_write_test_schema;
     use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
-    use crate::utils::devsetup::SetupWalletPool;
+    use crate::utils::devsetup::SetupIndyWalletPool;
 
     #[tokio::test]
     async fn test_create_cred_def_real() {

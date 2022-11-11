@@ -5,23 +5,22 @@ extern crate serde_json;
 
 pub mod utils;
 
-#[cfg(feature = "pool_tests")]
+#[cfg(feature = "agency_pool_tests")]
 mod integration_tests {
     use aries_vcx::handlers::proof_presentation::prover::Prover;
-    use aries_vcx::indy::ledger::transactions::get_cred_def_json;
-    use aries_vcx::indy::proofs::proof_request::PresentationRequestData;
-    use aries_vcx::indy::test_utils::{
+    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
+    use aries_vcx::xyz::test_utils::{
         create_and_store_credential, create_and_store_nonrevocable_credential,
         create_and_store_nonrevocable_credential_def, create_indy_proof,
     };
     use aries_vcx::messages::proof_presentation::presentation_request::PresentationRequest;
     use aries_vcx::utils::constants::{DEFAULT_SCHEMA_ATTRS, TAILS_DIR};
-    use aries_vcx::utils::devsetup::SetupWalletPool;
+    use aries_vcx::utils::devsetup::SetupIndyWalletPool;
     use aries_vcx::utils::get_temp_dir_path;
 
     #[tokio::test]
     async fn test_retrieve_credentials() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
 
         create_and_store_nonrevocable_credential(
             setup.wallet_handle,
@@ -44,7 +43,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_get_credential_def() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
         let (_, _, cred_def_id, cred_def_json, _) = create_and_store_nonrevocable_credential_def(
             setup.wallet_handle,
             setup.pool_handle,
@@ -65,7 +64,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_retrieve_credentials_empty() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
 
         let mut req = json!({
            "nonce":"123432421212",
@@ -97,7 +96,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_case_for_proof_req_doesnt_matter_for_retrieve_creds() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
         create_and_store_nonrevocable_credential(
             setup.wallet_handle,
             setup.pool_handle,
@@ -157,7 +156,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_generate_proof() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
 
         create_and_store_credential(
             setup.wallet_handle,
@@ -225,7 +224,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_generate_self_attested_proof() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
 
         let indy_proof_req = json!({
            "nonce":"123432421212",
@@ -267,7 +266,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_generate_proof_with_predicates() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
 
         create_and_store_credential(
             setup.wallet_handle,

@@ -13,7 +13,7 @@ mod integration_tests {
     use aries_vcx::messages::did_doc::service_aries::AriesService;
     use aries_vcx::messages::connection::did::Did;
     use aries_vcx::utils::constants::{DEFAULT_SCHEMA_ATTRS, SCHEMA_DATA};
-    use aries_vcx::utils::devsetup::SetupWalletPool;
+    use aries_vcx::utils::devsetup::SetupIndyWalletPool;
     use vdrtools::ledger::append_request_endorser;
     use std::thread;
     use std::time::Duration;

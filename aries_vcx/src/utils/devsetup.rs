@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
+use futures::Future;
 use std::fs;
 use std::sync::{Once, Arc};
 
@@ -8,6 +9,7 @@ use agency_client::agency_client::AgencyClient;
 use agency_client::configuration::AgentProvisionConfig;
 use agency_client::testing::mocking::{disable_agency_mocks, enable_agency_mocks, AgencyMockDecrypted};
 
+use crate::core::profile::profile::Profile;
 use crate::global::settings;
 use crate::global::settings::init_issuer_config;
 use crate::global::settings::{disable_indy_mocks, enable_indy_mocks, set_test_configs};
@@ -60,10 +62,18 @@ pub struct SetupWalletPoolAgency {
     pub pool_handle: PoolHandle,
 }
 
-pub struct SetupWalletPool {
+pub struct SetupIndyWalletPool {
     pub institution_did: String,
     pub wallet_handle: WalletHandle,
     pub pool_handle: PoolHandle,
+}
+
+pub struct SetupProfile<F> 
+    where F: Future
+{
+    pub institution_did: String,
+    pub profile: Arc<dyn Profile>,
+    teardown: fn() -> F // Arc<dyn Future<Output = ()>>
 }
 
 pub struct SetupInstitutionWallet {
@@ -272,8 +282,8 @@ impl Drop for SetupWalletPoolAgency {
     }
 }
 
-impl SetupWalletPool {
-    pub async fn init() -> SetupWalletPool {
+impl SetupIndyWalletPool {
+    pub async fn init() -> SetupIndyWalletPool {
         init_test_logging();
         set_test_configs();
         let (institution_did, wallet_handle) = setup_issuer_wallet().await;
@@ -285,7 +295,7 @@ impl SetupWalletPool {
         )
         .unwrap();
         let pool_handle = open_test_pool().await;
-        SetupWalletPool {
+        SetupIndyWalletPool {
             institution_did,
             wallet_handle,
             pool_handle,
@@ -293,9 +303,22 @@ impl SetupWalletPool {
     }
 }
 
-impl Drop for SetupWalletPool {
+impl Drop for SetupIndyWalletPool {
     fn drop(&mut self) {
         futures::executor::block_on(delete_test_pool(self.pool_handle));
+        reset_global_state();
+    }
+}
+
+impl<F: Future> SetupProfile<F> {
+    pub async fn init() -> SetupProfile<F> {
+        todo!()
+    }
+}
+
+impl<F: Future> Drop for SetupProfile<F> {
+    fn drop(&mut self) {
+        futures::executor::block_on((self.teardown)());
         reset_global_state();
     }
 }
