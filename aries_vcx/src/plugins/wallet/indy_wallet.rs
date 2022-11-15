@@ -67,6 +67,14 @@ impl BaseWallet for IndySdkWallet {
         indy::wallet::update_wallet_record_tags(self.wallet_handle, xtype, id, tags_json).await
     }
 
+    async fn add_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()> {
+        indy::wallet::add_wallet_record_tags(self.wallet_handle, xtype, id, tags_json).await
+    }
+
+    async fn delete_wallet_record_tags(&self, xtype: &str, id: &str, tag_names: &str) -> VcxResult<()> {
+        indy::wallet::delete_wallet_record_tags(self.wallet_handle, xtype, id, tag_names).await
+    }
+
     async fn iterate_wallet_records(
         &self,
         xtype: &str,

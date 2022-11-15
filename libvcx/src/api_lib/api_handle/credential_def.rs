@@ -1,11 +1,10 @@
 use aries_vcx::error::{VcxError, VcxErrorKind, VcxResult};
-use aries_vcx::indy::primitives::credential_definition::PublicEntityStateType;
-use aries_vcx::indy::primitives::credential_definition::CredentialDefConfigBuilder;
-use aries_vcx::indy::primitives::credential_definition::CredentialDef;
-use crate::api_lib::global::pool::get_main_pool_handle;
+use aries_vcx::xyz::primitives::credential_definition::PublicEntityStateType;
+use aries_vcx::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
+use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
 
 use crate::api_lib::api_handle::object_cache::ObjectCache;
-use crate::api_lib::global::wallet::get_main_wallet_handle;
+use crate::api_lib::global::profile::get_main_profile;
 
 lazy_static! {
     pub static ref CREDENTIALDEF_MAP: ObjectCache<CredentialDef> =
@@ -30,7 +29,8 @@ pub async fn create(
                 format!("Failed build credential config using provided parameters: {:?}", err),
             )
         })?;
-    let cred_def = CredentialDef::create(get_main_wallet_handle(), get_main_pool_handle()?, source_id, config, support_revocation).await?;
+        let profile = get_main_profile()?;
+    let cred_def = CredentialDef::create(&profile, source_id, config, support_revocation).await?;
     let handle = CREDENTIALDEF_MAP.add(cred_def)?;
     Ok(handle)
 }
@@ -38,7 +38,8 @@ pub async fn create(
 pub async fn publish(handle: u32) -> VcxResult<()> {
     let mut cd = CREDENTIALDEF_MAP.get_cloned(handle)?;
     if !cd.was_published() {
-        cd = cd.publish_cred_def(get_main_wallet_handle(), get_main_pool_handle()?).await?;
+        let profile = get_main_profile()?;
+        cd = cd.publish_cred_def(&profile).await?;
     } else {
         info!("publish >>> Credential definition was already published")
     }
@@ -78,7 +79,8 @@ pub fn release_all() {
 
 pub async fn update_state(handle: u32) -> VcxResult<u32> {
     let mut cd = CREDENTIALDEF_MAP.get_cloned(handle)?;
-    let res = cd.update_state(get_main_wallet_handle(), get_main_pool_handle()?).await?;
+    let profile = get_main_profile()?;
+    let res = cd.update_state(&profile).await?;
     CREDENTIALDEF_MAP.insert(handle, cd)?;
     Ok(res)
 }

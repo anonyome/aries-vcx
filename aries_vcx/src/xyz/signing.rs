@@ -3,7 +3,7 @@ use std::sync::Arc;
 use time;
 use base64;
 
-use crate::{error::prelude::*, plugins::wallet::base_wallet::BaseWallet};
+use crate::{error::prelude::*, plugins::wallet::base_wallet::BaseWallet, global::settings};
 use messages::connection::response::{Response, SignedResponse, ConnectionSignature, ConnectionData};
 
 async fn get_signature_data(wallet: &Arc<dyn BaseWallet>, data: String, key: &str) -> VcxResult<(Vec<u8>, Vec<u8>)> {
@@ -83,6 +83,24 @@ pub async fn decode_signed_connection_response(wallet: &Arc<dyn BaseWallet>, res
         connection,
         please_ack: response.please_ack,
         timing: response.timing,
+    })
+}
+
+pub async fn unpack_message_to_string(wallet: &Arc<dyn BaseWallet>, msg: &[u8]) -> VcxResult<String> {
+    if settings::indy_mocks_enabled() {
+        return Ok(String::new());
+    }
+
+    String::from_utf8(
+        wallet.unpack_message(&msg)
+            .await
+            .map_err(|_| VcxError::from_msg(VcxErrorKind::InvalidMessagePack, "Failed to unpack message"))?,
+    )
+    .map_err(|_| {
+        VcxError::from_msg(
+            VcxErrorKind::InvalidMessageFormat,
+            "Failed to convert message to utf8 string",
+        )
     })
 }
 

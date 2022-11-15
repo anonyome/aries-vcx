@@ -1,7 +1,7 @@
 // todo - visibility of all indy should be 'crate'
 pub(crate) mod credentials;
 pub(crate) mod proofs;
-pub(crate) mod utils;
+pub mod utils;
 pub mod wallet; // temporarily left public due to wallet set up utils
 pub(crate) mod keys;
 pub(crate) mod signing;

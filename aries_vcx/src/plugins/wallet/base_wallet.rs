@@ -30,7 +30,11 @@ pub trait BaseWallet: std::fmt::Debug + Send + Sync {
 
     async fn update_wallet_record_value(&self, xtype: &str, id: &str, value: &str) -> VcxResult<()>;
 
+    async fn add_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()>;
+
     async fn update_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()>;
+
+    async fn delete_wallet_record_tags(&self, xtype: &str, id: &str, tag_names: &str) -> VcxResult<()>;
 
     async fn iterate_wallet_records(&self, xtype: &str, query: &str, options: &str) -> VcxResult<Box<dyn AsyncFnIterator<Item = VcxResult<String>>>> ;
 

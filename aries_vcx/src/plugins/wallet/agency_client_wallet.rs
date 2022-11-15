@@ -56,6 +56,14 @@ impl BaseWallet for AgencyClientWallet {
         Err(unimplemented_agency_client_wallet_method("update_wallet_record_value"))
     }
 
+    async fn add_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()> {
+        Err(unimplemented_agency_client_wallet_method("add_wallet_record_tags"))
+    }
+
+    async fn delete_wallet_record_tags(&self, xtype: &str, id: &str, tag_names: &str) -> VcxResult<()> {
+        Err(unimplemented_agency_client_wallet_method("delete_wallet_record_tags"))
+    }
+
     async fn update_wallet_record_tags(&self, xtype: &str, id: &str, tags_json: &str) -> VcxResult<()> {
         Err(unimplemented_agency_client_wallet_method("update_wallet_record_tags"))
     }

@@ -8,12 +8,12 @@ use aries_vcx::messages::a2a::A2AMessage;
 use aries_vcx::messages::connection::did::Did;
 use aries_vcx::messages::connection::invite::Invitation;
 use aries_vcx::messages::did_doc::service_resolvable::ServiceResolvable;
-use aries_vcx::indy::ledger::transactions::into_did_doc;
-use crate::api_lib::global::pool::get_main_pool_handle;
+use aries_vcx::xyz::ledger::transactions::into_did_doc;
 
 use crate::api_lib::api_handle::connection::CONNECTION_MAP;
 use crate::api_lib::api_handle::object_cache::ObjectCache;
 use crate::api_lib::global::agency_client::get_main_agency_client;
+use crate::api_lib::global::profile::get_main_profile;
 
 lazy_static! {
     pub static ref OUT_OF_BAND_SENDER_MAP: ObjectCache<OutOfBandSender> =
@@ -153,8 +153,9 @@ pub async fn connection_exists(handle: u32, conn_handles: &Vec<u32>) -> VcxResul
         conn_map.insert(*conn_handle, connection);
     }
     let connections = conn_map.values().collect();
+    let profile = get_main_profile()?;
 
-    if let Some(connection) = oob.connection_exists(get_main_pool_handle()?, &connections).await? {
+    if let Some(connection) = oob.connection_exists(&profile, &connections).await? {
         if let Some((&handle, _)) = conn_map.iter().find(|(_, conn)| *conn == connection) {
             Ok((handle, true))
         } else {
@@ -168,8 +169,9 @@ pub async fn connection_exists(handle: u32, conn_handles: &Vec<u32>) -> VcxResul
 pub async fn build_connection(handle: u32) -> VcxResult<String> {
     let oob = OUT_OF_BAND_RECEIVER_MAP.get_cloned(handle)?;
     let invitation = Invitation::OutOfBand(oob.oob.clone());
-    let ddo = into_did_doc(get_main_pool_handle()?, &invitation).await?;
-    oob.build_connection(&get_main_agency_client().unwrap(), ddo, false)
+    let profile = get_main_profile()?;
+    let ddo = into_did_doc(&profile, &invitation).await?;
+    oob.build_connection(&profile, &get_main_agency_client().unwrap(), ddo, false)
         .await?
         .to_string()
         .map_err(|err| err.into())

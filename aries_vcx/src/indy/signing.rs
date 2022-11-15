@@ -43,24 +43,6 @@ pub async fn unpack_message(wallet_handle: WalletHandle, msg: &[u8]) -> VcxResul
     crypto::unpack_message(wallet_handle, msg).await.map_err(VcxError::from)
 }
 
-pub async fn unpack_message_to_string(wallet_handle: WalletHandle, msg: &[u8]) -> VcxResult<String> {
-    if settings::indy_mocks_enabled() {
-        return Ok(String::new());
-    }
-
-    String::from_utf8(
-        crypto::unpack_message(wallet_handle, &msg)
-            .await
-            .map_err(|_| VcxError::from_msg(VcxErrorKind::InvalidMessagePack, "Failed to unpack message"))?,
-    )
-    .map_err(|_| {
-        VcxError::from_msg(
-            VcxErrorKind::InvalidMessageFormat,
-            "Failed to convert message to utf8 string",
-        )
-    })
-}
-
 pub async fn create_key(wallet_handle: WalletHandle, seed: Option<&str>) -> VcxResult<String> {
     let key_json = json!({ "seed": seed }).to_string();
 
