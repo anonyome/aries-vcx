@@ -64,10 +64,10 @@ pub async fn create_main_wallet(config: &WalletConfig) -> VcxResult<()> {
 #[cfg(feature = "test_utils")]
 pub mod test_utils {
     use aries_vcx::global::settings;
-    use aries_vcx::indy::keys::create_and_store_my_did;
-    use aries_vcx::indy::wallet::{add_wallet_record, WalletConfig};
+    use aries_vcx::indy::wallet::{WalletConfig};
     use aries_vcx::utils::devsetup::TempFile;
 
+    use crate::api_lib::global::profile::indy_wallet_handle_to_wallet;
     use crate::api_lib::global::wallet::{
         close_main_wallet,
         create_and_open_as_main_wallet,
@@ -94,10 +94,11 @@ pub mod test_utils {
             rekey_derivation_method: None,
         };
         let wallet_handle = create_and_open_as_main_wallet(&wallet_config).await.unwrap();
-        create_and_store_my_did(wallet_handle, None, None).await.unwrap();
+        let wallet = indy_wallet_handle_to_wallet(wallet_handle);
+        wallet.create_and_store_my_did(None, None).await.unwrap();
         let backup_key = settings::get_config_value(settings::CONFIG_WALLET_BACKUP_KEY).unwrap();
         let (type_, id, value) = _record();
-        add_wallet_record(wallet_handle, type_, id, value, None).await.unwrap();
+        wallet.add_wallet_record(type_, id, value, None).await.unwrap();
         export_main_wallet(&export_file.path, &backup_key).await.unwrap();
 
         close_main_wallet().await.unwrap();

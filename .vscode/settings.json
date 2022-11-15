@@ -1,4 +1,4 @@
 {
     // "rust-analyzer.cargo.features": "all"
-    "rust-analyzer.cargo.features": ["agency_pool_tests", "modular_deps"]
+    "rust-analyzer.cargo.features": ["agency_pool_tests", "test_utils", "modular_deps"]
 }
