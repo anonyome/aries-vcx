@@ -12,6 +12,16 @@ pub async fn resolve_service(profile: &Arc<dyn Profile>, service: &ServiceResolv
     }
 }
 
+pub async fn add_new_did(profile: &Arc<dyn Profile>, submitter_did: &str, role: Option<&str>) -> VcxResult<(String, String)> {
+    let (did, verkey) = profile.inject_wallet().create_and_store_my_did(None, None).await?;
+
+    let ledger = Arc::clone(profile).inject_ledger();
+
+    ledger.publish_nym(submitter_did, &did, Some(&verkey),None, role).await?;
+    // validate response?
+
+    Ok((did, verkey))
+}
 
 pub async fn into_did_doc(profile: &Arc<dyn Profile>, invitation: &Invitation) -> VcxResult<DidDoc> {
     let ledger = Arc::clone(profile).inject_ledger();

@@ -34,7 +34,7 @@ pub mod test_utils {
     use aries_vcx::handlers::proof_presentation::verifier::Verifier;
     use aries_vcx::indy::wallet::open_wallet;
     use aries_vcx::indy::wallet::{
-        close_wallet, create_wallet_with_master_secret, delete_wallet, wallet_configure_issuer, IssuerConfig,
+        create_wallet_with_master_secret, delete_wallet, wallet_configure_issuer, IssuerConfig,
         WalletConfig,
     };
     use aries_vcx::messages::a2a::A2AMessage;

@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use credx::{
     types::{
         Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue, MasterSecret,
-        PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId,
+        PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId, AttributeNames,
     },
     ursa::{bn::BigNumber, errors::UrsaCryptoError},
 };
@@ -412,30 +412,6 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
             cred_by_attr[ATTRS][reft] = Value::Array(credentials_json);
         }
 
-        // for (item_referent, requested_attr_val) in requested_attributes {
-        //     let _attr_name = requested_attr_val.try_get("name")?;
-        //     let _attr_name = _attr_name.try_as_str()?;
-        //     let attr_name = _normalize_attr_name(_attr_name);
-
-        //     let non_revoked = requested_attr_val.get("non_revoked");
-        //     let restrictions = requested_attr_val.get("restrictions");
-
-        //     let credx_creds = self
-        //         ._get_credentials_for_proof_req_for_attr_name(restrictions, &attr_name)
-        //         .await?;
-
-        //     let mut credentials_json = vec![];
-
-        //     for (cred_id, credx_cred) in credx_creds {
-        //         credentials_json.push(json!({
-        //             "cred_info": _make_cred_info(&cred_id, &credx_cred)?,
-        //             "interval": non_revoked
-        //         }))
-        //     }
-
-        //     cred_by_attr[ATTRS][item_referent] = Value::Array(credentials_json);
-        // }
-
         Ok(serde_json::to_string(&cred_by_attr)?)
     }
 
@@ -617,7 +593,16 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         version: &str,
         attrs: &str,
     ) -> VcxResult<(String, String)> {
-        Err(unimplemented_method_err("credx issuer_create_schema"))
+        let origin_did = DidValue::new(&issuer_did, None);
+        let attr_names = serde_json::from_str(attrs)?;
+        
+        let schema = credx::issuer::create_schema(&origin_did, name, version, attr_names, None)?;
+
+        let schema_json = serde_json::to_string(&schema)?;
+        let schema_id = &schema.id().0;
+        
+        // future - store as cache
+        Ok((schema_id.to_string(), schema_json))
     }
 
     // todo - think about moving this to somewhere else as it aggregates other calls

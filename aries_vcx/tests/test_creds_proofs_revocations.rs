@@ -14,7 +14,7 @@ mod integration_tests {
     use aries_vcx::protocols::proof_presentation::prover::state_machine::ProverState;
     use aries_vcx::utils::devsetup::*;
 
-    use crate::utils::devsetup_agent::test_utils::{Faber, create_test_alice_instance};
+    use crate::utils::devsetup_agent::test_utils::{create_test_alice_instance, Faber};
     use crate::utils::scenarios::test_utils::{
         _create_address_schema, _exchange_credential, attr_names, create_connected_connections, create_proof,
         generate_and_send_proof, issue_address_credential, prover_select_credentials_and_send_proof,
@@ -118,27 +118,35 @@ mod integration_tests {
         thread::sleep(Duration::from_millis(2000));
 
         assert!(issuer_credential.is_revoked(&institution.profile).await.unwrap());
-        let config = aries_vcx::protocols::revocation_notification::sender::state_machine::SenderConfigBuilder::default()
-            .ack_on(vec![messages::ack::please_ack::AckOn::Receipt])
-            .rev_reg_id(issuer_credential.get_rev_reg_id().unwrap())
-            .cred_rev_id(issuer_credential.get_rev_id().unwrap())
-            .comment(None)
-            .build()
+        let config =
+            aries_vcx::protocols::revocation_notification::sender::state_machine::SenderConfigBuilder::default()
+                .ack_on(vec![messages::ack::please_ack::AckOn::Receipt])
+                .rev_reg_id(issuer_credential.get_rev_reg_id().unwrap())
+                .cred_rev_id(issuer_credential.get_rev_id().unwrap())
+                .comment(None)
+                .build()
+                .unwrap();
+        let send_message = institution_to_consumer
+            .send_message_closure(&institution.profile)
+            .await
             .unwrap();
-        let send_message = institution_to_consumer.send_message_closure(&institution.profile).await.unwrap();
         aries_vcx::handlers::revocation_notification::sender::RevocationNotificationSender::build()
             .clone()
             .send_revocation_notification(config, send_message)
             .await
             .unwrap();
 
-        let rev_nots = aries_vcx::handlers::revocation_notification::test_utils::get_revocation_notification_messages(&consumer.agency_client, &consumer_to_institution).await.unwrap();
+        let rev_nots = aries_vcx::handlers::revocation_notification::test_utils::get_revocation_notification_messages(
+            &consumer.agency_client,
+            &consumer_to_institution,
+        )
+        .await
+        .unwrap();
         assert_eq!(rev_nots.len(), 1);
 
         // consumer.receive_revocation_notification(rev_not).await;
         // let ack = aries_vcx::handlers::revocation_notification::test_utils::get_revocation_notification_ack_messages(&institution.agency_client, &institution_to_consumer).await.unwrap().pop().unwrap();
         // institution.handle_revocation_notification_ack(ack).await;
-
     }
 
     #[cfg(feature = "agency_pool_tests")]
@@ -232,11 +240,7 @@ mod integration_tests {
 
         // Issue and send three credentials of the same schema
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(
-                &institution.profile,
-                &institution.config_issuer.institution_did,
-            )
-            .await;
+            _create_address_schema(&institution.profile, &institution.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
         let issuer_credential1 = _exchange_credential(
@@ -531,11 +535,7 @@ mod integration_tests {
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(
-                &issuer.profile,
-                &issuer.config_issuer.institution_did,
-            )
-            .await;
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let (req1, req2) = (Some("request1"), Some("request2"));
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
@@ -579,11 +579,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req1, Some(&credential_data1))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -602,11 +598,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req2, Some(&credential_data2))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -631,11 +623,7 @@ mod integration_tests {
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
         let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, rev_reg_id) =
-            _create_address_schema(
-                &issuer.profile,
-                &issuer.config_issuer.institution_did,
-            )
-            .await;
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let (req1, req2) = (Some("request1"), Some("request2"));
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
@@ -679,11 +667,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req1, Some(&credential_data1))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -702,11 +686,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req2, Some(&credential_data2))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -730,11 +710,8 @@ mod integration_tests {
             create_connected_connections(&mut consumer, &mut verifier).await;
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
-        let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) = _create_address_schema(
-            &issuer.profile,
-            &issuer.config_issuer.institution_did,
-        )
-        .await;
+        let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) =
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let (req1, req2) = (Some("request1"), Some("request2"));
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
@@ -774,11 +751,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req1, Some(&credential_data1))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -797,11 +770,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req2, Some(&credential_data2))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -825,11 +794,8 @@ mod integration_tests {
             create_connected_connections(&mut consumer, &mut verifier).await;
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
-        let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) = _create_address_schema(
-            &issuer.profile,
-            &issuer.config_issuer.institution_did,
-        )
-        .await;
+        let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) =
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let (req1, req2) = (Some("request1"), Some("request2"));
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
@@ -874,11 +840,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req1, Some(&credential_data1))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -897,11 +859,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req2, Some(&credential_data2))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -925,11 +883,8 @@ mod integration_tests {
             create_connected_connections(&mut consumer, &mut verifier).await;
         let (consumer_to_issuer, issuer_to_consumer) = create_connected_connections(&mut consumer, &mut issuer).await;
 
-        let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) = _create_address_schema(
-            &issuer.profile,
-            &issuer.config_issuer.institution_did,
-        )
-        .await;
+        let (schema_id, _schema_json, cred_def_id, _cred_def_json, cred_def, rev_reg, _) =
+            _create_address_schema(&issuer.profile, &issuer.config_issuer.institution_did).await;
         let (address1, address2, city, state, zip) = attr_names();
         let (req1, req2) = (Some("request1"), Some("request2"));
         let credential_data1 = json!({address1.clone(): "123 Main St", address2.clone(): "Suite 3", city.clone(): "Draper", state.clone(): "UT", zip.clone(): "84000"}).to_string();
@@ -974,11 +929,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req1, Some(&credential_data1))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(
@@ -997,11 +948,7 @@ mod integration_tests {
         prover_select_credentials_and_send_proof(&mut consumer, &consumer_to_verifier, req2, Some(&credential_data2))
             .await;
         proof_verifier
-            .update_state(
-                &verifier.profile,
-                &verifier.agency_client,
-                &verifier_to_consumer,
-            )
+            .update_state(&verifier.profile, &verifier.agency_client, &verifier_to_consumer)
             .await
             .unwrap();
         assert_eq!(

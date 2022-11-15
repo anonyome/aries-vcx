@@ -391,6 +391,7 @@ mod integration_tests {
     }
 
     #[cfg(feature = "agency_pool_tests")]
+    #[tokio::test]
     async fn test_update_agent_webhook() {
         use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
         use aries_vcx::plugins::wallet::base_wallet::BaseWallet;

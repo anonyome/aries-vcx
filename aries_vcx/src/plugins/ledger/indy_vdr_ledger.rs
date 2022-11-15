@@ -43,9 +43,7 @@ impl IndyVdrLedgerPool {
         let vdr_config = IndyVdrPoolConfig::default();
         let txns = PoolTransactions::from_json_file(config.genesis_file_path)?;
 
-        let runner = PoolBuilder::from(vdr_config)
-            .transactions(txns)?
-            .into_runner()?;
+        let runner = PoolBuilder::from(vdr_config).transactions(txns)?.into_runner()?;
 
         Ok(IndyVdrLedgerPool { runner })
     }
@@ -90,9 +88,9 @@ impl IndyVdrLedger {
             }),
         )?;
 
-        let send_req_result: VdrSendRequestResult = recv.await.map_err(|e| {
-           VcxError::from_msg(VcxErrorKind::InvalidState, e) 
-        })?;
+        let send_req_result: VdrSendRequestResult = recv
+            .await
+            .map_err(|e| VcxError::from_msg(VcxErrorKind::InvalidState, e))?;
         let (result, _) = send_req_result?;
 
         let reply = match result {
@@ -233,7 +231,23 @@ impl BaseLedger for IndyVdrLedger {
         data: Option<&str>,
         role: Option<&str>,
     ) -> VcxResult<String> {
-        Err(unimplemented_method_err("indy_vdr publish_nym"))
+        // to implement: convert data into "alias" for indy vdr. for now throw unimplemented
+        if data.is_some() {
+            return Err(unimplemented_method_err("indy_vdr publish_nym with data"));
+        }
+        let alias = None;
+
+        let identifier = DidValue::from_str(submitter_did)?;
+        let dest = DidValue::from_str(target_did)?;
+        let request = self.request_builder()?.build_nym_request(
+            &identifier,
+            &dest,
+            verkey.map(String::from),
+            alias,
+            role.map(String::from),
+        )?;
+        
+        self._sign_and_submit_request(submitter_did, request).await
     }
 
     async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
@@ -516,18 +530,18 @@ impl From<VdrError> for VcxError {
             indy_vdr::common::error::VdrErrorKind::Connection => {
                 VcxError::from_msg(VcxErrorKind::PoolLedgerConnect, err)
             }
-            indy_vdr::common::error::VdrErrorKind::FileSystem(_) => {
-                VcxError::from_msg(VcxErrorKind::IOError, err)
-            }
-            indy_vdr::common::error::VdrErrorKind::Input => {
-                VcxError::from_msg(VcxErrorKind::InvalidInput, err)
-            }
+            indy_vdr::common::error::VdrErrorKind::FileSystem(_) => VcxError::from_msg(VcxErrorKind::IOError, err),
+            indy_vdr::common::error::VdrErrorKind::Input => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
             indy_vdr::common::error::VdrErrorKind::Resource => VcxError::from_msg(VcxErrorKind::UnknownError, err),
             indy_vdr::common::error::VdrErrorKind::Unavailable => VcxError::from_msg(VcxErrorKind::UnknownError, err),
             indy_vdr::common::error::VdrErrorKind::Unexpected => VcxError::from_msg(VcxErrorKind::UnknownError, err),
             indy_vdr::common::error::VdrErrorKind::Incompatible => VcxError::from_msg(VcxErrorKind::UnknownError, err),
-            indy_vdr::common::error::VdrErrorKind::PoolNoConsensus => VcxError::from_msg(VcxErrorKind::UnknownError, err),
-            indy_vdr::common::error::VdrErrorKind::PoolRequestFailed(_) => VcxError::from_msg(VcxErrorKind::PoolLedgerConnect, err),
+            indy_vdr::common::error::VdrErrorKind::PoolNoConsensus => {
+                VcxError::from_msg(VcxErrorKind::UnknownError, err)
+            }
+            indy_vdr::common::error::VdrErrorKind::PoolRequestFailed(_) => {
+                VcxError::from_msg(VcxErrorKind::PoolLedgerConnect, err)
+            }
             indy_vdr::common::error::VdrErrorKind::PoolTimeout => VcxError::from_msg(VcxErrorKind::UnknownError, err),
         }
     }
