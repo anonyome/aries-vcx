@@ -16,10 +16,17 @@ pub trait BaseLedger: Send + Sync {
     // returns request result as JSON
     async fn submit_request(&self, request_json: &str) -> VcxResult<String>;
 
+    // endorsers/multi signs a request, submits to ledger, and verifies successful result
+    async fn endorse_transaction(&self, endorser_did: &str, request_json: &str) -> VcxResult<()>;
+
+    // adds endorser to request and signs with submitter_did, returns the transaction ready for endorser to take
+    async fn set_endorser(&self, submitter_did: &str, request: &str, endorser: &str) -> VcxResult<String>;
+
     // libindy_build_schema_request - internal/testing
     // libindy_build_create_credential_def_txn - internal
 
-    // get_txn_author_agreement - todo - used in libvcx
+    async fn get_txn_author_agreement(&self) -> VcxResult<String>;
+
     // append_txn_author_agreement_to_request - internal
     // libindy_build_auth_rules_request - unused
     // libindy_build_attrib_request - internal
@@ -58,9 +65,6 @@ pub trait BaseLedger: Send + Sync {
 
     // if submitter_did provided, try use cache
     async fn get_cred_def(&self, cred_def_id: &str, submitter_did: Option<&str>) -> VcxResult<String>;
-
-    // set_endorser - todo - used in libvcx
-    // endorse_transaction - todo - used in libvcx
 
     // build_attrib_request - internal
     // add_attr - internal
@@ -123,7 +127,8 @@ pub trait BaseLedger: Send + Sync {
     // returns request result as JSON
     async fn get_ledger_txn(&self, seq_no: i32, submitter_did: Option<&str>) -> VcxResult<String>;
 
-    // build_schema_request - todo - used in libvcx
+    // returns request as JSON
+    async fn build_schema_request(&self, submitter_did: &str, schema_json: &str) -> VcxResult<String>;
 
     async fn publish_schema(
         &self,

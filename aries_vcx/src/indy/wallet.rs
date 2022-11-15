@@ -387,7 +387,8 @@ pub(crate) async fn delete_wallet_record_tags(
         .map_err(VcxError::from)
 }
 
-pub(crate) async fn open_search_wallet(
+// todo future - revert to pub(crate) after libvcx dependency is fixed
+pub async fn open_search_wallet(
     wallet_handle: WalletHandle,
     xtype: &str,
     query: &str,
@@ -409,7 +410,8 @@ pub(crate) async fn open_search_wallet(
         .map_err(VcxError::from)
 }
 
-pub(crate) async fn fetch_next_records_wallet(
+// todo future - revert to pub(crate) after libvcx dependency is fixed
+pub async fn fetch_next_records_wallet(
     wallet_handle: WalletHandle,
     search_handle: SearchHandle,
     count: usize,
@@ -429,7 +431,8 @@ pub(crate) async fn fetch_next_records_wallet(
         .map_err(VcxError::from)
 }
 
-pub(crate) async fn close_search_wallet(search_handle: SearchHandle) -> VcxResult<()> {
+// todo future - revert to pub(crate) after libvcx dependency is fixed
+pub async fn close_search_wallet(search_handle: SearchHandle) -> VcxResult<()> {
     trace!("close_search >>> search_handle: {}", search_handle);
 
     if settings::indy_mocks_enabled() {

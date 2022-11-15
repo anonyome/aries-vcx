@@ -17,14 +17,12 @@ use aries_vcx::vdrtools_sys::CommandHandle;
 use aries_vcx::utils::constants::*;
 use aries_vcx::utils::error;
 use aries_vcx::global::settings;
-use crate::api_lib::global::pool::get_main_pool_handle;
 
 use crate::api_lib::api_handle::connection;
 use crate::api_lib::api_handle::connection::{parse_connection_handles, parse_status_codes};
 use crate::api_lib::api_handle::utils::agency_update_messages;
 use crate::api_lib::global::agency_client::get_main_agency_client;
 use crate::api_lib::global::profile::{get_main_wallet, get_main_profile};
-use crate::api_lib::global::wallet::get_main_wallet_handle;
 use crate::api_lib::utils::cstring::CStringUtils;
 use crate::api_lib::utils::error::{set_current_error, set_current_error_vcx};
 use crate::api_lib::utils::runtime::execute_async;
@@ -413,8 +411,8 @@ pub extern "C" fn vcx_endorse_transaction(
 
     check_useful_c_str!(transaction, VcxErrorKind::InvalidOption);
     check_useful_c_callback!(cb, VcxErrorKind::InvalidOption);
-    let pool_handle = match get_main_pool_handle() {
-        Ok(handle) => handle,
+    let profile = match get_main_profile() {
+        Ok(profile) => profile,
         Err(err) => return err.into(),
     };
     let issuer_did: String = match settings::get_config_value(settings::CONFIG_INSTITUTION_DID) {
@@ -422,15 +420,16 @@ pub extern "C" fn vcx_endorse_transaction(
         Err(err) => return err.into(),
     };
     trace!(
-        "vcx_endorse_transaction(command_handle: {}, pool_handle: {:?}, issuer_did: {}, transaction: {})",
+        "vcx_endorse_transaction(command_handle: {}, profile: {:?}, issuer_did: {}, transaction: {})",
         command_handle,
-        pool_handle,
+        profile,
         issuer_did,
         transaction
     );
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(Box::pin(async move {
-        match aries_vcx::indy::ledger::transactions::endorse_transaction(get_main_wallet_handle(), pool_handle, &issuer_did, &transaction).await {
+        let ledger = profile.inject_ledger();
+        match ledger.endorse_transaction(&issuer_did, &transaction).await {
             Ok(()) => {
                 trace!(
                     "vcx_endorse_transaction(command_handle: {}, issuer_did: {}, rc: {})",
@@ -803,7 +802,8 @@ pub extern "C" fn vcx_create_pairwise_info(
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(
         async move {
-            match PairwiseInfo::create(get_main_wallet_handle()).await {
+            let wallet = get_main_wallet();
+            match PairwiseInfo::create(&wallet).await {
                 Ok(pw_info) => {
                     trace!(
                         "vcx_create_pairwise_info(command_handle: {}, rc: {})",

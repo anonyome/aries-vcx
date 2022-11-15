@@ -1,10 +1,10 @@
 use std::string::ToString;
+use std::sync::Arc;
 
 use serde_json;
 
 use aries_vcx::error::{VcxError, VcxErrorKind, VcxResult};
 use aries_vcx::vdrtools::{PoolHandle, WalletHandle};
-use aries_vcx::xyz::ledger::transactions;
 use aries_vcx::xyz::primitives::credential_schema::Schema;
 
 use crate::api_lib::api_handle::object_cache::ObjectCache;
@@ -87,9 +87,10 @@ pub async fn prepare_schema_for_endorser(
         .get_schema_json(&profile)
         .await?;
     let schema_id = schema.get_schema_id();
-    let schema_request = build_schema_request(&issuer_did, &schema_json).await?;
+    let ledger = Arc::clone(&profile).inject_ledger();
+    let schema_request = ledger.build_schema_request(&issuer_did, &schema_json).await?;
     let schema_request =
-        transactions::set_endorser(get_main_wallet_handle(), &issuer_did, &schema_request, &endorser).await?;
+       ledger.set_endorser(&issuer_did, &schema_request, &endorser).await?;
 
     debug!("prepared schema for endorser with id: {}", schema_id);
 

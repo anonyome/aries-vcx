@@ -36,6 +36,18 @@ impl BaseLedger for IndySdkLedger {
         indy::ledger::transactions::libindy_submit_request(self.profile.indy_pool_handle, request_json).await
     }
 
+    async fn endorse_transaction(&self, endorser_did: &str, request_json: &str) -> VcxResult<()> {
+        indy::ledger::transactions::endorse_transaction(self.profile.indy_wallet_handle, self.profile.indy_pool_handle, endorser_did, request_json).await
+    }
+
+    async fn set_endorser(&self, submitter_did: &str, request_json: &str, endorser: &str) -> VcxResult<String> {
+        indy::ledger::transactions::set_endorser(self.profile.indy_wallet_handle, submitter_did, request_json, endorser).await
+    }
+
+    async fn get_txn_author_agreement(&self) -> VcxResult<String> {
+        indy::ledger::transactions::libindy_get_txn_author_agreement(self.profile.indy_pool_handle).await
+    }
+
     async fn get_nym(&self, did: &str) -> VcxResult<String> {
         indy::ledger::transactions::get_nym(self.profile.indy_pool_handle, did).await
     }
@@ -85,7 +97,7 @@ impl BaseLedger for IndySdkLedger {
         }
     }
 
-    async fn get_cred_def(&self, cred_def_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
+    async fn get_cred_def(&self, cred_def_id: &str, _submitter_did: Option<&str>) -> VcxResult<String> {
         indy::ledger::transactions::libindy_get_cred_def(
             self.profile.indy_wallet_handle,
             self.profile.indy_pool_handle,
@@ -135,6 +147,10 @@ impl BaseLedger for IndySdkLedger {
             submitter_did,
         )
         .await
+    }
+
+    async fn build_schema_request(&self, submitter_did: &str, schema_json: &str) -> VcxResult<String> {
+        indy::ledger::transactions::build_schema_request(submitter_did, schema_json).await
     }
 
     async fn publish_schema(
@@ -194,35 +210,4 @@ impl BaseLedger for IndySdkLedger {
 
         Ok(())
     }
-
-    // async fn build_schema_request(&self, submitter_did: &str, data: &str) -> VcxResult<String> {
-    //     libindy_ledger::libindy_build_schema_request(submitter_did, data).await
-    // }
-
-    // async fn build_create_credential_def_txn(
-    //     &self,
-    //     submitter_did: &str,
-    //     credential_def_json: &str,
-    // ) -> VcxResult<String> {
-    //     libindy_ledger::libindy_build_create_credential_def_txn(submitter_did, credential_def_json).await
-    // }
-
-    // async fn append_txn_author_agreement_to_request(&self, request_json: &str) -> VcxResult<String> {
-    //     libindy_ledger::append_txn_author_agreement_to_request(request_json).await
-    // }
-
-    // async fn build_nym_request(
-    //     &self,
-    //     submitter_did: &str,
-    //     target_did: &str,
-    //     verkey: Option<&str>,
-    //     data: Option<&str>,
-    //     role: Option<&str>,
-    // ) -> VcxResult<String> {
-    //     libindy_ledger::libindy_build_nym_request(submitter_did, target_did, verkey, data, role).await
-    // }
-
-    // fn parse_response(&self, response: &str) -> VcxResult<Response> {
-    //     libindy_ledger::parse_response(response)
-    // }
 }

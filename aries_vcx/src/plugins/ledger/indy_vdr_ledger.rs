@@ -215,6 +215,20 @@ impl BaseLedger for IndyVdrLedger {
         self._submit_request(request).await
     }
 
+    async fn endorse_transaction(&self, endorser_did: &str, request_json: &str) -> VcxResult<()> {
+        let _ = (endorser_did, request_json);
+        Err(unimplemented_method_err("indy_vdr endorse_transaction"))
+    }
+
+    async fn set_endorser(&self, submitter_did: &str, request_json: &str, endorser: &str) -> VcxResult<String> {
+        let _ = (submitter_did, request_json, endorser);
+        Err(unimplemented_method_err("indy_vdr set_endorser"))
+    }
+
+    async fn get_txn_author_agreement(&self) -> VcxResult<String> {
+        Err(unimplemented_method_err("indy_vdr get_txn_author_agreement"))
+    }
+
     async fn get_nym(&self, did: &str) -> VcxResult<String> {
         let dest = DidValue::from_str(did)?;
         let request = self.request_builder()?.build_get_nym_request(None, &dest)?;
@@ -246,16 +260,16 @@ impl BaseLedger for IndyVdrLedger {
             alias,
             role.map(String::from),
         )?;
-        
+
         self._sign_and_submit_request(submitter_did, request).await
     }
 
     async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String> {
+        let _ = submitter_did;
         // TODO try from cache first
 
         // TODO - do we need to handle someone submitting a schema request by seq number?
 
-        // let identifier = DidValue::from_str(submitter_did)?;
         let id = SchemaId::from_str(schema_id)?;
 
         let request = self.request_builder()?.build_get_schema_request(None, &id)?;
@@ -446,14 +460,19 @@ impl BaseLedger for IndyVdrLedger {
     }
 
     async fn get_rev_reg(&self, rev_reg_id: &str, timestamp: u64) -> VcxResult<(String, String, u64)> {
+        let _ = (rev_reg_id, timestamp);
         Err(unimplemented_method_err("indy_vdr get_rev_reg"))
     }
 
     async fn get_ledger_txn(&self, seq_no: i32, submitter_did: Option<&str>) -> VcxResult<String> {
+        let _ = (seq_no, submitter_did);
         Err(unimplemented_method_err("indy_vdr get_ledger_txn"))
     }
 
-    // build_schema_request - todo - used in libvcx
+    async fn build_schema_request(&self, submitter_did: &str, schema_json: &str) -> VcxResult<String> {
+        let _ = (submitter_did, schema_json);
+        Err(unimplemented_method_err("indy_vdr build_schema_request"))
+    }
 
     async fn publish_schema(
         &self,
@@ -461,10 +480,12 @@ impl BaseLedger for IndyVdrLedger {
         submitter_did: &str,
         endorser_did: Option<String>,
     ) -> VcxResult<()> {
+        let _ = (schema_json, submitter_did, endorser_did);
         Err(unimplemented_method_err("indy_vdr publish_schema"))
     }
 
     async fn publish_cred_def(&self, cred_def_json: &str, submitter_did: &str) -> VcxResult<()> {
+        let _ = (cred_def_json, submitter_did);
         Err(unimplemented_method_err("indy_vdr publish_cred_def"))
     }
 
@@ -473,6 +494,7 @@ impl BaseLedger for IndyVdrLedger {
         rev_reg_def: &RevocationRegistryDefinition,
         submitter_did: &str,
     ) -> VcxResult<()> {
+        let _ = (rev_reg_def, submitter_did);
         Err(unimplemented_method_err("indy_vdr publish_rev_reg_def"))
     }
 
@@ -482,6 +504,7 @@ impl BaseLedger for IndyVdrLedger {
         rev_reg_entry_json: &str,
         submitter_did: &str,
     ) -> VcxResult<()> {
+        let _ = (rev_reg_entry_json, rev_reg_id, submitter_did);
         Err(unimplemented_method_err("indy_vdr publish_rev_reg_delta"))
     }
 }
