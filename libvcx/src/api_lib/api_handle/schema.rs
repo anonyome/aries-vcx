@@ -173,13 +173,14 @@ pub mod tests {
 
     use aries_vcx::global::settings;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::indy::ledger::transactions::add_new_did;
+    use aries_vcx::xyz::ledger::transactions::add_new_did;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::indy::test_utils::create_and_write_test_schema;
+    use aries_vcx::xyz::test_utils::create_and_write_test_schema;
     #[cfg(feature = "pool_tests")]
     use aries_vcx::utils::constants;
     use aries_vcx::utils::constants::SCHEMA_ID;
     use aries_vcx::utils::devsetup::{SetupDefaults, SetupEmpty, SetupMocks};
+    use crate::api_lib::global::wallet::get_main_wallet_handle;
 
     #[cfg(feature = "pool_tests")]
     use crate::api_lib::api_handle::schema;
@@ -320,9 +321,10 @@ pub mod tests {
     async fn test_get_schema_attrs_from_ledger() {
         let setup = SetupGlobalsWalletPoolAgency::init().await;
 
+        let profile = get_main_profile().unwrap();
+
         let (schema_id, _) = create_and_write_test_schema(
-            get_main_wallet_handle(),
-            get_main_pool_handle().unwrap(),
+            &profile,
             &setup.setup.institution_did,
             constants::DEFAULT_SCHEMA_ATTRS,
         )
@@ -421,13 +423,14 @@ pub mod tests {
 
         let (did, schema_name, schema_version, data) = prepare_schema_data();
 
+        let profile = get_main_profile().unwrap();
+
         let (endorser_did, _) = add_new_did(
-            get_main_wallet_handle(),
-            get_main_pool_handle().unwrap(),
+            &profile,
             &setup.setup.institution_did,
             Some("ENDORSER"),
         )
-        .await;
+        .await.unwrap();
 
         let (schema_handle, schema_request) = prepare_schema_for_endorser(
             "test_vcx_schema_update_state_with_ledger",
@@ -447,9 +450,9 @@ pub mod tests {
                 .unwrap()
         );
 
-        transactions::endorse_transaction(
-            get_main_wallet_handle(),
-            setup.setup.pool_handle,
+        let ledger = profile.inject_ledger();
+
+        ledger.endorse_transaction(
             &endorser_did,
             &schema_request,
         )

@@ -17,8 +17,8 @@ use crate::{
 use async_trait::async_trait;
 use credx::{
     types::{
-        Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue, MasterSecret,
-        PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId, AttributeNames,
+        AttributeNames, Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue,
+        MasterSecret, PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId,
     },
     ursa::{bn::BigNumber, errors::UrsaCryptoError},
 };
@@ -362,27 +362,49 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     }
 
     async fn prover_get_credentials_for_proof_req(&self, proof_req: &str) -> VcxResult<String> {
-        let proof_req_v: Value = serde_json::from_str(proof_req)?;
+        let proof_req_v: Value =
+            serde_json::from_str(proof_req).map_err(|e| VcxError::from_msg(VcxErrorKind::InvalidProofRequest, e))?;
 
-        let requested_attributes = (&proof_req_v).try_get("requested_attributes")?;
-        let requested_attributes = requested_attributes.try_as_object()?;
-        let requested_predicates = (&proof_req_v).try_get("requested_predicates")?;
-        let requested_predicates = requested_predicates.try_as_object()?;
+        let requested_attributes = (&proof_req_v).get("requested_attributes");
+        let requested_attributes = if let Some(requested_attributes) = requested_attributes {
+            Some(requested_attributes.try_as_object()?.clone())
+        } else {
+            None
+        };
+        let requested_predicates = (&proof_req_v).get("requested_predicates");
+        let requested_predicates = if let Some(requested_predicates) = requested_predicates {
+            Some(requested_predicates.try_as_object()?.clone())
+        } else {
+            None
+        };
+
+        // handle special case of "empty because json is bad" vs "empty because no attributes sepected"
+        if requested_attributes == None && requested_predicates == None {
+            return Err(VcxError::from_msg(
+                VcxErrorKind::InvalidAttributesStructure,
+                "Invalid Json Parsing of Requested Attributes Retrieved From Libindy",
+            ));
+        }
 
         let mut referents: HashSet<String> = HashSet::new();
-        requested_attributes.iter().for_each(|(k, _)| {
-            referents.insert(k.to_string());
-        });
-        requested_predicates.iter().for_each(|(k, _)| {
-            referents.insert(k.to_string());
-        });
+        if let Some(requested_attributes) = &requested_attributes {
+            requested_attributes.iter().for_each(|(k, _)| {
+                referents.insert(k.to_string());
+            })
+        };
+        if let Some(requested_predicates) = &requested_predicates {
+            requested_predicates.iter().for_each(|(k, _)| {
+                referents.insert(k.to_string());
+            });
+        }
 
         let mut cred_by_attr: Value = json!({});
 
         for reft in referents {
             let requested_val = requested_attributes
-                .get(&reft)
-                .or_else(|| requested_predicates.get(&reft))
+                .as_ref()
+                .and_then(|req_attrs| req_attrs.get(&reft))
+                .or_else(|| requested_predicates.as_ref().and_then(|req_preds| req_preds.get(&reft)))
                 .ok_or(VcxError::from_msg(
                     // should not happen
                     VcxErrorKind::InvalidState,
@@ -595,12 +617,12 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
     ) -> VcxResult<(String, String)> {
         let origin_did = DidValue::new(&issuer_did, None);
         let attr_names = serde_json::from_str(attrs)?;
-        
+
         let schema = credx::issuer::create_schema(&origin_did, name, version, attr_names, None)?;
 
         let schema_json = serde_json::to_string(&schema)?;
         let schema_id = &schema.id().0;
-        
+
         // future - store as cache
         Ok((schema_id.to_string(), schema_json))
     }
@@ -728,14 +750,28 @@ impl From<CredxError> for VcxError {
 impl From<UrsaCryptoError> for VcxError {
     fn from(err: UrsaCryptoError) -> Self {
         match err.kind() {
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidState =>VcxError::from_msg(VcxErrorKind::InvalidState, err),
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidStructure => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidParam(_) => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidState => {
+                VcxError::from_msg(VcxErrorKind::InvalidState, err)
+            }
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidStructure => {
+                VcxError::from_msg(VcxErrorKind::InvalidInput, err)
+            }
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidParam(_) => {
+                VcxError::from_msg(VcxErrorKind::InvalidInput, err)
+            }
             credx::ursa::errors::UrsaCryptoErrorKind::IOError => VcxError::from_msg(VcxErrorKind::IOError, err),
-            credx::ursa::errors::UrsaCryptoErrorKind::ProofRejected => VcxError::from_msg(VcxErrorKind::InvalidState, err),
-            credx::ursa::errors::UrsaCryptoErrorKind::RevocationAccumulatorIsFull => VcxError::from_msg(VcxErrorKind::InvalidState, err),
-            credx::ursa::errors::UrsaCryptoErrorKind::InvalidRevocationAccumulatorIndex => VcxError::from_msg(VcxErrorKind::InvalidInput, err),
-            credx::ursa::errors::UrsaCryptoErrorKind::CredentialRevoked => VcxError::from_msg(VcxErrorKind::InvalidState, err),
+            credx::ursa::errors::UrsaCryptoErrorKind::ProofRejected => {
+                VcxError::from_msg(VcxErrorKind::InvalidState, err)
+            }
+            credx::ursa::errors::UrsaCryptoErrorKind::RevocationAccumulatorIsFull => {
+                VcxError::from_msg(VcxErrorKind::InvalidState, err)
+            }
+            credx::ursa::errors::UrsaCryptoErrorKind::InvalidRevocationAccumulatorIndex => {
+                VcxError::from_msg(VcxErrorKind::InvalidInput, err)
+            }
+            credx::ursa::errors::UrsaCryptoErrorKind::CredentialRevoked => {
+                VcxError::from_msg(VcxErrorKind::InvalidState, err)
+            }
         }
     }
 }

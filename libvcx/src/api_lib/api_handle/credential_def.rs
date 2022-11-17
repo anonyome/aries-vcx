@@ -99,9 +99,9 @@ pub mod tests {
 
     use aries_vcx::global::settings;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::indy::primitives::credential_definition::RevocationDetailsBuilder;
+    use aries_vcx::xyz::primitives::credential_definition::RevocationDetailsBuilder;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::indy::test_utils::create_and_write_test_schema;
+    use aries_vcx::xyz::test_utils::create_and_write_test_schema;
     #[cfg(feature = "pool_tests")]
     use aries_vcx::utils;
     use aries_vcx::utils::devsetup::SetupMocks;
@@ -153,8 +153,9 @@ pub mod tests {
     async fn create_revocable_cred_def_and_check_tails_location() {
         let setup = SetupGlobalsWalletPoolAgency::init().await;
 
+        let profile = get_main_profile().unwrap();
         let (schema_id, _) =
-            create_and_write_test_schema(get_main_wallet_handle(), setup.setup.pool_handle, &setup.setup.institution_did, utils::constants::DEFAULT_SCHEMA_ATTRS).await;
+            create_and_write_test_schema(&profile, &setup.setup.institution_did, utils::constants::DEFAULT_SCHEMA_ATTRS).await;
         let issuer_did = settings::get_config_value(settings::CONFIG_INSTITUTION_DID).unwrap();
 
         let revocation_details = RevocationDetailsBuilder::default()

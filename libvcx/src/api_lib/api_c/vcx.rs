@@ -810,6 +810,7 @@ mod tests {
     use crate::api_lib::global::pool::reset_main_pool_handle;
     #[cfg(feature = "pool_tests")]
     use crate::api_lib::global::wallet::test_utils::_create_main_wallet_and_its_backup;
+    use crate::api_lib::global::wallet::get_main_wallet_handle;
     use crate::api_lib::utils::error::reset_current_error;
     use crate::api_lib::utils::return_types_u32;
     use crate::api_lib::utils::timeout::TimeoutUtils;

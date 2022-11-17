@@ -266,20 +266,17 @@ pub fn build_requested_credentials_json(
 pub mod pool_tests {
 
     use crate::utils::constants::{CRED_DEF_ID, CRED_REV_ID, LICENCE_CRED_ID, SCHEMA_ID, TAILS_DIR};
-    use crate::utils::devsetup::SetupIndyWalletPool;
+    use crate::utils::devsetup::{SetupProfile};
     use crate::utils::get_temp_dir_path;
-
-    fn _dummy_pool_handle() -> PoolHandle {
-        0
-    }
+    use crate::xyz::proofs::prover::prover_internal::{build_rev_states_json, CredInfoProver};
 
     #[tokio::test]
     async fn test_build_rev_states_json_empty() {
-        let _setup = SetupWalletPool::init().await;
+        let _setup = SetupProfile::init().await;
 
         // empty vector
         assert_eq!(
-            build_rev_states_json(_dummy_pool_handle(), Vec::new().as_mut()).await.unwrap(),
+            build_rev_states_json(&_setup.profile, Vec::new().as_mut()).await.unwrap(),
             "{}".to_string()
         );
 
@@ -296,7 +293,7 @@ pub mod pool_tests {
             timestamp: None,
         };
         assert_eq!(
-            build_rev_states_json(_dummy_pool_handle(), vec![cred1].as_mut()).await.unwrap(),
+            build_rev_states_json(&_setup.profile, vec![cred1].as_mut()).await.unwrap(),
             "{}".to_string()
         );
     }

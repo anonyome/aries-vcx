@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{error::prelude::*, core::profile::profile::Profile};
+use crate::{core::profile::profile::Profile, error::prelude::*};
 
 #[derive(Clone, Deserialize, Debug, Serialize, Default)]
 pub struct RevocationRegistryDelta {
@@ -60,19 +60,18 @@ impl RevocationRegistryDelta {
 #[cfg(feature = "pool_tests")]
 pub mod integration_tests {
     use super::*;
-    use crate::{indy::test_utils::create_and_store_credential_def, utils::devsetup::SetupIndyWalletPool};
+    use crate::{utils::devsetup::SetupProfile, xyz::test_utils::create_and_store_credential_def};
 
     #[tokio::test]
     async fn test_create_rev_reg_delta_from_ledger() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupProfile::init_indy().await;
 
         let attrs = r#"["address1","address2","city","state","zip"]"#;
         let (_, _, _, _, rev_reg_id, _, _) =
-            create_and_store_credential_def(setup.wallet_handle, setup.pool_handle, &setup.institution_did, attrs)
-                .await;
+            create_and_store_credential_def(&setup.profile, &setup.institution_did, attrs).await;
 
         assert!(
-            RevocationRegistryDelta::create_from_ledger(setup.pool_handle, &rev_reg_id, None, None)
+            RevocationRegistryDelta::create_from_ledger(&setup.profile, &rev_reg_id, None, None)
                 .await
                 .is_ok()
         );

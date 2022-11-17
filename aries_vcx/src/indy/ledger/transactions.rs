@@ -799,7 +799,7 @@ pub mod integration_tests {
 
     #[tokio::test]
     async fn test_get_txn() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
         get_ledger_txn(setup.wallet_handle, setup.pool_handle, 0, None).await.unwrap_err();
         let txn = get_ledger_txn(setup.wallet_handle, setup.pool_handle, 1, None).await;
         assert!(txn.is_ok());

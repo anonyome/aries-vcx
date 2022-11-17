@@ -324,6 +324,8 @@ impl SetupProfile {
         }
     }
 
+    // FUTURE - ideally no tests should be using this method, they should be using the generic init
+    // after modular profile Anoncreds/Ledger methods have all been implemented, all tests should use init()
     pub async fn init_indy() -> SetupProfile {
         init_test_logging();
         set_test_configs();

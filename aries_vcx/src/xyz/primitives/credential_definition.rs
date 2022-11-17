@@ -4,10 +4,9 @@ use crate::plugins::ledger::base_ledger::BaseLedger;
 use crate::utils::constants::{CRED_DEF_ID, CRED_DEF_JSON, DEFAULT_SERIALIZE_VERSION};
 use crate::utils::serialization::ObjectWithVersion;
 
+use crate::global::settings;
 use std::fmt;
 use std::sync::Arc;
-use crate::global::settings;
-
 
 macro_rules! enum_number {
     ($name:ident { $($variant:ident = $value:expr, )* }) => {
@@ -65,7 +64,6 @@ enum_number!(PublicEntityStateType
     Published = 1,
 });
 
-
 #[derive(Clone, Deserialize, Debug, Serialize, PartialEq, Default)]
 pub struct CredentialDef {
     #[serde(alias = "cred_def_id")]
@@ -103,7 +101,11 @@ impl Default for PublicEntityStateType {
     }
 }
 
-async fn _try_get_cred_def_from_ledger(ledger: &Arc<dyn BaseLedger>, issuer_did: &str, cred_def_id: &str) -> VcxResult<Option<String>> {
+async fn _try_get_cred_def_from_ledger(
+    ledger: &Arc<dyn BaseLedger>,
+    issuer_did: &str,
+    cred_def_id: &str,
+) -> VcxResult<Option<String>> {
     match ledger.get_cred_def(cred_def_id, Some(issuer_did)).await {
         Ok(cred_def) => Ok(Some(cred_def)),
         // todo - handle generic indy error, not just libindy
@@ -136,15 +138,8 @@ impl CredentialDef {
         } = config;
         let ledger = Arc::clone(profile).inject_ledger();
         let schema_json = ledger.get_schema(&schema_id, Some(&issuer_did)).await?;
-        let (cred_def_id, cred_def_json) = generate_cred_def(
-            profile,
-            &issuer_did,
-            &schema_json,
-            &tag,
-            None,
-            Some(support_revocation),
-        )
-        .await?;
+        let (cred_def_id, cred_def_json) =
+            generate_cred_def(profile, &issuer_did, &schema_json, &tag, None, Some(support_revocation)).await?;
         Ok(Self {
             source_id,
             tag,
@@ -207,8 +202,12 @@ impl CredentialDef {
     }
 
     pub fn get_data_json(&self) -> VcxResult<String> {
-        serde_json::to_string(&self)
-            .map_err(|_| VcxError::from_msg(VcxErrorKind::SerializationError, "Failed to serialize credential definition"))
+        serde_json::to_string(&self).map_err(|_| {
+            VcxError::from_msg(
+                VcxErrorKind::SerializationError,
+                "Failed to serialize credential definition",
+            )
+        })
     }
 
     pub fn get_source_id(&self) -> &String {
@@ -240,7 +239,6 @@ impl CredentialDef {
     }
 }
 
-
 pub async fn generate_cred_def(
     profile: &Arc<dyn Profile>,
     issuer_did: &str,
@@ -264,82 +262,92 @@ pub async fn generate_cred_def(
     let config_json = json!({"support_revocation": support_revocation.unwrap_or(false)}).to_string();
 
     let anoncreds = Arc::clone(profile).inject_anoncreds();
-    anoncreds.issuer_create_and_store_credential_def(issuer_did, schema_json, tag, sig_type, &config_json).await
+    anoncreds
+        .issuer_create_and_store_credential_def(issuer_did, schema_json, tag, sig_type, &config_json)
+        .await
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "pool_tests")]
 pub mod integration_tests {
-    use crate::indy::test_utils::create_and_write_test_schema;
-    use crate::indy::primitives::credential_definition::generate_cred_def;
-    use crate::indy::ledger::transactions::get_schema_json;
-    use crate::indy::primitives::credential_definition::publish_cred_def;
-    use crate::indy::primitives::revocation_registry::{generate_rev_reg, publish_rev_reg_def, publish_rev_reg_delta};
+    use std::sync::Arc;
+
+    use futures::{Future, FutureExt};
+
+    use crate::indy::utils::mocks::pool_mocks::disable_pool_mocks;
     use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
-    use crate::utils::devsetup::SetupIndyWalletPool;
+    use crate::utils::devsetup::SetupProfile;
+    use crate::xyz::primitives::credential_definition::generate_cred_def;
+    use crate::xyz::primitives::revocation_registry::generate_rev_reg;
+    use crate::xyz::test_utils::create_and_write_test_schema;
 
     #[tokio::test]
     async fn test_create_cred_def_real() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupProfile::init_indy().await;
 
         let (schema_id, _) =
-            create_and_write_test_schema(
-                setup.wallet_handle,
-                setup.pool_handle,
-                &setup.institution_did,
-                DEFAULT_SCHEMA_ATTRS)
-            .await;
+            create_and_write_test_schema(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
 
-        let (_, schema_json) =
-            get_schema_json(
-                setup.wallet_handle,
-                setup.pool_handle,
-                &schema_id)
-            .await
-            .unwrap();
+        let ledger = Arc::clone(&setup.profile).inject_ledger();
+        let schema_json = ledger.get_schema(&schema_id, None).await.unwrap();
 
-        let (_, cred_def_json) =
-            generate_cred_def(
-                setup.wallet_handle,
-                &setup.institution_did,
-                &schema_json,
-                "tag_1", None, Some(true))
-            .await
-            .unwrap();
-
-        publish_cred_def(
-            setup.wallet_handle,
-            setup.pool_handle,
+        let (_, cred_def_json) = generate_cred_def(
+            &setup.profile,
             &setup.institution_did,
-            &cred_def_json)
+            &schema_json,
+            "tag_1",
+            None,
+            Some(true),
+        )
+        .await
+        .unwrap();
+
+        ledger
+            .publish_cred_def(&cred_def_json, &setup.institution_did)
             .await
             .unwrap();
     }
 
     #[tokio::test]
     async fn test_create_rev_reg_def() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupProfile::init_indy().await;
 
         let (schema_id, _) =
-            create_and_write_test_schema(setup.wallet_handle, setup.pool_handle, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
-        let (_, schema_json) = get_schema_json(setup.wallet_handle, setup.pool_handle, &schema_id).await.unwrap();
+            create_and_write_test_schema(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        let ledger = Arc::clone(&setup.profile).inject_ledger();
+        let schema_json = ledger.get_schema(&schema_id, None).await.unwrap();
 
-        let (cred_def_id, cred_def_json) =
-            generate_cred_def(setup.wallet_handle, &setup.institution_did, &schema_json, "tag_1", None, Some(true))
-                .await
-                .unwrap();
-        publish_cred_def(setup.wallet_handle, setup.pool_handle, &setup.institution_did, &cred_def_json)
+        let (cred_def_id, cred_def_json) = generate_cred_def(
+            &setup.profile,
+            &setup.institution_did,
+            &schema_json,
+            "tag_1",
+            None,
+            Some(true),
+        )
+        .await
+        .unwrap();
+        ledger
+            .publish_cred_def(&cred_def_json, &setup.institution_did)
             .await
             .unwrap();
-        let (rev_reg_def_id, rev_reg_def_json, rev_reg_entry_json) =
-            generate_rev_reg(setup.wallet_handle, &setup.institution_did, &cred_def_id, "tails.txt", 2, "tag1")
-                .await
-                .unwrap();
-        publish_rev_reg_def(setup.wallet_handle, setup.pool_handle, &setup.institution_did, &rev_reg_def_json)
+
+        let (rev_reg_def_id, rev_reg_def_json, rev_reg_entry_json) = generate_rev_reg(
+            &setup.profile,
+            &setup.institution_did,
+            &cred_def_id,
+            "tails.txt",
+            2,
+            "tag1",
+        )
+        .await
+        .unwrap();
+        ledger
+            .publish_rev_reg_def(&rev_reg_def_json, &setup.institution_did)
             .await
             .unwrap();
-        publish_rev_reg_delta(setup.wallet_handle, setup.pool_handle, &setup.institution_did, &rev_reg_def_id, &rev_reg_entry_json)
+        ledger
+            .publish_rev_reg_delta(&rev_reg_def_id, &rev_reg_entry_json, &setup.institution_did)
             .await
             .unwrap();
     }
