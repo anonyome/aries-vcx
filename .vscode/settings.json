@@ -3,7 +3,8 @@
     "rust-analyzer.cargo.features": [
         // "agency_pool_tests", 
         "test_utils", 
-        "pool_tests", 
+        // "pool_tests", 
+        "general_test",
         // "modular_deps"
     ],
     "rust-analyzer.runnableEnv": {

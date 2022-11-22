@@ -272,9 +272,6 @@ pub async fn generate_cred_def(
 pub mod integration_tests {
     use std::sync::Arc;
 
-    use futures::{Future, FutureExt};
-
-    use crate::indy::utils::mocks::pool_mocks::disable_pool_mocks;
     use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
     use crate::utils::devsetup::SetupProfile;
     use crate::xyz::primitives::credential_definition::generate_cred_def;

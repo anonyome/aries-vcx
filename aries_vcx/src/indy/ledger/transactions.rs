@@ -755,9 +755,6 @@ pub async fn get_cred_def_json(wallet_handle: WalletHandle, pool_handle: PoolHan
 #[cfg(feature = "general_test")]
 mod test {
     use crate::utils::devsetup::*;
-    use messages::a2a::MessageId;
-    use messages::did_doc::test_utils::{_recipient_keys, _routing_keys, _service_endpoint};
-    use messages::connection::invite::test_utils::_pairwise_invitation;
 
     use super::*;
 
@@ -778,16 +775,6 @@ mod test {
         let transaction =
             r#"{"reqId":1, "identifier": "EbP4aYNeTHL6q385GuVpRV", "endorser": "NcYxiDXkpYi6ov5FcYDi1e"}"#;
         assert!(_verify_transaction_can_be_endorsed(transaction, "EbP4aYNeTHL6q385GuVpRV").is_err());
-    }
-
-    #[tokio::test]
-    async fn test_did_doc_from_invitation_works() {
-        let mut did_doc = DidDoc::default();
-        did_doc.set_id(MessageId::id().0);
-        did_doc.set_service_endpoint(_service_endpoint());
-        did_doc.set_recipient_keys(_recipient_keys());
-        did_doc.set_routing_keys(_routing_keys());
-        assert_eq!(did_doc, into_did_doc(0, &Invitation::Pairwise(_pairwise_invitation())).await.unwrap());
     }
 }
 

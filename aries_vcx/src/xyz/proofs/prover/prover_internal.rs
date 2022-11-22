@@ -310,12 +310,9 @@ pub mod unit_tests {
         },
         get_temp_dir_path,
     };
+    use crate::xyz::test_utils::{dummy_profile, indy_handles_to_profile};
 
     use super::*;
-
-    fn _dummy_pool_handle() -> PoolHandle {
-        0
-    }
 
 
     fn proof_req_no_interval() -> ProofRequestData {
@@ -363,7 +360,7 @@ pub mod unit_tests {
         };
         let creds = vec![cred1, cred2];
 
-        let credential_def = build_cred_defs_json_prover(WalletHandle(0), _dummy_pool_handle(), &creds).await.unwrap();
+        let credential_def = build_cred_defs_json_prover(&dummy_profile(), &creds).await.unwrap();
         assert!(credential_def.len() > 0);
         assert!(credential_def.contains(r#""id":"V4SGRU86Z58d6TV7PBUe6f:3:CL:47:tag1","schemaId":"47""#));
     }
@@ -382,7 +379,8 @@ pub mod unit_tests {
             tails_file: None,
             timestamp: None,
         }];
-        let err_kind = build_cred_defs_json_prover(setup.wallet_handle, _dummy_pool_handle(), &credential_ids)
+        let profile = indy_handles_to_profile(setup.wallet_handle, 0);
+        let err_kind = build_cred_defs_json_prover(&profile, &credential_ids)
             .await
             .unwrap_err()
             .kind();
@@ -404,8 +402,9 @@ pub mod unit_tests {
             tails_file: None,
             timestamp: None,
         }];
+        let profile = indy_handles_to_profile(setup.wallet_handle, 0);
         assert_eq!(
-            build_schemas_json_prover(setup.wallet_handle, _dummy_pool_handle(), &credential_ids)
+            build_schemas_json_prover(&profile, &credential_ids)
                 .await
                 .unwrap_err()
                 .kind(),
@@ -418,7 +417,7 @@ pub mod unit_tests {
         let _setup = SetupMocks::init();
 
         assert_eq!(
-            build_schemas_json_prover(WalletHandle(0), _dummy_pool_handle(), &Vec::new()).await.unwrap(),
+            build_schemas_json_prover(&dummy_profile(), &Vec::new()).await.unwrap(),
             "{}".to_string()
         );
 
@@ -446,7 +445,7 @@ pub mod unit_tests {
         };
         let creds = vec![cred1, cred2];
 
-        let schemas = build_schemas_json_prover(WalletHandle(0), _dummy_pool_handle(), &creds).await.unwrap();
+        let schemas = build_schemas_json_prover(&dummy_profile(), &creds).await.unwrap();
         assert!(schemas.len() > 0);
         assert!(schemas.contains(r#""id":"2hoqvcwupRTUNkXn6ArYzs:2:test-licence:4.4.4","name":"test-licence""#));
     }
@@ -747,7 +746,7 @@ pub mod unit_tests {
             timestamp: None,
         };
         let mut cred_info = vec![cred1];
-        let states = build_rev_states_json(_dummy_pool_handle(), cred_info.as_mut()).await.unwrap();
+        let states = build_rev_states_json(&&dummy_profile(), cred_info.as_mut()).await.unwrap();
         let rev_state_json: Value = serde_json::from_str(REV_STATE_JSON).unwrap();
         let expected = json!({REV_REG_ID: {"1": rev_state_json}}).to_string();
         assert_eq!(states, expected);

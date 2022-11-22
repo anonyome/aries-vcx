@@ -553,12 +553,9 @@ pub mod unit_tests {
     use crate::test::source_id;
     use crate::utils::constants::LIBINDY_CRED_OFFER;
     use crate::utils::devsetup::SetupMocks;
+    use crate::xyz::test_utils::dummy_profile;
 
     use super::*;
-
-    fn _dummy_wallet_handle() -> WalletHandle {
-        WalletHandle(0)
-    }
 
     pub fn _rev_reg_id() -> String {
         String::from("TEST_REV_REG_ID")
@@ -603,7 +600,7 @@ pub mod unit_tests {
             self = self.to_offer_sent_state();
             self = self
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -616,7 +613,7 @@ pub mod unit_tests {
             self = self.to_request_received_state().await;
             self = self
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialSend(),
                     _send_message(),
                 )
@@ -624,7 +621,7 @@ pub mod unit_tests {
                 .unwrap();
             self = self
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialAck(_ack()),
                     _send_message(),
                 )
@@ -718,7 +715,7 @@ pub mod unit_tests {
             let mut issuer_sm = _issuer_sm();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialProposal(_credential_proposal()),
                     None,
                 )
@@ -758,7 +755,7 @@ pub mod unit_tests {
 
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::Credential(_credential()),
                     _send_message(),
                 )
@@ -768,7 +765,7 @@ pub mod unit_tests {
 
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -797,7 +794,7 @@ pub mod unit_tests {
 
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::Credential(_credential()),
                     _send_message(),
                 )
@@ -807,7 +804,7 @@ pub mod unit_tests {
 
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -825,7 +822,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -844,7 +841,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialProposal(_credential_proposal()),
                     _send_message(),
                 )
@@ -863,7 +860,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::ProblemReport(_problem_report()),
                     _send_message(),
                 )
@@ -886,7 +883,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::Credential(_credential()),
                     _send_message(),
                 )
@@ -905,7 +902,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -913,7 +910,7 @@ pub mod unit_tests {
                 .unwrap();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialSend(),
                     _send_message(),
                 )
@@ -932,7 +929,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(CredentialRequest::create()),
                     _send_message(),
                 )
@@ -940,7 +937,7 @@ pub mod unit_tests {
                 .unwrap();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialSend(),
                     _send_message(),
                 )
@@ -963,7 +960,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -971,7 +968,7 @@ pub mod unit_tests {
                 .unwrap();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialSend(),
                     _send_message(),
                 )
@@ -980,7 +977,7 @@ pub mod unit_tests {
             assert_match!(IssuerFullState::CredentialSent(_), issuer_sm.state);
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialAck(_ack()),
                     _send_message(),
                 )
@@ -998,7 +995,7 @@ pub mod unit_tests {
             issuer_sm = issuer_sm.to_offer_sent_state();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request_1()),
                     _send_message(),
                 )
@@ -1006,7 +1003,7 @@ pub mod unit_tests {
                 .unwrap();
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialSend(),
                     _send_message(),
                 )
@@ -1030,7 +1027,7 @@ pub mod unit_tests {
 
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
                     _send_message(),
                 )
@@ -1040,7 +1037,7 @@ pub mod unit_tests {
 
             issuer_sm = issuer_sm
                 .handle_message(
-                    _dummy_wallet_handle(),
+                    &dummy_profile(),
                     CredentialIssuanceAction::Credential(_credential()),
                     _send_message(),
                 )

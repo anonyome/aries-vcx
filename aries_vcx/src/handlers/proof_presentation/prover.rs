@@ -251,13 +251,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_retrieve_credentials_fails_with_no_proof_req() {
-        let setup = SetupLibraryWallet::init().await;
+        let setup = SetupProfile::init().await;
 
         let proof_req = PresentationRequest::create();
         let proof = Prover::create_from_request("1", proof_req).unwrap();
         assert_eq!(
             proof
-                .retrieve_credentials(setup.wallet_handle)
+                .retrieve_credentials(&setup.profile)
                 .await
                 .unwrap_err()
                 .kind(),

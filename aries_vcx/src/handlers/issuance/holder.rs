@@ -231,16 +231,9 @@ pub mod unit_tests {
     use messages::issuance::credential_proposal::test_utils::_credential_proposal_data;
     use messages::issuance::credential_request::test_utils::_my_pw_did;
     use crate::utils::devsetup::SetupMocks;
+    use crate::xyz::test_utils::dummy_profile;
 
     use super::*;
-
-    fn _dummy_wallet_handle() -> WalletHandle {
-        WalletHandle(0)
-    }
-
-    fn _dummy_pool_handle() -> PoolHandle {
-        0
-    }
 
     pub fn _send_message() -> Option<SendClosure> {
         Some(Box::new(|_: A2AMessage| Box::pin(async { VcxResult::Ok(()) })))
@@ -257,32 +250,28 @@ pub mod unit_tests {
     impl Holder {
         async fn to_finished_state(mut self) -> Holder {
             self.step(
-                _dummy_wallet_handle(),
-                _dummy_pool_handle(),
+                &dummy_profile(),
                 CredentialIssuanceAction::CredentialProposalSend(_credential_proposal_data()),
                 _send_message(),
             )
             .await
             .unwrap();
             self.step(
-                _dummy_wallet_handle(),
-                _dummy_pool_handle(),
+                &dummy_profile(),
                 CredentialIssuanceAction::CredentialOffer(_credential_offer()),
                 _send_message(),
             )
             .await
             .unwrap();
             self.step(
-                _dummy_wallet_handle(),
-                _dummy_pool_handle(),
+                &dummy_profile(),
                 CredentialIssuanceAction::CredentialRequestSend(_my_pw_did()),
                 _send_message(),
             )
             .await
             .unwrap();
             self.step(
-                _dummy_wallet_handle(),
-                _dummy_pool_handle(),
+                &dummy_profile(),
                 CredentialIssuanceAction::Credential(_credential()),
                 _send_message(),
             )
@@ -319,7 +308,7 @@ pub mod unit_tests {
         );
         let (_, msg) = holder.find_message_to_handle(messages).unwrap();
         holder
-            .step(_dummy_wallet_handle(), _dummy_pool_handle(), msg.into(), _send_message())
+            .step(&dummy_profile(), msg.into(), _send_message())
             .await
             .unwrap();
         assert_eq!(HolderState::OfferReceived, holder.get_state());
@@ -338,13 +327,13 @@ pub mod unit_tests {
         );
         let (_, msg) = holder.find_message_to_handle(messages).unwrap();
         holder
-            .step(_dummy_wallet_handle(), _dummy_pool_handle(), msg.into(), _send_message())
+            .step(&dummy_profile(), msg.into(), _send_message())
             .await
             .unwrap();
         assert_eq!(HolderState::OfferReceived, holder.get_state());
 
         holder
-            .send_request(_dummy_wallet_handle(), _dummy_pool_handle(), _my_pw_did(), _send_message().unwrap())
+            .send_request(&dummy_profile(), _my_pw_did(), _send_message().unwrap())
             .await
             .unwrap();
         assert_eq!(HolderState::RequestSent, holder.get_state());
@@ -354,7 +343,7 @@ pub mod unit_tests {
         );
         let (_, msg) = holder.find_message_to_handle(messages).unwrap();
         holder
-            .step(_dummy_wallet_handle(), _dummy_pool_handle(), msg.into(), _send_message())
+            .step(&dummy_profile(), msg.into(), _send_message())
             .await
             .unwrap();
         assert_eq!(HolderState::Finished, holder.get_state());

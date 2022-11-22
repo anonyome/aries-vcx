@@ -3,7 +3,7 @@ use std::ffi::CString;
 use futures::future::{BoxFuture, FutureExt};
 use libc::c_char;
 
-use crate::api_lib::global::pool::{close_main_pool, get_main_pool_handle, is_main_pool_open, open_main_pool};
+use crate::api_lib::global::pool::{close_main_pool, is_main_pool_open, open_main_pool};
 use crate::api_lib::global::profile::get_main_profile;
 use aries_vcx::agency_client::configuration::AgencyClientConfig;
 use aries_vcx::agency_client::testing::mocking::enable_agency_mocks;
@@ -808,7 +808,6 @@ mod tests {
         connection, credential, credential_def, disclosed_proof, issuer_credential, proof, schema,
     };
     use crate::api_lib::global::pool::reset_main_pool_handle;
-    #[cfg(feature = "pool_tests")]
     use crate::api_lib::global::wallet::test_utils::_create_main_wallet_and_its_backup;
     use crate::api_lib::global::wallet::get_main_wallet_handle;
     use crate::api_lib::utils::error::reset_current_error;

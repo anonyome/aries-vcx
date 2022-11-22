@@ -508,17 +508,9 @@ pub mod unit_tests {
     use messages::proof_presentation::test_utils::{_ack, _problem_report};
     use crate::test::source_id;
     use crate::utils::devsetup::SetupMocks;
+    use crate::xyz::test_utils::dummy_profile;
 
     use super::*;
-
-    fn _dummy_wallet_handle() -> WalletHandle {
-        WalletHandle(0)
-    }
-
-    fn _dummy_pool_handle() -> PoolHandle {
-        0
-    }
-
 
     pub fn _prover_sm_from_request() -> ProverSM {
         ProverSM::from_request(_presentation_request(), source_id())
@@ -536,8 +528,7 @@ pub mod unit_tests {
         async fn to_presentation_proposal_sent_state(mut self) -> ProverSM {
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationProposalSend(_presentation_proposal_data()),
                     _send_message(),
                 )
@@ -549,8 +540,7 @@ pub mod unit_tests {
         async fn to_presentation_prepared_state(mut self) -> ProverSM {
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     None,
                 )
@@ -562,8 +552,7 @@ pub mod unit_tests {
         async fn to_presentation_sent_state(mut self) -> ProverSM {
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -571,8 +560,7 @@ pub mod unit_tests {
                 .unwrap();
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -584,8 +572,7 @@ pub mod unit_tests {
         async fn to_finished_state(mut self) -> ProverSM {
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     None,
                 )
@@ -593,8 +580,7 @@ pub mod unit_tests {
                 .unwrap();
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -602,8 +588,7 @@ pub mod unit_tests {
                 .unwrap();
             self = self
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -725,8 +710,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationProposalSend(_presentation_proposal_data()),
                     _send_message(),
                 )
@@ -744,8 +728,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request().to_presentation_proposal_sent_state().await;
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationRequestReceived(_presentation_request()),
                     _send_message(),
                 )
@@ -763,8 +746,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request().to_presentation_proposal_sent_state().await;
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationRejectReceived(_problem_report()),
                     _send_message(),
                 )
@@ -786,8 +768,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationProposalSend(_presentation_proposal_data()),
                     _send_message(),
                 )
@@ -805,8 +786,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SetPresentation(_presentation()),
                     _send_message(),
                 )
@@ -826,8 +806,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation(("invalid".to_string(), _self_attested())),
                     _send_message(),
                 )
@@ -845,8 +824,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::RejectPresentationRequest(String::from("reject request")),
                     _send_message(),
                 )
@@ -864,8 +842,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::ProposePresentation(_presentation_preview()),
                     _send_message(),
                 )
@@ -884,8 +861,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -895,8 +871,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -914,8 +889,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -923,8 +897,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -943,8 +916,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationRejectReceived(_problem_report()),
                     _send_message(),
                 )
@@ -954,8 +926,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -973,8 +944,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::RejectPresentationRequest(String::from("reject request")),
                     _send_message(),
                 )
@@ -992,8 +962,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request().to_presentation_prepared_state().await;
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::ProposePresentation(_presentation_preview()),
                     _send_message(),
                 )
@@ -1012,8 +981,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation(("invalid".to_string(), _self_attested())),
                     _send_message(),
                 )
@@ -1023,8 +991,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -1046,8 +1013,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation(("invalid".to_string(), _self_attested())),
                     _send_message(),
                 )
@@ -1056,8 +1022,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationRejectReceived(_problem_report()),
                     _send_message(),
                 )
@@ -1067,8 +1032,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -1085,8 +1049,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -1094,8 +1057,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -1103,8 +1065,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -1123,8 +1084,7 @@ pub mod unit_tests {
             let prover_sm = _prover_sm_from_request().to_presentation_sent_state().await;
             let err = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::RejectPresentationRequest(String::from("reject")),
                     _send_message(),
                 )
@@ -1141,8 +1101,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -1150,8 +1109,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -1159,8 +1117,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationRejectReceived(_problem_report()),
                     _send_message(),
                 )
@@ -1182,8 +1139,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -1191,8 +1147,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -1201,8 +1156,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -1212,8 +1166,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -1230,8 +1183,7 @@ pub mod unit_tests {
             let mut prover_sm = _prover_sm_from_request();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PreparePresentation((_credentials(), _self_attested())),
                     _send_message(),
                 )
@@ -1239,8 +1191,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::SendPresentation,
                     _send_message(),
                 )
@@ -1248,8 +1199,7 @@ pub mod unit_tests {
                 .unwrap();
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -1258,8 +1208,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationAckReceived(_ack()),
                     _send_message(),
                 )
@@ -1269,8 +1218,7 @@ pub mod unit_tests {
 
             prover_sm = prover_sm
                 .step(
-                    _dummy_wallet_handle(),
-                    _dummy_pool_handle(),
+                    &dummy_profile(),
                     ProverMessages::PresentationRejectReceived(_problem_report()),
                     _send_message(),
                 )

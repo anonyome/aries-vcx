@@ -215,6 +215,7 @@ pub async fn build_rev_reg_json(profile: &Arc<dyn Profile>, credential_data: &Ve
 pub mod unit_tests {
     use crate::utils::constants::*;
     use crate::utils::devsetup::*;
+    use crate::xyz::test_utils::dummy_profile;
 
     use super::*;
 
@@ -235,7 +236,7 @@ pub mod unit_tests {
             timestamp: None,
         };
         let credentials = vec![cred1, cred2];
-        let credential_json = build_cred_defs_json_verifier(WalletHandle(0), 0, &credentials)
+        let credential_json = build_cred_defs_json_verifier(&dummy_profile(), &credentials)
             .await
             .unwrap();
 
@@ -261,7 +262,7 @@ pub mod unit_tests {
             timestamp: None,
         };
         let credentials = vec![cred1, cred2];
-        let schema_json = build_schemas_json_verifier(WalletHandle(0), 0, &credentials)
+        let schema_json = build_schemas_json_verifier(&dummy_profile(), &credentials)
             .await
             .unwrap();
 
@@ -287,7 +288,7 @@ pub mod unit_tests {
             timestamp: None,
         };
         let credentials = vec![cred1, cred2];
-        let rev_reg_defs_json = build_rev_reg_defs_json(0, &credentials).await.unwrap();
+        let rev_reg_defs_json = build_rev_reg_defs_json(&dummy_profile(), &credentials).await.unwrap();
 
         let json: Value = serde_json::from_str(&rev_def_json()).unwrap();
         let expected = json!({ REV_REG_ID: json }).to_string();
@@ -311,7 +312,7 @@ pub mod unit_tests {
             timestamp: Some(2),
         };
         let credentials = vec![cred1, cred2];
-        let rev_reg_json = build_rev_reg_json(0, &credentials).await.unwrap();
+        let rev_reg_json = build_rev_reg_json(&dummy_profile(), &credentials).await.unwrap();
 
         let json: Value = serde_json::from_str(REV_REG_JSON).unwrap();
         let expected = json!({REV_REG_ID:{"1":json}}).to_string();

@@ -2,8 +2,12 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use vdrtools_sys::{PoolHandle, WalletHandle};
+
+use crate::core::profile::indy_profile::IndySdkProfile;
 use crate::core::profile::profile::Profile;
 use crate::global::settings;
+use crate::indy::utils::test_setup::TRUSTEE_SEED;
 use crate::utils::constants::{DEFAULT_SCHEMA_ATTRS, TAILS_DIR, TEST_TAILS_URL};
 use crate::utils::get_temp_dir_path;
 use crate::xyz::credentials::encoding::encode_attributes;
@@ -17,7 +21,8 @@ pub async fn create_schema(profile: &Arc<dyn Profile>, attr_list: &str, submitte
     let schema_version: String = crate::utils::random::generate_random_schema_version();
 
     let anoncreds = Arc::clone(profile).inject_anoncreds();
-    anoncreds.issuer_create_schema(&submitter_did, &schema_name, &schema_version, &data)
+    anoncreds
+        .issuer_create_schema(&submitter_did, &schema_name, &schema_version, &data)
         .await
         .unwrap()
 }
@@ -193,7 +198,7 @@ pub async fn create_and_store_credential(
         cred_id,
         rev_reg_id,
         cred_rev_id.unwrap(),
-        tails_file
+        tails_file,
     )
 }
 
@@ -219,15 +224,10 @@ pub async fn create_and_store_nonrevocable_credential(
         .await
         .unwrap();
     /* store cred */
-    let cred_id = anoncreds.prover_store_credential(
-        None,
-        &req_meta,
-        &cred,
-        &cred_def_json,
-        None,
-    )
-    .await
-    .unwrap();
+    let cred_id = anoncreds
+        .prover_store_credential(None, &req_meta, &cred, &cred_def_json, None)
+        .await
+        .unwrap();
     (
         schema_id,
         schema_json,
@@ -240,10 +240,7 @@ pub async fn create_and_store_nonrevocable_credential(
     )
 }
 
-pub async fn create_indy_proof(
-    profile: &Arc<dyn Profile>,
-    did: &str,
-) -> (String, String, String, String) {
+pub async fn create_indy_proof(profile: &Arc<dyn Profile>, did: &str) -> (String, String, String, String) {
     let (schema_id, schema_json, cred_def_id, cred_def_json, _offer, _req, _req_meta, cred_id) =
         create_and_store_nonrevocable_credential(profile, &did, DEFAULT_SCHEMA_ATTRS).await;
     let proof_req = json!({
@@ -292,20 +289,22 @@ pub async fn create_indy_proof(
 
     let anoncreds = Arc::clone(profile).inject_anoncreds();
 
-    anoncreds.prover_get_credentials_for_proof_req(&proof_req)
+    anoncreds
+        .prover_get_credentials_for_proof_req(&proof_req)
         .await
         .unwrap();
 
-    let proof = anoncreds.prover_create_proof(
-        &proof_req,
-        &requested_credentials_json,
-        "main",
-        &schemas,
-        &cred_defs,
-        None,
-    )
-    .await
-    .unwrap();
+    let proof = anoncreds
+        .prover_create_proof(
+            &proof_req,
+            &requested_credentials_json,
+            "main",
+            &schemas,
+            &cred_defs,
+            None,
+        )
+        .await
+        .unwrap();
     (schemas, cred_defs, proof_req, proof)
 }
 
@@ -378,19 +377,59 @@ pub async fn create_proof_with_predicate(
 
     let anoncreds = Arc::clone(profile).inject_anoncreds();
 
-    anoncreds.prover_get_credentials_for_proof_req( &proof_req)
+    anoncreds
+        .prover_get_credentials_for_proof_req(&proof_req)
         .await
         .unwrap();
 
-    let proof = anoncreds.prover_create_proof(
-        &proof_req,
-        &requested_credentials_json,
-        "main",
-        &schemas,
-        &cred_defs,
-        None,
-    )
-    .await
-    .unwrap();
+    let proof = anoncreds
+        .prover_create_proof(
+            &proof_req,
+            &requested_credentials_json,
+            "main",
+            &schemas,
+            &cred_defs,
+            None,
+        )
+        .await
+        .unwrap();
     (schemas, cred_defs, proof_req, proof)
+}
+
+pub async fn create_trustee_key(profile: &Arc<dyn Profile>) -> String {
+    // let key_config = json!({ "seed": TRUSTEE_SEED }).to_string();
+    // vdrtools::crypto::create_key(wallet_handle, Some(&key_config))
+    //     .await
+    //     .unwrap()
+    Arc::clone(profile)
+        .inject_wallet()
+        .create_and_store_my_did(Some(TRUSTEE_SEED), None)
+        .await
+        .unwrap()
+        .1
+}
+
+// FUTURE - should be a standalone method within wallet - not depending on create did
+pub async fn create_key(profile: &Arc<dyn Profile>) -> String {
+    let seed: String = crate::utils::random::generate_random_seed();
+    // let key_config = json!({ "seed": seed }).to_string();
+    // vdrtools::crypto::create_key(wallet_handle, Some(&key_config))
+    //     .await
+    //     .unwrap()
+    Arc::clone(profile)
+        .inject_wallet()
+        .create_and_store_my_did(Some(&seed), None)
+        .await
+        .unwrap()
+        .1
+}
+
+// used for mocking profile
+pub fn dummy_profile() -> Arc<dyn Profile> {
+    indy_handles_to_profile(WalletHandle(0), 0)
+}
+
+// should only ben used for quick mock setups
+pub fn indy_handles_to_profile(wallet_handle: WalletHandle, pool_handle: PoolHandle) -> Arc<dyn Profile> {
+    Arc::new(IndySdkProfile::new(wallet_handle, pool_handle))
 }

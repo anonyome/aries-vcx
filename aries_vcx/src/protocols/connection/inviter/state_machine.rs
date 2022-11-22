@@ -1,6 +1,5 @@
 use std::clone::Clone;
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::Arc;
 
 use messages::did_doc::DidDoc;
@@ -346,11 +345,9 @@ pub mod unit_tests {
 
     use super::*;
 
-    fn _dummy_wallet_handle() -> WalletHandle {
-        WalletHandle(0)
-    }
-
     pub mod inviter {
+        use crate::xyz::test_utils::dummy_profile;
+
         use super::*;
 
         fn _send_message() -> SendClosureConnection {
@@ -358,7 +355,7 @@ pub mod unit_tests {
         }
 
         pub async fn inviter_sm() -> SmConnectionInviter {
-            let pairwise_info = PairwiseInfo::create(_dummy_wallet_handle()).await.unwrap();
+            let pairwise_info = PairwiseInfo::create(&dummy_profile().inject_wallet()).await.unwrap();
             SmConnectionInviter::new(&source_id(), pairwise_info)
         }
 
@@ -372,12 +369,12 @@ pub mod unit_tests {
 
             async fn to_inviter_requested_state(mut self) -> SmConnectionInviter {
                 self = self.to_inviter_invited_state();
-                let new_pairwise_info = PairwiseInfo::create(_dummy_wallet_handle()).await.unwrap();
+                let new_pairwise_info = PairwiseInfo::create(&dummy_profile().inject_wallet()).await.unwrap();
                 let new_routing_keys: Vec<String> = vec!["verkey456".into()];
                 let new_service_endpoint = String::from("https://example.org/agent");
                 self = self
                     .handle_connection_request(
-                        _dummy_wallet_handle(),
+                        dummy_profile().inject_wallet(),
                         _request(),
                         &new_pairwise_info,
                         new_routing_keys,
@@ -435,7 +432,7 @@ pub mod unit_tests {
                 let new_service_endpoint = String::from("https://example.org/agent");
                 let msg = inviter
                     .build_response(
-                        WalletHandle(0),
+                        &dummy_profile().inject_wallet(),
                         &_request(),
                         &new_pairwise_info,
                         new_routing_keys,
@@ -549,7 +546,7 @@ pub mod unit_tests {
                 let new_service_endpoint = String::from("https://example.org/agent");
                 did_exchange_sm = did_exchange_sm
                     .handle_connection_request(
-                        _dummy_wallet_handle(),
+                        dummy_profile().inject_wallet(),
                         _request(),
                         &new_pairwise_info,
                         new_routing_keys,
@@ -583,7 +580,7 @@ pub mod unit_tests {
                 let new_service_endpoint = String::from("https://example.org/agent");
                 did_exchange_sm = did_exchange_sm
                     .handle_connection_request(
-                        _dummy_wallet_handle(),
+                        dummy_profile().inject_wallet(),
                         request,
                         &new_pairwise_info,
                         new_routing_keys,

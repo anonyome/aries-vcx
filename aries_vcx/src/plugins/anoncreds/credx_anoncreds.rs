@@ -17,7 +17,7 @@ use crate::{
 use async_trait::async_trait;
 use credx::{
     types::{
-        AttributeNames, Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue,
+        Credential as CredxCredential, CredentialDefinitionId, CredentialRevocationState, DidValue,
         MasterSecret, PresentationRequest, RevocationRegistryDefinition, RevocationRegistryDelta, Schema, SchemaId,
     },
     ursa::{bn::BigNumber, errors::UrsaCryptoError},
@@ -154,6 +154,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         rev_reg_defs_json: &str,
         rev_regs_json: &str,
     ) -> VcxResult<bool> {
+        let _ = (proof_req_json, proof_json, schemas_json, credential_defs_json, rev_reg_defs_json, rev_regs_json);
         Err(unimplemented_method_err("credx verifier_verify_proof"))
     }
 
@@ -165,6 +166,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         max_creds: u32,
         tag: &str,
     ) -> VcxResult<(String, String, String)> {
+        let _ = (issuer_did, cred_def_id, tails_dir, max_creds, tag);
         Err(unimplemented_method_err("credx issuer_create_and_store_revoc_reg"))
     }
 
@@ -176,10 +178,12 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         sig_type: Option<&str>,
         config_json: &str,
     ) -> VcxResult<(String, String)> {
+        let _ = (issuer_did, schema_json, tag, sig_type, config_json);
         Err(unimplemented_method_err("credx issuer_create_and_store_credential_def"))
     }
 
     async fn issuer_create_credential_offer(&self, cred_def_id: &str) -> VcxResult<String> {
+        let _ = cred_def_id;
         Err(unimplemented_method_err("credx issuer_create_credential_offer"))
     }
 
@@ -191,6 +195,7 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
         rev_reg_id: Option<String>,
         tails_dir: Option<String>,
     ) -> VcxResult<(String, Option<String>, Option<String>)> {
+        let _ = (cred_offer_json, cred_req_json, cred_values_json, rev_reg_id, tails_dir);
         Err(unimplemented_method_err("credx issuer_create_credential"))
     }
 
@@ -629,11 +634,13 @@ impl BaseAnonCreds for IndyCredxAnonCreds {
 
     // todo - think about moving this to somewhere else as it aggregates other calls
     async fn revoke_credential_local(&self, tails_dir: &str, rev_reg_id: &str, cred_rev_id: &str) -> VcxResult<()> {
+        let _ = (tails_dir, rev_reg_id, cred_rev_id);
         Err(unimplemented_method_err("credx revoke_credential_local"))
     }
 
     // todo - think about moving this to somewhere else as it aggregates other calls
     async fn publish_local_revocations(&self, submitter_did: &str, rev_reg_id: &str) -> VcxResult<()> {
+        let _ = (submitter_did, rev_reg_id);
         Err(unimplemented_method_err("credx publish_local_revocations"))
     }
 

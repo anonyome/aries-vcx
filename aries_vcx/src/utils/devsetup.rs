@@ -1,6 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
-use futures::Future;
 use std::fs;
 use std::sync::{Arc, Once};
 
@@ -19,7 +18,7 @@ use crate::global::settings::{disable_indy_mocks, enable_indy_mocks, set_test_co
 use crate::indy::ledger::pool::test_utils::{
     create_test_ledger_config, create_tmp_genesis_txn_file, delete_test_pool, open_test_pool,
 };
-use crate::indy::ledger::pool::{create_pool_ledger_config, delete, open_pool_ledger, PoolConfig};
+use crate::indy::ledger::pool::{PoolConfig};
 use crate::indy::utils::mocks::did_mocks::DidMocks;
 use crate::indy::utils::mocks::pool_mocks::PoolMocks;
 use crate::indy::wallet::open_wallet;
@@ -30,7 +29,7 @@ use crate::indy::wallet::{
 use crate::plugins::wallet::base_wallet::BaseWallet;
 use crate::plugins::wallet::indy_wallet::IndySdkWallet;
 use crate::utils;
-use crate::utils::constants::{GENESIS_PATH, POOL};
+use crate::utils::constants::{GENESIS_PATH};
 use crate::utils::file::write_file;
 use crate::utils::get_temp_dir_path;
 use crate::utils::provision::provision_cloud_agent;

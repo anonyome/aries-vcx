@@ -198,7 +198,9 @@ impl EncryptionEnvelope {
 pub mod unit_tests {
     use messages::did_doc::test_utils::*;
     use messages::ack::test_utils::_ack;
+    use crate::indy::utils::test_setup;
     use crate::utils::devsetup::SetupEmpty;
+    use crate::xyz::test_utils::{create_trustee_key, indy_handles_to_profile, create_key};
 
     use super::*;
 
@@ -206,12 +208,13 @@ pub mod unit_tests {
     async fn test_encryption_envelope_works_for_no_keys() {
         SetupEmpty::init();
         let setup = test_setup::setup_wallet().await;
-        let trustee_key = create_trustee_key(setup.wallet_handle).await;
+        let profile = indy_handles_to_profile(setup.wallet_handle, 0);
+        let trustee_key = create_trustee_key(&profile).await;
 
         let message = A2AMessage::Ack(_ack());
 
         let res =
-            EncryptionEnvelope::create(setup.wallet_handle, &message, Some(&trustee_key), &DidDoc::default()).await;
+            EncryptionEnvelope::create(&profile.inject_wallet(), &message, Some(&trustee_key), &DidDoc::default()).await;
         assert_eq!(res.unwrap_err().kind(), VcxErrorKind::InvalidLibindyParam);
     }
 
@@ -219,12 +222,13 @@ pub mod unit_tests {
     async fn test_encryption_envelope_works_for_recipient_only() {
         SetupEmpty::init();
         let setup = test_setup::setup_wallet().await;
-        let trustee_key = create_trustee_key(setup.wallet_handle).await;
+        let profile = indy_handles_to_profile(setup.wallet_handle, 0);
+        let trustee_key = create_trustee_key(&profile).await;
 
         let message = A2AMessage::Ack(_ack());
 
         let envelope = EncryptionEnvelope::create(
-            setup.wallet_handle,
+            &profile.inject_wallet(),
             &message,
             Some(&trustee_key),
             &_did_doc_empty_routing(),
@@ -233,7 +237,7 @@ pub mod unit_tests {
         .unwrap();
         assert_eq!(
             message,
-            EncryptionEnvelope::anon_unpack(setup.wallet_handle, envelope.0)
+            EncryptionEnvelope::anon_unpack(&profile.inject_wallet(), envelope.0)
                 .await
                 .unwrap()
         );
@@ -243,10 +247,11 @@ pub mod unit_tests {
     async fn test_encryption_envelope_works_for_routing_keys() {
         SetupEmpty::init();
         let setup = test_setup::setup_wallet().await;
-        let trustee_key = create_trustee_key(setup.wallet_handle).await;
+        let profile = indy_handles_to_profile(setup.wallet_handle, 0);
+        let trustee_key = create_trustee_key(&profile).await;
 
-        let key_1 = create_key(setup.wallet_handle, None).await.unwrap();
-        let key_2 = create_key(setup.wallet_handle, None).await.unwrap();
+        let key_1 = create_key(&profile).await;
+        let key_2 = create_key(&profile).await;
 
         let mut did_doc = DidDoc::default();
         did_doc.set_service_endpoint(_service_endpoint());
@@ -255,11 +260,11 @@ pub mod unit_tests {
 
         let ack = A2AMessage::Ack(_ack());
 
-        let envelope = EncryptionEnvelope::create(setup.wallet_handle, &ack, Some(&trustee_key), &did_doc)
+        let envelope = EncryptionEnvelope::create(&profile.inject_wallet(), &ack, Some(&trustee_key), &did_doc)
             .await
             .unwrap();
 
-        let message_1 = EncryptionEnvelope::anon_unpack(setup.wallet_handle, envelope.0)
+        let message_1 = EncryptionEnvelope::anon_unpack(&profile.inject_wallet(), envelope.0)
             .await
             .unwrap();
 
@@ -271,7 +276,7 @@ pub mod unit_tests {
             _ => return assert!(false),
         };
 
-        let message_2 = EncryptionEnvelope::anon_unpack(setup.wallet_handle, message_1)
+        let message_2 = EncryptionEnvelope::anon_unpack(&profile.inject_wallet(), message_1)
             .await
             .unwrap();
 
@@ -285,7 +290,7 @@ pub mod unit_tests {
 
         assert_eq!(
             ack,
-            EncryptionEnvelope::anon_unpack(setup.wallet_handle, message_2)
+            EncryptionEnvelope::anon_unpack(&profile.inject_wallet(), message_2)
                 .await
                 .unwrap()
         );
@@ -295,19 +300,21 @@ pub mod unit_tests {
     async fn test_auth_unpack_message_should_succeed_if_sender_key_matches_expectation() {
         SetupEmpty::init();
         let recipient_wallet = test_setup::setup_wallet().await;
-        let recipient_key = test_setup::create_key(recipient_wallet.wallet_handle).await;
+        let recipient_profile = indy_handles_to_profile(recipient_wallet.wallet_handle, 0);
+        let recipient_key = create_key(&recipient_profile).await;
 
         let sender_wallet = test_setup::setup_wallet().await;
-        let sender_key = test_setup::create_key(sender_wallet.wallet_handle).await;
+        let sender_profile = indy_handles_to_profile(sender_wallet.wallet_handle, 0);
+        let sender_key = create_key(&sender_profile).await;
 
         let mut did_doc = DidDoc::default();
         did_doc.set_recipient_keys(vec![recipient_key]);
 
         let ack = A2AMessage::Ack(_ack());
-        let envelope = EncryptionEnvelope::create(sender_wallet.wallet_handle, &ack, Some(&sender_key), &did_doc)
+        let envelope = EncryptionEnvelope::create(&sender_profile.inject_wallet(), &ack, Some(&sender_key), &did_doc)
             .await
             .unwrap();
-        let _message_1 = EncryptionEnvelope::auth_unpack(recipient_wallet.wallet_handle, envelope.0, &sender_key)
+        let _message_1 = EncryptionEnvelope::auth_unpack(&recipient_profile.inject_wallet(), envelope.0, &sender_key)
             .await
             .unwrap();
     }
@@ -316,20 +323,22 @@ pub mod unit_tests {
     async fn test_auth_unpack_message_should_fail_if_sender_key_does_not_match_expectation() {
         SetupEmpty::init();
         let recipient_wallet = test_setup::setup_wallet().await;
-        let recipient_key = test_setup::create_key(recipient_wallet.wallet_handle).await;
+        let recipient_profile = indy_handles_to_profile(recipient_wallet.wallet_handle, 0);
+        let recipient_key = create_key(&recipient_profile).await;
 
         let sender_wallet = test_setup::setup_wallet().await;
-        let sender_key_1 = test_setup::create_key(sender_wallet.wallet_handle).await;
-        let sender_key_2 = test_setup::create_key(sender_wallet.wallet_handle).await;
+        let sender_profile = indy_handles_to_profile(sender_wallet.wallet_handle, 0);
+        let sender_key_1 = create_key(&sender_profile).await;
+        let sender_key_2 = create_key(&sender_profile).await;
 
         let mut did_doc = DidDoc::default();
         did_doc.set_recipient_keys(vec![recipient_key]);
 
         let ack = A2AMessage::Ack(_ack());
-        let envelope = EncryptionEnvelope::create(sender_wallet.wallet_handle, &ack, Some(&sender_key_2), &did_doc)
+        let envelope = EncryptionEnvelope::create(&sender_profile.inject_wallet(), &ack, Some(&sender_key_2), &did_doc)
             .await
             .unwrap();
-        let result = EncryptionEnvelope::auth_unpack(recipient_wallet.wallet_handle, envelope.0, &sender_key_1).await;
+        let result = EncryptionEnvelope::auth_unpack(&recipient_profile.inject_wallet(), envelope.0, &sender_key_1).await;
         assert!(result.is_err());
     }
 }

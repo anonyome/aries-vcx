@@ -141,6 +141,7 @@ mod unit_tests {
     use crate::utils::constants::{REQUESTED_ATTRS, REQUESTED_PREDICATES};
     use crate::utils::devsetup::SetupDefaults;
     use crate::utils::mockdata::mockdata_proof;
+    use crate::xyz::test_utils::dummy_profile;
 
     use super::*;
 
@@ -161,7 +162,7 @@ mod unit_tests {
     async fn test_proof_request_msg() {
         let _setup = SetupDefaults::init();
 
-        let request = ProofRequestData::create("Test")
+        let request = ProofRequestData::create(&dummy_profile(), "Test")
             .await
             .unwrap()
             .set_not_revoked_interval(r#"{"from":1100000000, "to": 1600000000}"#.into())
@@ -186,7 +187,7 @@ mod unit_tests {
     async fn test_requested_attrs_constructed_correctly() {
         let _setup = SetupDefaults::init();
 
-        let request = ProofRequestData::create("")
+        let request = ProofRequestData::create(&dummy_profile(), "")
             .await
             .unwrap()
             .set_requested_attributes_as_string(REQUESTED_ATTRS.into())
@@ -201,7 +202,7 @@ mod unit_tests {
         let expected_req_attrs = _expected_req_attrs();
         let req_attrs_string = serde_json::to_string(&expected_req_attrs).unwrap();
 
-        let request = ProofRequestData::create("")
+        let request = ProofRequestData::create(&dummy_profile(), "")
             .await
             .unwrap()
             .set_requested_attributes_as_string(req_attrs_string)
@@ -242,7 +243,7 @@ mod unit_tests {
         .unwrap();
         check_predicates.insert("predicate_0".to_string(), attr_info1);
 
-        let request = ProofRequestData::create("")
+        let request = ProofRequestData::create(&dummy_profile(), "")
             .await
             .unwrap()
             .set_requested_predicates_as_string(REQUESTED_PREDICATES.into())
@@ -265,7 +266,7 @@ mod unit_tests {
 
         let requested_attrs = json!([attr_info, attr_info_2]).to_string();
 
-        let request = ProofRequestData::create("")
+        let request = ProofRequestData::create(&dummy_profile(), "")
             .await
             .unwrap()
             .set_requested_attributes_as_string(requested_attrs.into())
@@ -289,7 +290,7 @@ mod unit_tests {
 
         let requested_attrs = json!([attr_info]).to_string();
 
-        let err = ProofRequestData::create("")
+        let err = ProofRequestData::create(&dummy_profile(), "")
             .await
             .unwrap()
             .set_requested_attributes_as_string(requested_attrs.into())
