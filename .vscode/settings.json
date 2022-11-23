@@ -4,7 +4,7 @@
         // "agency_pool_tests", 
         "test_utils", 
         // "pool_tests", 
-        "general_test",
+        // "general_test",
         // "modular_deps"
     ],
     "rust-analyzer.runnableEnv": {

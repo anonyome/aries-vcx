@@ -2,7 +2,6 @@ use std::clone::Clone;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::util::verify_thread_id;
 use crate::plugins::wallet::base_wallet::BaseWallet;
