@@ -25,7 +25,7 @@ mod integration_tests {
     use aries_vcx::{ 
         core::profile::{indy_profile::IndySdkProfile, profile::Profile},
         global::{self, settings},
-        handlers::connection::mediated_connection::Connection,
+        handlers::connection::mediated_connection::MediatedConnection,
         utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
     };
 

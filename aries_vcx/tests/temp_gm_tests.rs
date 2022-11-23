@@ -35,7 +35,7 @@ mod integration_tests {
     use aries_vcx::{
         core::profile::{indy_profile::IndySdkProfile, profile::Profile},
         global::{self, settings},
-        handlers::connection::mediated_connection::Connection,
+        handlers::connection::mediated_connection::MediatedConnection,
         messages::connection::invite::Invitation,
         plugins::wallet::{base_wallet::BaseWallet, indy_wallet::IndySdkWallet},
         utils::devsetup::{AGENCY_DID, AGENCY_VERKEY},
@@ -65,7 +65,7 @@ mod integration_tests {
         let their_did_doc = into_did_doc(&profile, &invitation).await.unwrap();
         let autohop = false; // note that trinsic doesn't understand the ACK, so turn it off when using trinisc
         let mut conn =
-            Connection::create_with_invite("69", &profile, &agency_client, invitation, their_did_doc, autohop)
+            MediatedConnection::create_with_invite("69", &profile, &agency_client, invitation, their_did_doc, autohop)
                 .await
                 .unwrap();
         conn.connect(&profile, &agency_client).await.unwrap();
@@ -354,7 +354,7 @@ mod integration_tests {
                 profile::Profile,
             },
             global::{self, settings},
-            handlers::connection::mediated_connection::Connection,
+            handlers::connection::mediated_connection::MediatedConnection,
             indy::{
                 ledger::pool::{create_pool_ledger_config, open_pool_ledger},
                 wallet::WalletConfig,
@@ -406,7 +406,7 @@ mod integration_tests {
         }
 
         pub async fn setup_with_existing_conn() -> (
-            Connection,
+            MediatedConnection,
             WalletHandle,
             Arc<dyn Profile>,
             Arc<dyn Profile>,
@@ -422,7 +422,7 @@ mod integration_tests {
             // aca anony (VCX1)
             let conn_ser = "{\"version\":\"1.0\",\"data\":{\"pw_did\":\"DUS8BqV86zx5n66uvArptJ\",\"pw_vk\":\"7oJ9dDjTvd9fdx2D3vs4h1kZCi355ZTUjRwvRNX6AGJ6\",\"agent_did\":\"D65iuNEhWQAsw1GMsErwzQ\",\"agent_vk\":\"7b7ZpW92qN5AUEzgGsPKvRQ3VZQRkNSQsoGikjJdf3pQ\"},\"state\":{\"Invitee\":{\"Responded\":{\"response\":{\"@id\":\"816bf6c6-c6ad-4487-badd-93a2cb860ed6\",\"~thread\":{\"thid\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2\",\"sender_order\":0,\"received_orders\":{}},\"connection~sig\":{\"@type\":\"did:sov:BzCbsNYhMrjHiqZDTUASHg/signature/1.0/ed25519Sha512_single\",\"signature\":\"glEtN1Wrwn-A7g9IaXI2kYS5whzseHWSA0j1alWExw8LTjL1919rjozCGvakjkkzfsXCJCKD81twodcW5uANBQ==\",\"sig_data\":\"AAAAAGNhzRN7IkRJRCI6ICJLMUNadThTM3Z3MzRwNHBubzVObnlKIiwgIkRJRERvYyI6IHsiQGNvbnRleHQiOiAiaHR0cHM6Ly93M2lkLm9yZy9kaWQvdjEiLCAiaWQiOiAiZGlkOnNvdjpLMUNadThTM3Z3MzRwNHBubzVObnlKIiwgInB1YmxpY0tleSI6IFt7ImlkIjogImRpZDpzb3Y6SzFDWnU4UzN2dzM0cDRwbm81Tm55SiMxIiwgInR5cGUiOiAiRWQyNTUxOVZlcmlmaWNhdGlvbktleTIwMTgiLCAiY29udHJvbGxlciI6ICJkaWQ6c292OksxQ1p1OFMzdnczNHA0cG5vNU5ueUoiLCAicHVibGljS2V5QmFzZTU4IjogIkFwOENraloycmpDaHBpOWRLb05tTnBFY01lWTF0QW9tR3NWYVp5cXRWUUpEIn1dLCAiYXV0aGVudGljYXRpb24iOiBbeyJ0eXBlIjogIkVkMjU1MTlTaWduYXR1cmVBdXRoZW50aWNhdGlvbjIwMTgiLCAicHVibGljS2V5IjogImRpZDpzb3Y6SzFDWnU4UzN2dzM0cDRwbm81Tm55SiMxIn1dLCAic2VydmljZSI6IFt7ImlkIjogImRpZDpzb3Y6SzFDWnU4UzN2dzM0cDRwbm81Tm55SjtpbmR5IiwgInR5cGUiOiAiSW5keUFnZW50IiwgInByaW9yaXR5IjogMCwgInJlY2lwaWVudEtleXMiOiBbIkFwOENraloycmpDaHBpOWRLb05tTnBFY01lWTF0QW9tR3NWYVp5cXRWUUpEIl0sICJzZXJ2aWNlRW5kcG9pbnQiOiAiaHR0cDovL2Nsb3VkYWdlbnQuZGktZGV2LmRpLXRlYW0uZGV2LnN1ZG9wbGF0Zm9ybS5jb206ODIwMCJ9XX19\",\"signer\":\"CwWZmYFKDLN7NkjRJzX7pPenNT9N6K8AuiQfLveEsXHf\"}},\"request\":{\"@id\":\"testid\",\"label\":\"69\",\"connection\":{\"DID\":\"DUS8BqV86zx5n66uvArptJ\",\"DIDDoc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"DUS8BqV86zx5n66uvArptJ\",\"publicKey\":[{\"id\":\"DUS8BqV86zx5n66uvArptJ#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"DUS8BqV86zx5n66uvArptJ\",\"publicKeyBase58\":\"7oJ9dDjTvd9fdx2D3vs4h1kZCi355ZTUjRwvRNX6AGJ6\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"DUS8BqV86zx5n66uvArptJ#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"7oJ9dDjTvd9fdx2D3vs4h1kZCi355ZTUjRwvRNX6AGJ6\"],\"routingKeys\":[\"7b7ZpW92qN5AUEzgGsPKvRQ3VZQRkNSQsoGikjJdf3pQ\",\"Hezce2UWMZ3wUhVkh2LfKSs8nDzWwzs2Win7EzNN3YaR\"],\"serviceEndpoint\":\"https://aebc-116-255-6-98.au.ngrok.io/agency/msg\"}]}},\"~thread\":{\"thid\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2\",\"sender_order\":0,\"received_orders\":{}},\"~timing\":{\"out_time\":\"2022-11-02T01:51:05.953Z\"}},\"did_doc\":{\"@context\":\"https://w3id.org/did/v1\",\"id\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2\",\"publicKey\":[{\"id\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2#1\",\"type\":\"Ed25519VerificationKey2018\",\"controller\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2\",\"publicKeyBase58\":\"CwWZmYFKDLN7NkjRJzX7pPenNT9N6K8AuiQfLveEsXHf\"}],\"authentication\":[{\"type\":\"Ed25519SignatureAuthentication2018\",\"publicKey\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2#1\"}],\"service\":[{\"id\":\"did:example:123456789abcdefghi;indy\",\"type\":\"IndyAgent\",\"priority\":0,\"recipientKeys\":[\"CwWZmYFKDLN7NkjRJzX7pPenNT9N6K8AuiQfLveEsXHf\"],\"routingKeys\":[],\"serviceEndpoint\":\"http://cloudagent.di-dev.di-team.dev.sudoplatform.com:8200\"}]}}}},\"source_id\":\"69\",\"thread_id\":\"c3db005c-b4d7-4480-9bc9-ca28bd1695d2\"}";
 
-            let conn: Connection = Connection::from_string(conn_ser).unwrap();
+            let conn: MediatedConnection = MediatedConnection::from_string(conn_ser).unwrap();
 
             // set up indy profile
             let indy_handle = open_default_indy_handle().await;
@@ -485,7 +485,7 @@ mod integration_tests {
         };
         use aries_vcx::{
             core::profile::{indy_profile::IndySdkProfile, profile::Profile},
-            handlers::connection::mediated_connection::Connection,
+            handlers::connection::mediated_connection::MediatedConnection,
             messages::{a2a::A2AMessage, connection::invite::PairwiseInvitation},
         };
         use reqwest::Url;
@@ -504,7 +504,7 @@ mod integration_tests {
             serde_json::from_str(&v).unwrap()
         }
 
-        pub async fn clear_connection_messages(conn: &Connection, agency_client: &AgencyClient) {
+        pub async fn clear_connection_messages(conn: &MediatedConnection, agency_client: &AgencyClient) {
             let msgs = conn.get_messages_noauth(&agency_client).await.unwrap();
             let msgs = msgs.iter().collect::<Vec<(&String, &A2AMessage)>>();
 
@@ -518,7 +518,7 @@ mod integration_tests {
         }
 
         pub async fn get_first_connection_msg(
-            conn: &Connection,
+            conn: &MediatedConnection,
             profile: &Arc<dyn Profile>,
             agency_client: &AgencyClient,
         ) -> (String, A2AMessage) {
