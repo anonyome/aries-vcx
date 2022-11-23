@@ -70,21 +70,6 @@ pub mod test_setup {
         }
     }
 
-    pub async fn create_trustee_key(wallet_handle: vdrtools::WalletHandle) -> String {
-        let key_config = json!({ "seed": TRUSTEE_SEED }).to_string();
-        vdrtools::crypto::create_key(wallet_handle, Some(&key_config))
-            .await
-            .unwrap()
-    }
-
-    pub async fn create_key(wallet_handle: vdrtools::WalletHandle) -> String {
-        let seed: String = crate::utils::random::generate_random_seed();
-        let key_config = json!({ "seed": seed }).to_string();
-        vdrtools::crypto::create_key(wallet_handle, Some(&key_config))
-            .await
-            .unwrap()
-    }
-
     impl Drop for WalletSetup {
         fn drop(&mut self) {
             if self.wallet_handle.0 != 0 {

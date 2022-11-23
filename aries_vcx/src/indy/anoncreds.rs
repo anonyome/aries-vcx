@@ -44,59 +44,19 @@ mod unit_tests {
 #[cfg(test)]
 #[cfg(feature = "pool_tests")]
 pub mod integration_tests {
-    use crate::indy::test_utils::create_and_store_credential;
-    use crate::indy::ledger::transactions::get_rev_reg_delta_json;
-    use crate::indy::proofs::prover::prover::libindy_prover_get_credentials_for_proof_req;
-    use crate::indy::primitives::revocation_registry::{
-        libindy_issuer_revoke_credential, publish_local_revocations, revoke_credential_local
-    };
+    use std::sync::Arc;
+
+    use crate::core::profile::indy_profile::IndySdkProfile;
+    use crate::core::profile::profile::Profile;
+    use crate::indy::primitives::revocation_registry::libindy_issuer_revoke_credential;
     use crate::utils::constants::TAILS_DIR;
-    use crate::utils::devsetup::{SetupLibraryWallet, SetupWalletPool};
+    use crate::utils::devsetup::SetupIndyWalletPool;
     use crate::utils::get_temp_dir_path;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn tests_libindy_returns_error_if_proof_request_is_malformed() {
-        let setup = SetupLibraryWallet::init().await;
-
-        let proof_req = "{";
-        let result = libindy_prover_get_credentials_for_proof_req(setup.wallet_handle, &proof_req).await;
-        assert_eq!(result.unwrap_err().kind(), VcxErrorKind::InvalidProofRequest);
-    }
-
-    #[tokio::test]
-    async fn tests_libindy_prover_get_credentials() {
-        let setup = SetupLibraryWallet::init().await;
-
-        let proof_req = json!({
-           "nonce":"123432421212",
-           "name":"proof_req_1",
-           "version":"0.1",
-           "requested_attributes": json!({
-               "address1_1": json!({
-                   "name":"address1",
-               }),
-               "zip_2": json!({
-                   "name":"zip",
-               }),
-           }),
-           "requested_predicates": json!({}),
-        })
-            .to_string();
-        let _result = libindy_prover_get_credentials_for_proof_req(setup.wallet_handle, &proof_req)
-            .await
-            .unwrap();
-
-        let result_malformed_json = libindy_prover_get_credentials_for_proof_req(setup.wallet_handle, "{}")
-            .await
-            .unwrap_err();
-        assert_eq!(result_malformed_json.kind(), VcxErrorKind::InvalidAttributesStructure);
-    }
+    use crate::xyz::test_utils::create_and_store_credential;
 
     #[tokio::test]
     async fn test_issuer_revoke_credential() {
-        let setup = SetupWalletPool::init().await;
+        let setup = SetupIndyWalletPool::init().await;
 
         let rc = libindy_issuer_revoke_credential(
             setup.wallet_handle,
@@ -104,16 +64,17 @@ pub mod integration_tests {
             "",
             "",
         )
-            .await;
+        .await;
         assert!(rc.is_err());
 
-        let (_, _, _, _, _, _, _, _, rev_reg_id, cred_rev_id, _) =
-            create_and_store_credential(
-                setup.wallet_handle,
-                setup.pool_handle,
-                &setup.institution_did,
-                crate::utils::constants::DEFAULT_SCHEMA_ATTRS,
-            ).await;
+        // not the best testing strategy to construct indy profile here.
+        let profile: Arc<dyn Profile> = Arc::new(IndySdkProfile::new(setup.wallet_handle, setup.pool_handle));
+        let (_, _, _, _, _, _, _, _, rev_reg_id, cred_rev_id, _) = create_and_store_credential(
+            &profile,
+            &setup.institution_did,
+            crate::utils::constants::DEFAULT_SCHEMA_ATTRS,
+        )
+        .await;
 
         let rc = libindy_issuer_revoke_credential(
             setup.wallet_handle,
@@ -121,51 +82,8 @@ pub mod integration_tests {
             &rev_reg_id,
             &cred_rev_id,
         )
-            .await;
+        .await;
 
         assert!(rc.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_revoke_credential() {
-        let setup = SetupWalletPool::init().await;
-
-        let (_, _, _, _, _, _, _, _, rev_reg_id, cred_rev_id, _) =
-            create_and_store_credential(
-                setup.wallet_handle,
-                setup.pool_handle,
-                &setup.institution_did,
-                crate::utils::constants::DEFAULT_SCHEMA_ATTRS,
-            ).await;
-
-        let (_, first_rev_reg_delta, first_timestamp) =
-            get_rev_reg_delta_json(setup.pool_handle, &rev_reg_id, None, None).await.unwrap();
-
-        let (_, test_same_delta, test_same_timestamp) =
-            get_rev_reg_delta_json(setup.pool_handle, &rev_reg_id, None, None).await.unwrap();
-
-        assert_eq!(first_rev_reg_delta, test_same_delta);
-        assert_eq!(first_timestamp, test_same_timestamp);
-
-        revoke_credential_local(
-            setup.wallet_handle,
-            get_temp_dir_path(TAILS_DIR).to_str().unwrap(),
-            &rev_reg_id,
-            &cred_rev_id
-        )
-            .await
-            .unwrap();
-
-        publish_local_revocations(setup.wallet_handle, setup.pool_handle, &setup.institution_did, &rev_reg_id)
-            .await
-            .unwrap();
-
-        // Delta should change after revocation
-        let (_, second_rev_reg_delta, _) =
-            get_rev_reg_delta_json(setup.pool_handle, &rev_reg_id, Some(first_timestamp + 1), None)
-            .await
-            .unwrap();
-
-        assert_ne!(first_rev_reg_delta, second_rev_reg_delta);
     }
 }
