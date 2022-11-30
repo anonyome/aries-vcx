@@ -196,7 +196,7 @@ pub mod unit_tests {
                 .unwrap_err()
                 .kind(),
             VcxErrorKind::LibndyError(405)
-        ); // AnoncredsProofRejected
+        );  // AnoncredsProofRejected
 
         let mut proof_req_json: serde_json::Value = serde_json::from_str(&proof_req_json).unwrap();
         proof_req_json["requested_attributes"]["attribute_0"]["restrictions"] = json!({});
