@@ -12,7 +12,7 @@ mod integration_tests {
     use aries_vcx::handlers::proof_presentation::prover::Prover;
     use aries_vcx::messages::proof_presentation::presentation_request::PresentationRequest;
     use aries_vcx::utils::constants::{DEFAULT_SCHEMA_ATTRS, TAILS_DIR};
-    use aries_vcx::utils::devsetup::SetupProfile;
+    use aries_vcx::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
     use aries_vcx::utils::get_temp_dir_path;
     use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
     use aries_vcx::xyz::test_utils::{
@@ -25,8 +25,10 @@ mod integration_tests {
         // todo - use SetupProfile::run after modular impls
         SetupProfile::run_indy(|setup| async move {
 
-        create_and_store_nonrevocable_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
-        let (_, _, req, _) = create_indy_proof(&setup.profile, &setup.institution_did).await;
+        let holder_setup = init_holder_setup_in_indy_context(&setup).await;
+
+        create_and_store_nonrevocable_credential(&setup.profile, &holder_setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        let (_, _, req, _) = create_indy_proof(&setup.profile, &holder_setup.profile, &setup.institution_did).await;
 
         let pres_req_data: PresentationRequestData = serde_json::from_str(&req).unwrap();
         let proof_req = PresentationRequest::create()
@@ -34,7 +36,7 @@ mod integration_tests {
             .unwrap();
         let proof: Prover = Prover::create_from_request("1", proof_req).unwrap();
 
-        let retrieved_creds = proof.retrieve_credentials(&setup.profile).await.unwrap();
+        let retrieved_creds = proof.retrieve_credentials(&holder_setup.profile).await.unwrap();
         assert!(retrieved_creds.len() > 500);
         }).await;
     }
@@ -94,7 +96,7 @@ mod integration_tests {
     async fn test_case_for_proof_req_doesnt_matter_for_retrieve_creds() {
         // todo - use SetupProfile::run after modular impls
         SetupProfile::run_indy(|setup| async move {
-        create_and_store_nonrevocable_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        create_and_store_nonrevocable_credential(&setup.profile, &setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
 
         let mut req = json!({
            "nonce":"123432421212",
@@ -151,7 +153,7 @@ mod integration_tests {
         // todo - use SetupProfile::run after modular impls
         SetupProfile::run_indy(|setup| async move {
 
-        create_and_store_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        create_and_store_credential(&setup.profile, &setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
         let to = time::get_time().sec;
         let indy_proof_req = json!({
             "nonce": "123432421212",
@@ -257,7 +259,7 @@ mod integration_tests {
         // todo - use SetupProfile::run after modular impls
         SetupProfile::run_indy(|setup| async move {
 
-        create_and_store_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        create_and_store_credential(&setup.profile, &setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
         let to = time::get_time().sec;
         let indy_proof_req = json!({
             "nonce": "123432421212",

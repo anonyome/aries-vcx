@@ -125,16 +125,16 @@ pub async fn create_and_store_credential_def(
 }
 
 pub async fn create_credential_req(
-    profile: &Arc<dyn Profile>,
+    issuer: &Arc<dyn Profile>,  // FUTURE - issuer and holder seperation only needed whilst modular deps not fully implemented
+    holder: &Arc<dyn Profile>,
     did: &str,
     cred_def_id: &str,
     cred_def_json: &str,
 ) -> (String, String, String) {
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
 
-    let offer = anoncreds.issuer_create_credential_offer(cred_def_id).await.unwrap();
+    let offer = Arc::clone(issuer).inject_anoncreds().issuer_create_credential_offer(cred_def_id).await.unwrap();
     let master_secret_name = settings::DEFAULT_LINK_SECRET_ALIAS;
-    let (req, req_meta) = anoncreds
+    let (req, req_meta) = Arc::clone(holder).inject_anoncreds()
         .prover_create_credential_req(&did, &offer, cred_def_json, master_secret_name)
         .await
         .unwrap();
@@ -143,7 +143,8 @@ pub async fn create_credential_req(
 
 // todo: extract create_and_store_credential_def into caller functions
 pub async fn create_and_store_credential(
-    profile: &Arc<dyn Profile>,
+    issuer: &Arc<dyn Profile>, // FUTURE - issuer and holder seperation only needed whilst modular deps not fully implemented
+    holder: &Arc<dyn Profile>,
     institution_did: &str,
     attr_list: &str,
 ) -> (
@@ -160,19 +161,18 @@ pub async fn create_and_store_credential(
     String,
 ) {
     let (schema_id, schema_json, cred_def_id, cred_def_json, rev_reg_id, _, _) =
-        create_and_store_credential_def(profile, institution_did, attr_list).await;
+        create_and_store_credential_def(issuer, institution_did, attr_list).await;
 
-    let (offer, req, req_meta) = create_credential_req(profile, institution_did, &cred_def_id, &cred_def_json).await;
+    let (offer, req, req_meta) = create_credential_req(issuer, holder, institution_did, &cred_def_id, &cred_def_json).await;
 
     /* create cred */
     let credential_data = r#"{"address1": ["123 Main St"], "address2": ["Suite 3"], "city": ["Draper"], "state": ["UT"], "zip": ["84000"]}"#;
     let encoded_attributes = encode_attributes(&credential_data).unwrap();
-    let ledger = Arc::clone(profile).inject_ledger();
+    let ledger = Arc::clone(issuer).inject_ledger();
     let rev_def_json = ledger.get_rev_reg_def_json(&rev_reg_id).await.unwrap();
     let tails_file = get_temp_dir_path(TAILS_DIR).to_str().unwrap().to_string();
 
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
-    let (cred, cred_rev_id, _) = anoncreds
+    let (cred, cred_rev_id, _) = Arc::clone(issuer).inject_anoncreds()
         .issuer_create_credential(
             &offer,
             &req,
@@ -183,7 +183,7 @@ pub async fn create_and_store_credential(
         .await
         .unwrap();
     /* store cred */
-    let cred_id = anoncreds
+    let cred_id = Arc::clone(holder).inject_anoncreds()
         .prover_store_credential(None, &req_meta, &cred, &cred_def_json, Some(&rev_def_json))
         .await
         .unwrap();
@@ -204,27 +204,26 @@ pub async fn create_and_store_credential(
 
 // todo: extract create_and_store_nonrevocable_credential_def into caller functions
 pub async fn create_and_store_nonrevocable_credential(
-    profile: &Arc<dyn Profile>,
+    issuer: &Arc<dyn Profile>,  // FUTURE - issuer and holder seperation only needed whilst modular deps not fully implemented
+    holder: &Arc<dyn Profile>,
     issuer_did: &str,
     attr_list: &str,
 ) -> (String, String, String, String, String, String, String, String) {
     let (schema_id, schema_json, cred_def_id, cred_def_json, _) =
-        create_and_store_nonrevocable_credential_def(profile, issuer_did, attr_list).await;
+        create_and_store_nonrevocable_credential_def(issuer, issuer_did, attr_list).await;
 
-    let (offer, req, req_meta) = create_credential_req(profile, issuer_did, &cred_def_id, &cred_def_json).await;
+    let (offer, req, req_meta) = create_credential_req(issuer, holder, issuer_did, &cred_def_id, &cred_def_json).await;
 
     /* create cred */
     let credential_data = r#"{"address1": ["123 Main St"], "address2": ["Suite 3"], "city": ["Draper"], "state": ["UT"], "zip": ["84000"]}"#;
     let encoded_attributes = encode_attributes(&credential_data).unwrap();
 
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
-
-    let (cred, _, _) = anoncreds
+    let (cred, _, _) = Arc::clone(issuer).inject_anoncreds()
         .issuer_create_credential(&offer, &req, &encoded_attributes, None, None)
         .await
         .unwrap();
     /* store cred */
-    let cred_id = anoncreds
+    let cred_id =  Arc::clone(holder).inject_anoncreds()
         .prover_store_credential(None, &req_meta, &cred, &cred_def_json, None)
         .await
         .unwrap();
@@ -240,9 +239,10 @@ pub async fn create_and_store_nonrevocable_credential(
     )
 }
 
-pub async fn create_indy_proof(profile: &Arc<dyn Profile>, did: &str) -> (String, String, String, String) {
+ // FUTURE - issuer and holder seperation only needed whilst modular deps not fully implemented
+pub async fn create_indy_proof(issuer: &Arc<dyn Profile>, prover: &Arc<dyn Profile>, did: &str) -> (String, String, String, String) {
     let (schema_id, schema_json, cred_def_id, cred_def_json, _offer, _req, _req_meta, cred_id) =
-        create_and_store_nonrevocable_credential(profile, &did, DEFAULT_SCHEMA_ATTRS).await;
+        create_and_store_nonrevocable_credential(issuer, prover, &did, DEFAULT_SCHEMA_ATTRS).await;
     let proof_req = json!({
        "nonce":"123432421212",
        "name":"proof_req_1",
@@ -287,7 +287,7 @@ pub async fn create_indy_proof(profile: &Arc<dyn Profile>, did: &str) -> (String
     })
     .to_string();
 
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
+    let anoncreds = Arc::clone(prover).inject_anoncreds();
 
     anoncreds
         .prover_get_credentials_for_proof_req(&proof_req)
@@ -309,12 +309,13 @@ pub async fn create_indy_proof(profile: &Arc<dyn Profile>, did: &str) -> (String
 }
 
 pub async fn create_proof_with_predicate(
-    profile: &Arc<dyn Profile>,
+    issuer: &Arc<dyn Profile>,   // FUTURE - issuer and holder seperation only needed whilst modular deps not fully implemented
+    prover: &Arc<dyn Profile>,
     did: &str,
     include_predicate_cred: bool,
 ) -> (String, String, String, String) {
     let (schema_id, schema_json, cred_def_id, cred_def_json, _offer, _req, _req_meta, cred_id) =
-        create_and_store_nonrevocable_credential(profile, &did, DEFAULT_SCHEMA_ATTRS).await;
+        create_and_store_nonrevocable_credential(issuer, prover, &did, DEFAULT_SCHEMA_ATTRS).await;
 
     let proof_req = json!({
        "nonce":"123432421212",
@@ -375,7 +376,7 @@ pub async fn create_proof_with_predicate(
     })
     .to_string();
 
-    let anoncreds = Arc::clone(profile).inject_anoncreds();
+    let anoncreds = Arc::clone(prover).inject_anoncreds();
 
     anoncreds
         .prover_get_credentials_for_proof_req(&proof_req)

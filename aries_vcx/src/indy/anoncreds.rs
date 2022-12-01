@@ -88,6 +88,7 @@ pub mod integration_tests {
         let profile = indy_handles_to_profile(setup.wallet_handle, setup.pool_handle);
         let (_, _, _, _, _, _, _, _, rev_reg_id, cred_rev_id, _) = create_and_store_credential(
             &profile,
+            &profile,
             &setup.institution_did,
             crate::utils::constants::DEFAULT_SCHEMA_ATTRS,
         )

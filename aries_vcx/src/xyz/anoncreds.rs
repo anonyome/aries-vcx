@@ -5,7 +5,7 @@ pub mod integration_tests {
 
     use crate::error::VcxErrorKind;
     use crate::utils::constants::TAILS_DIR;
-    use crate::utils::devsetup::{SetupProfile};
+    use crate::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
     use crate::utils::get_temp_dir_path;
     use crate::xyz::test_utils::create_and_store_credential;
 
@@ -53,14 +53,17 @@ pub mod integration_tests {
     async fn test_revoke_credential() {
         SetupProfile::run_indy(|setup| async move {
 
+        let holder_setup = init_holder_setup_in_indy_context(&setup).await;
+
         let (_, _, _, _, _, _, _, _, rev_reg_id, cred_rev_id, _) = create_and_store_credential(
             &setup.profile,
+            &holder_setup.profile,
             &setup.institution_did,
             crate::utils::constants::DEFAULT_SCHEMA_ATTRS,
         )
         .await;
 
-        let ledger = Arc::clone(&setup.profile).inject_ledger();
+        let ledger = Arc::clone(&holder_setup.profile).inject_ledger();
 
         let (_, first_rev_reg_delta, first_timestamp) =
             ledger.get_rev_reg_delta_json(&rev_reg_id, None, None)

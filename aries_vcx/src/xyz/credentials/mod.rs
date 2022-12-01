@@ -49,21 +49,23 @@ mod integration_tests {
     use super::*;
 
     use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
-    use crate::utils::devsetup::SetupProfile;
+    use crate::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
     use crate::xyz::test_utils::create_and_store_credential;
 
     #[tokio::test]
     async fn test_prover_get_credential() {
         SetupProfile::run_indy(|setup| async move {
         
-        let res = create_and_store_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        let holder_setup = init_holder_setup_in_indy_context(&setup).await;
+        
+        let res = create_and_store_credential(&setup.profile, &holder_setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
         let schema_id = res.0;
         let cred_def_id = res.2;
         let cred_id = res.7;
         let rev_reg_id = res.8;
         let cred_rev_id = res.9;
 
-        let anoncreds = Arc::clone(&setup.profile).inject_anoncreds();
+        let anoncreds = Arc::clone(&holder_setup.profile).inject_anoncreds();
 
         let cred_json = anoncreds.prover_get_credential(&cred_id).await.unwrap();
         let prover_cred = serde_json::from_str::<ProverCredential>(&cred_json).unwrap();
@@ -79,11 +81,13 @@ mod integration_tests {
     async fn test_get_cred_rev_id() {
         SetupProfile::run_indy(|setup| async move {
 
-        let res = create_and_store_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        let holder_setup = init_holder_setup_in_indy_context(&setup).await;
+
+        let res = create_and_store_credential(&setup.profile, &holder_setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
         let cred_id = res.7;
         let cred_rev_id = res.9;
 
-        let cred_rev_id_ = get_cred_rev_id(&setup.profile, &cred_id).await.unwrap();
+        let cred_rev_id_ = get_cred_rev_id(&holder_setup.profile, &cred_id).await.unwrap();
 
         assert_eq!(cred_rev_id, cred_rev_id_.to_string());
         }).await;
@@ -93,12 +97,14 @@ mod integration_tests {
     async fn test_is_cred_revoked() {
         SetupProfile::run_indy(|setup| async move {
 
-        let res = create_and_store_credential(&setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
+        let holder_setup = init_holder_setup_in_indy_context(&setup).await;
+
+        let res = create_and_store_credential(&setup.profile, &holder_setup.profile, &setup.institution_did, DEFAULT_SCHEMA_ATTRS).await;
         let rev_reg_id = res.8;
         let cred_rev_id = res.9;
         let tails_file = res.10;
 
-        assert!(!is_cred_revoked(&setup.profile, &rev_reg_id, &cred_rev_id)
+        assert!(!is_cred_revoked(&holder_setup.profile, &rev_reg_id, &cred_rev_id)
             .await
             .unwrap());
 
@@ -115,7 +121,7 @@ mod integration_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(500));
 
-        assert!(is_cred_revoked(&setup.profile, &rev_reg_id, &cred_rev_id)
+        assert!(is_cred_revoked(&holder_setup.profile, &rev_reg_id, &cred_rev_id)
             .await
             .unwrap());
         }).await;

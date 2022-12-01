@@ -74,6 +74,7 @@ pub struct SetupWalletPool {
     pub pool_handle: PoolHandle,
 }
 
+#[derive(Clone)]
 pub struct SetupProfile {
     pub institution_did: String,
     pub profile: Arc<dyn Profile>,
@@ -362,8 +363,12 @@ impl SetupWalletPool {
 }
 
 impl SetupProfile {
-    async fn init() -> SetupProfile {
-        if cfg!(feature = "modular_dependencies") {
+    pub(self) fn should_run_modular() -> bool {
+        cfg!(feature = "modular_dependencies")
+    }
+
+    pub async fn init() -> SetupProfile {
+        if SetupProfile::should_run_modular() {
             info!("SetupProfile >> using modular profile");
             SetupProfile::init_modular().await
         } else {
@@ -457,6 +462,15 @@ impl SetupProfile {
 
         reset_global_state();
     }
+}
+
+// TODO - FUTURE - delete this method after `SetupProfile::run_indy` is removed. The purpose of this helper method
+// is to return a test profile for a prover/holder given an existing indy-based profile setup (i.e. returned by SetupProfile::run_indy)
+pub async fn init_holder_setup_in_indy_context(indy_issuer_setup: &SetupProfile) -> SetupProfile {
+    if SetupProfile::should_run_modular() {
+        return SetupProfile::init().await; // create a new modular profile
+    }
+    indy_issuer_setup.clone() // if indy runtime, just re-use the issuer setup
 }
 
 impl SetupInstitutionWallet {
