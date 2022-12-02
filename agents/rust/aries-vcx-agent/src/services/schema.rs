@@ -4,7 +4,7 @@ use crate::error::*;
 use crate::storage::Storage;
 use crate::storage::object_cache::ObjectCache;
 use aries_vcx::core::profile::profile::Profile;
-use aries_vcx::xyz::primitives::credential_schema::Schema;
+use aries_vcx::common::primitives::credential_schema::Schema;
 
 pub struct ServiceSchemas {
     profile: Arc<dyn Profile>,

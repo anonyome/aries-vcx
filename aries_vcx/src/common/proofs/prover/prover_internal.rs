@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use serde_json::Value;
 
-use crate::{error::prelude::*, xyz::proofs::{proof_request_internal::NonRevokedInterval, proof_request::ProofRequestData}, core::profile::profile::Profile};
+use crate::{error::prelude::*, common::proofs::{proof_request_internal::NonRevokedInterval, proof_request::ProofRequestData}, core::profile::profile::Profile};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct CredInfoProver {
@@ -181,7 +181,7 @@ pub async fn build_rev_states_json(profile: &Arc<dyn Profile>, credentials_ident
                     tails_file,
                     &rev_reg_def_json,
                     &rev_reg_delta_json,
-                    100, // TODO - should we use `timestamp` from above?
+                    timestamp,
                     cred_rev_id,
                 )
                 .await?;
@@ -268,7 +268,7 @@ pub mod pool_tests {
     use crate::utils::constants::{CRED_DEF_ID, CRED_REV_ID, LICENCE_CRED_ID, SCHEMA_ID, TAILS_DIR};
     use crate::utils::devsetup::{SetupProfile};
     use crate::utils::get_temp_dir_path;
-    use crate::xyz::proofs::prover::prover_internal::{build_rev_states_json, CredInfoProver};
+    use crate::common::proofs::prover::prover_internal::{build_rev_states_json, CredInfoProver};
 
     #[tokio::test]
     async fn test_build_rev_states_json_empty() {
@@ -311,7 +311,7 @@ pub mod unit_tests {
         },
         get_temp_dir_path,
     };
-    use crate::xyz::test_utils::{mock_profile, indy_handles_to_profile};
+    use crate::common::test_utils::{mock_profile, indy_handles_to_profile};
 
     use super::*;
 

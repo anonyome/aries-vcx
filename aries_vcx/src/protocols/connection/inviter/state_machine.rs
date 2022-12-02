@@ -6,7 +6,7 @@ use messages::did_doc::DidDoc;
 use crate::error::prelude::*;
 use crate::handlers::util::verify_thread_id;
 use crate::protocols::SendClosureConnection;
-use crate::xyz::signing::sign_connection_response;
+use crate::common::signing::sign_connection_response;
 use messages::a2a::protocol_registry::ProtocolRegistry;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::connection::invite::{Invitation, PairwiseInvitation};
@@ -346,7 +346,7 @@ pub mod unit_tests {
     use super::*;
 
     pub mod inviter {
-        use crate::xyz::test_utils::mock_profile;
+        use crate::common::test_utils::mock_profile;
 
         use super::*;
 

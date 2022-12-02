@@ -60,7 +60,7 @@ impl RevocationRegistryDelta {
 #[cfg(feature = "pool_tests")]
 pub mod integration_tests {
     use super::*;
-    use crate::{utils::devsetup::SetupProfile, xyz::test_utils::create_and_store_credential_def};
+    use crate::{utils::devsetup::SetupProfile, common::test_utils::create_and_store_credential_def};
 
     #[tokio::test]
     async fn test_create_rev_reg_delta_from_ledger() {

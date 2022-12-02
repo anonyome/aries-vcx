@@ -3,7 +3,7 @@ use std::sync::{Mutex, Arc};
 use crate::error::*;
 use crate::storage::Storage;
 use crate::storage::object_cache::ObjectCache;
-use aries_vcx::{xyz::primitives::credential_definition::{CredentialDef, CredentialDefConfig}, core::profile::profile::Profile};
+use aries_vcx::{common::primitives::credential_definition::{CredentialDef, CredentialDefConfig}, core::profile::profile::Profile};
 
 pub struct ServiceCredentialDefinitions {
     profile: Arc<dyn Profile>,

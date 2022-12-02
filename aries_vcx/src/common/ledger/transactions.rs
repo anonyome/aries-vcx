@@ -64,7 +64,7 @@ mod test {
     use messages::did_doc::test_utils::{_recipient_keys, _routing_keys, _service_endpoint};
     use messages::connection::invite::test_utils::_pairwise_invitation;
 
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

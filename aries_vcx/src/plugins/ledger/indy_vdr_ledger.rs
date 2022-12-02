@@ -26,7 +26,7 @@ use crate::global::settings;
 use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 use crate::utils::json::{AsTypeOrDeserializationError, TryGetIndex};
-use crate::xyz::primitives::revocation_registry::RevocationRegistryDefinition;
+use crate::common::primitives::revocation_registry::RevocationRegistryDefinition;
 
 use super::base_ledger::BaseLedger;
 
@@ -591,7 +591,7 @@ mod unit_tests {
     use crate::{
         error::{VcxErrorKind, VcxResult},
         plugins::ledger::{base_ledger::BaseLedger, indy_vdr_ledger::IndyVdrLedgerPool},
-        xyz::{primitives::revocation_registry::RevocationRegistryDefinition, test_utils::mock_profile},
+        common::{primitives::revocation_registry::RevocationRegistryDefinition, test_utils::mock_profile},
     };
 
     use super::IndyVdrLedger;

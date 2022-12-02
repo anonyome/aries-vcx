@@ -70,7 +70,7 @@ pub mod integration_tests {
     use crate::utils::constants::TAILS_DIR;
     use crate::utils::devsetup::SetupWalletPool;
     use crate::utils::get_temp_dir_path;
-    use crate::xyz::test_utils::{create_and_store_credential, indy_handles_to_profile};
+    use crate::common::test_utils::{create_and_store_credential, indy_handles_to_profile};
 
     #[tokio::test]
     async fn test_issuer_revoke_credential() {

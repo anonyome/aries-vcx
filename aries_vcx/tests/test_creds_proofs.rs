@@ -14,8 +14,8 @@ mod integration_tests {
     use aries_vcx::utils::constants::{DEFAULT_SCHEMA_ATTRS, TAILS_DIR};
     use aries_vcx::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
     use aries_vcx::utils::get_temp_dir_path;
-    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
-    use aries_vcx::xyz::test_utils::{
+    use aries_vcx::common::proofs::proof_request::PresentationRequestData;
+    use aries_vcx::common::test_utils::{
         create_and_store_credential, create_and_store_nonrevocable_credential,
         create_and_store_nonrevocable_credential_def, create_indy_proof,
     };
@@ -325,7 +325,7 @@ mod integration_tests {
 #[cfg(test)]
 #[cfg(feature = "agency_pool_tests")]
 mod tests {
-    use aries_vcx::xyz::test_utils::create_and_store_nonrevocable_credential_def;
+    use aries_vcx::common::test_utils::create_and_store_nonrevocable_credential_def;
     use serde_json::Value;
 
     use aries_vcx::handlers::issuance::holder::Holder;

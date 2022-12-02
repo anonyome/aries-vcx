@@ -9,7 +9,7 @@ use aries_vcx::messages::proof_presentation::presentation::Presentation;
 use aries_vcx::messages::proof_presentation::presentation_proposal::PresentationProposal;
 use aries_vcx::messages::status::Status;
 use aries_vcx::protocols::proof_presentation::verifier::state_machine::VerifierState;
-use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
+use aries_vcx::common::proofs::proof_request::PresentationRequestData;
 
 use super::connection::ServiceConnections;
 

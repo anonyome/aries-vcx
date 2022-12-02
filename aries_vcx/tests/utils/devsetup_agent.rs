@@ -51,11 +51,11 @@ pub mod test_utils {
     use aries_vcx::protocols::proof_presentation::verifier::state_machine::VerifierState;
     use aries_vcx::utils::devsetup::*;
     use aries_vcx::utils::provision::provision_cloud_agent;
-    use aries_vcx::xyz::ledger::transactions::into_did_doc;
-    use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
-    use aries_vcx::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
-    use aries_vcx::xyz::primitives::credential_schema::Schema;
-    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
+    use aries_vcx::common::ledger::transactions::into_did_doc;
+    use aries_vcx::common::primitives::credential_definition::CredentialDef;
+    use aries_vcx::common::primitives::credential_definition::CredentialDefConfigBuilder;
+    use aries_vcx::common::primitives::credential_schema::Schema;
+    use aries_vcx::common::proofs::proof_request::PresentationRequestData;
     use vdrtools::{PoolHandle, WalletHandle};
 
     #[derive(Debug)]

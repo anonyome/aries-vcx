@@ -42,7 +42,7 @@ pub mod protocols;
 
 pub mod core;
 pub mod plugins;
-pub mod xyz;
+pub mod common;
 
 #[cfg(test)]
 pub mod test {

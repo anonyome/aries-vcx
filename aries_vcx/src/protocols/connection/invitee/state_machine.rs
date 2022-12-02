@@ -12,7 +12,7 @@ use crate::protocols::connection::invitee::states::requested::RequestedState;
 use crate::protocols::connection::invitee::states::responded::RespondedState;
 use crate::protocols::connection::pairwise_info::PairwiseInfo;
 use crate::protocols::SendClosureConnection;
-use crate::xyz::signing::decode_signed_connection_response;
+use crate::common::signing::decode_signed_connection_response;
 use messages::a2a::protocol_registry::ProtocolRegistry;
 use messages::a2a::A2AMessage;
 use messages::ack::Ack;
@@ -396,8 +396,8 @@ pub mod unit_tests {
         use messages::connection::response::{Response, SignedResponse};
         use messages::did_doc::test_utils::{_did_doc_inlined_recipient_keys, _service_endpoint};
 
-        use crate::xyz::signing::sign_connection_response;
-        use crate::xyz::test_utils::mock_profile;
+        use crate::common::signing::sign_connection_response;
+        use crate::common::test_utils::mock_profile;
 
         use super::*;
 

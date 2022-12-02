@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::storage::Storage;
 use crate::storage::object_cache::ObjectCache;
 use aries_vcx::core::profile::profile::Profile;
-use aries_vcx::xyz::primitives::revocation_registry::RevocationRegistry;
+use aries_vcx::common::primitives::revocation_registry::RevocationRegistry;
 
 pub struct ServiceRevocationRegistries {
     profile: Arc<dyn Profile>,

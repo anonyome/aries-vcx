@@ -5,7 +5,7 @@ use serde_json;
 
 use aries_vcx::error::{VcxError, VcxErrorKind, VcxResult};
 use aries_vcx::vdrtools::{PoolHandle, WalletHandle};
-use aries_vcx::xyz::primitives::credential_schema::Schema;
+use aries_vcx::common::primitives::credential_schema::Schema;
 
 use crate::api_lib::api_handle::object_cache::ObjectCache;
 use crate::api_lib::global::profile::{get_main_profile, indy_handles_to_profile};
@@ -173,9 +173,9 @@ pub mod tests {
 
     use aries_vcx::global::settings;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::xyz::ledger::transactions::add_new_did;
+    use aries_vcx::common::ledger::transactions::add_new_did;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::xyz::test_utils::create_and_write_test_schema;
+    use aries_vcx::common::test_utils::create_and_write_test_schema;
     #[cfg(feature = "pool_tests")]
     use aries_vcx::utils::constants;
     use aries_vcx::utils::constants::SCHEMA_ID;

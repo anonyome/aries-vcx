@@ -9,7 +9,7 @@ use agency_client::agency_client::AgencyClient;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::mediated_connection::MediatedConnection;
-use crate::xyz::proofs::proof_request::PresentationRequestData;
+use crate::common::proofs::proof_request::PresentationRequestData;
 use crate::protocols::proof_presentation::verifier::messages::VerifierMessages;
 use crate::protocols::proof_presentation::verifier::state_machine::{VerifierSM, VerifierState};
 use crate::protocols::SendClosure;

@@ -7,7 +7,7 @@ pub mod integration_tests {
     use crate::utils::constants::TAILS_DIR;
     use crate::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
     use crate::utils::get_temp_dir_path;
-    use crate::xyz::test_utils::create_and_store_credential;
+    use crate::common::test_utils::create_and_store_credential;
 
     #[tokio::test]
     async fn tests_returns_error_if_proof_request_is_malformed() {

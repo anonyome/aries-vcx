@@ -1,6 +1,6 @@
 use std::ptr;
 
-use aries_vcx::xyz::signing::unpack_message_to_string;
+use aries_vcx::common::signing::unpack_message_to_string;
 use aries_vcx::messages::connection::did::Did;
 use aries_vcx::messages::did_doc::service_aries::AriesService;
 use aries_vcx::protocols::connection::pairwise_info::PairwiseInfo;
@@ -474,7 +474,7 @@ pub extern "C" fn vcx_rotate_verkey(
     };
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(Box::pin(async move {
-        match aries_vcx::xyz::keys::rotate_verkey(&profile, &did).await {
+        match aries_vcx::common::keys::rotate_verkey(&profile, &did).await {
             Ok(()) => {
                 trace!(
                     "vcx_rotate_verkey_cb(command_handle: {}, rc: {})",
@@ -566,7 +566,7 @@ pub extern "C" fn vcx_rotate_verkey_apply(
     };
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(Box::pin(async move {
-        match aries_vcx::xyz::keys::rotate_verkey_apply(&profile, &did, &temp_vk).await {
+        match aries_vcx::common::keys::rotate_verkey_apply(&profile, &did, &temp_vk).await {
             Ok(()) => {
                 trace!(
                     "vcx_rotate_verkey_apply_cb(command_handle: {}, rc: {})",
@@ -658,7 +658,7 @@ pub extern "C" fn vcx_get_verkey_from_ledger(
     };
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(Box::pin(async move {
-        match aries_vcx::xyz::keys::get_verkey_from_ledger(&profile, &did).await {
+        match aries_vcx::common::keys::get_verkey_from_ledger(&profile, &did).await {
             Ok(verkey) => {
                 trace!(
                     "vcx_get_verkey_from_ledger_cb(command_handle: {}, rc: {}, verkey: {})",

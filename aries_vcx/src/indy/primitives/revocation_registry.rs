@@ -12,7 +12,7 @@ use crate::indy::ledger::transactions::{
     check_response, sign_and_submit_to_ledger,
 };
 use crate::indy::wallet_non_secrets::{clear_rev_reg_delta, get_rev_reg_delta, set_rev_reg_delta};
-use crate::xyz::primitives::revocation_registry::RevocationRegistryDefinition;
+use crate::common::primitives::revocation_registry::RevocationRegistryDefinition;
 use crate::utils::parse_and_validate;
 
 pub const BLOB_STORAGE_TYPE: &str = "default";

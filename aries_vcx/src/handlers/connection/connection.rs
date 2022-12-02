@@ -352,9 +352,9 @@ pub mod test_utils {
 #[cfg(test)]
 #[cfg(feature = "general_test")]
 mod unit_tests {
-    use crate::xyz::ledger::transactions::into_did_doc;
+    use crate::common::ledger::transactions::into_did_doc;
     use crate::utils::devsetup::{SetupMocks, SetupInstitutionWallet};
-    use crate::xyz::test_utils::{mock_profile, indy_handles_to_profile};
+    use crate::common::test_utils::{mock_profile, indy_handles_to_profile};
 
     use async_channel::bounded;
     use messages::basic_message::message::BasicMessage;

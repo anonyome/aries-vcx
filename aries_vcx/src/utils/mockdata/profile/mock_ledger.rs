@@ -11,7 +11,7 @@ use crate::{
             rev_def_json, CRED_DEF_JSON, REV_REG_DELTA_JSON, REV_REG_ID, REV_REG_JSON, SCHEMA_JSON, SCHEMA_TXN,
         },
     },
-    xyz::primitives::revocation_registry::RevocationRegistryDefinition,
+    common::primitives::revocation_registry::RevocationRegistryDefinition,
 };
 
 #[derive(Debug)]

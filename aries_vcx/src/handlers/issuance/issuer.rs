@@ -322,7 +322,7 @@ pub mod unit_tests {
     use messages::issuance::credential_request::test_utils::_credential_request;
     use crate::protocols::issuance::issuer::state_machine::unit_tests::_send_message;
     use crate::utils::devsetup::SetupMocks;
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

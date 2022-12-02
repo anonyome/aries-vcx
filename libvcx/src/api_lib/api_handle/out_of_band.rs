@@ -8,7 +8,7 @@ use aries_vcx::messages::connection::did::Did;
 use aries_vcx::messages::connection::invite::Invitation;
 use aries_vcx::messages::did_doc::service_resolvable::ServiceResolvable;
 use aries_vcx::messages::out_of_band::{GoalCode, HandshakeProtocol};
-use aries_vcx::xyz::ledger::transactions::into_did_doc;
+use aries_vcx::common::ledger::transactions::into_did_doc;
 
 use crate::api_lib::api_handle::mediated_connection::CONNECTION_MAP;
 use crate::api_lib::api_handle::object_cache::ObjectCache;

@@ -6,7 +6,7 @@ use crate::core::profile::profile::Profile;
 
 use crate::error::prelude::*;
 use crate::global::settings;
-use crate::xyz::credentials::{get_cred_rev_id, is_cred_revoked};
+use crate::common::credentials::{get_cred_rev_id, is_cred_revoked};
 use messages::a2a::{A2AMessage, MessageId};
 use messages::ack::Ack;
 use messages::issuance::credential::Credential;
@@ -613,7 +613,7 @@ mod test {
     use crate::test::source_id;
     use crate::utils::constants;
     use crate::utils::devsetup::SetupMocks;
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

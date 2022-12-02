@@ -10,7 +10,7 @@ use aries_vcx::messages::issuance::credential_offer::CredentialOffer;
 use aries_vcx::messages::issuance::credential_proposal::CredentialProposal;
 use aries_vcx::messages::proof_presentation::presentation_proposal::PresentationProposal;
 use aries_vcx::plugins::wallet::agency_client_wallet::ToBaseAgencyClientWallet;
-use aries_vcx::xyz::ledger::transactions::into_did_doc;
+use aries_vcx::common::ledger::transactions::into_did_doc;
 use aries_vcx::{
     agency_client::{agency_client::AgencyClient, configuration::AgencyClientConfig},
     handlers::connection::mediated_connection::{ConnectionState, MediatedConnection},

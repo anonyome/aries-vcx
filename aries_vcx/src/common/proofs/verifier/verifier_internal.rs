@@ -215,7 +215,7 @@ pub async fn build_rev_reg_json(profile: &Arc<dyn Profile>, credential_data: &Ve
 pub mod unit_tests {
     use crate::utils::constants::*;
     use crate::utils::devsetup::*;
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

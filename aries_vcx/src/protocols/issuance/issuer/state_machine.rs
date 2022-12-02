@@ -7,8 +7,8 @@ use messages::problem_report::ProblemReport;
 use crate::core::profile::profile::Profile;
 
 use crate::error::{VcxError, VcxErrorKind, VcxResult};
-use crate::xyz::credentials::encoding::encode_attributes;
-use crate::xyz::credentials::is_cred_revoked;
+use crate::common::credentials::encoding::encode_attributes;
+use crate::common::credentials::is_cred_revoked;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::issuance::credential::Credential;
 use messages::issuance::credential_offer::{CredentialOffer, OfferInfo};
@@ -553,7 +553,7 @@ pub mod unit_tests {
     use crate::test::source_id;
     use crate::utils::constants::LIBINDY_CRED_OFFER;
     use crate::utils::devsetup::SetupMocks;
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

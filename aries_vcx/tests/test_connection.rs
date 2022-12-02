@@ -19,7 +19,7 @@ mod integration_tests {
     use aries_vcx::protocols::connection::invitee::state_machine::InviteeState;
     use aries_vcx::utils::devsetup::*;
     use aries_vcx::utils::mockdata::mockdata_proof::REQUESTED_ATTRIBUTES;
-    use aries_vcx::xyz::ledger::transactions::into_did_doc;
+    use aries_vcx::common::ledger::transactions::into_did_doc;
 
     use crate::utils::devsetup_agent::test_utils::{Faber, create_test_alice_instance};
     use crate::utils::scenarios::test_utils::{

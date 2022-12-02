@@ -201,7 +201,7 @@ pub mod unit_tests {
     use messages::ack::test_utils::_ack;
     use crate::indy::utils::test_setup;
     use crate::utils::devsetup::SetupEmpty;
-    use crate::xyz::test_utils::{create_trustee_key, indy_handles_to_profile, create_key};
+    use crate::common::test_utils::{create_trustee_key, indy_handles_to_profile, create_key};
 
     use super::*;
 

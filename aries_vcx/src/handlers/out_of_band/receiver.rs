@@ -6,7 +6,7 @@ use agency_client::agency_client::AgencyClient;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::mediated_connection::MediatedConnection;
-use crate::xyz::ledger::transactions::resolve_service;
+use crate::common::ledger::transactions::resolve_service;
 use messages::a2a::A2AMessage;
 use messages::attachment::AttachmentId;
 use messages::connection::invite::Invitation;

@@ -10,10 +10,10 @@ use crate::global::settings;
 use crate::utils::constants::{DEFAULT_SCHEMA_ATTRS, TAILS_DIR, TEST_TAILS_URL, TRUSTEE_SEED};
 use crate::utils::get_temp_dir_path;
 use crate::utils::mockdata::profile::mock_profile::MockProfile;
-use crate::xyz::credentials::encoding::encode_attributes;
-use crate::xyz::primitives::credential_definition::CredentialDef;
-use crate::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
-use crate::xyz::primitives::revocation_registry::RevocationRegistry;
+use crate::common::credentials::encoding::encode_attributes;
+use crate::common::primitives::credential_definition::CredentialDef;
+use crate::common::primitives::credential_definition::CredentialDefConfigBuilder;
+use crate::common::primitives::revocation_registry::RevocationRegistry;
 
 pub async fn create_schema(profile: &Arc<dyn Profile>, attr_list: &str, submitter_did: &str) -> (String, String) {
     let data = attr_list.to_string();

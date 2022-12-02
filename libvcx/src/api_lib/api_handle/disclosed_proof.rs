@@ -312,7 +312,7 @@ mod tests {
     use aries_vcx::utils::mockdata::mockdata_proof;
     use aries_vcx::utils::mockdata::mockdata_proof::{ARIES_PROOF_PRESENTATION_ACK, ARIES_PROOF_REQUEST_PRESENTATION};
 
-    use crate::aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
+    use crate::aries_vcx::common::proofs::proof_request::PresentationRequestData;
     use crate::aries_vcx::protocols::proof_presentation::prover::state_machine::ProverState;
 
     use super::*;

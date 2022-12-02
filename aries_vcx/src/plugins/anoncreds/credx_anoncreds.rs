@@ -799,7 +799,7 @@ mod unit_tests {
     use crate::{
         error::{VcxErrorKind, VcxResult},
         plugins::anoncreds::base_anoncreds::BaseAnonCreds,
-        xyz::test_utils::mock_profile,
+        common::test_utils::mock_profile,
     };
 
     use super::IndyCredxAnonCreds;

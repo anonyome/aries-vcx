@@ -111,7 +111,7 @@ pub mod unit_tests {
     use messages::connection::response::test_utils::{_did, _response, _thread_id};
     use crate::indy::utils::test_setup::with_wallet;
     use crate::utils::devsetup::SetupEmpty;
-    use crate::xyz::test_utils::{create_trustee_key, indy_handles_to_profile};
+    use crate::common::test_utils::{create_trustee_key, indy_handles_to_profile};
 
     use super::*;
 

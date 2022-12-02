@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::utils::mockdata::mock_settings::get_mock_result_for_validate_indy_proof;
-use crate::xyz::proofs::verifier::verifier_internal::{
+use crate::common::proofs::verifier::verifier_internal::{
     build_cred_defs_json_verifier, build_rev_reg_defs_json, build_rev_reg_json, build_schemas_json_verifier,
     get_credential_info, validate_proof_revealed_attributes,
 };
@@ -58,8 +58,8 @@ pub async fn validate_indy_proof(
 pub mod unit_tests {
     use crate::utils;
     use crate::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
-    use crate::xyz::proofs::proof_request::ProofRequestData;
-    use crate::xyz::test_utils::create_and_store_nonrevocable_credential;
+    use crate::common::proofs::proof_request::ProofRequestData;
+    use crate::common::test_utils::create_and_store_nonrevocable_credential;
 
     use super::*;
 
@@ -327,7 +327,7 @@ pub mod integration_tests {
     use std::sync::Arc;
 
     use crate::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
-    use crate::xyz::test_utils::{create_indy_proof, create_proof_with_predicate};
+    use crate::common::test_utils::{create_indy_proof, create_proof_with_predicate};
 
     #[tokio::test]
     async fn test_prover_verify_proof() {

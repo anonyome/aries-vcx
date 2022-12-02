@@ -1080,7 +1080,7 @@ mod tests {
         CONNECTION_SM_INVITEE_COMPLETED, CONNECTION_SM_INVITEE_INVITED, CONNECTION_SM_INVITEE_REQUESTED,
         CONNECTION_SM_INVITER_COMPLETED,
     };
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
     use messages::connection::invite::test_utils::{
         _pairwise_invitation, _pairwise_invitation_random_id, _public_invitation, _public_invitation_random_id,
     };

@@ -1,7 +1,7 @@
 use aries_vcx::error::{VcxError, VcxErrorKind, VcxResult};
-use aries_vcx::xyz::primitives::credential_definition::PublicEntityStateType;
-use aries_vcx::xyz::primitives::credential_definition::CredentialDefConfigBuilder;
-use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
+use aries_vcx::common::primitives::credential_definition::PublicEntityStateType;
+use aries_vcx::common::primitives::credential_definition::CredentialDefConfigBuilder;
+use aries_vcx::common::primitives::credential_definition::CredentialDef;
 
 use crate::api_lib::api_handle::object_cache::ObjectCache;
 use crate::api_lib::global::profile::get_main_profile;
@@ -99,9 +99,9 @@ pub mod tests {
 
     use aries_vcx::global::settings;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::xyz::primitives::credential_definition::RevocationDetailsBuilder;
+    use aries_vcx::common::primitives::credential_definition::RevocationDetailsBuilder;
     #[cfg(feature = "pool_tests")]
-    use aries_vcx::xyz::test_utils::create_and_write_test_schema;
+    use aries_vcx::common::test_utils::create_and_write_test_schema;
     #[cfg(feature = "pool_tests")]
     use aries_vcx::utils;
     use aries_vcx::utils::devsetup::SetupMocks;

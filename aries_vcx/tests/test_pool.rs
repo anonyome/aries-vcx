@@ -12,9 +12,9 @@ mod integration_tests {
     use aries_vcx::messages::did_doc::service_aries::AriesService;
     use aries_vcx::utils::constants::{DEFAULT_SCHEMA_ATTRS, SCHEMA_DATA};
     use aries_vcx::utils::devsetup::{SetupWalletPool, SetupProfile};
-    use aries_vcx::xyz::keys::{get_verkey_from_ledger, rotate_verkey};
-    use aries_vcx::xyz::ledger::transactions::add_new_did;
-    use aries_vcx::xyz::test_utils::create_and_store_nonrevocable_credential_def;
+    use aries_vcx::common::keys::{get_verkey_from_ledger, rotate_verkey};
+    use aries_vcx::common::ledger::transactions::add_new_did;
+    use aries_vcx::common::test_utils::create_and_store_nonrevocable_credential_def;
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;

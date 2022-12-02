@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
-use crate::xyz::proofs::proof_request::PresentationRequestData;
+use crate::common::proofs::proof_request::PresentationRequestData;
 use messages::a2a::{A2AMessage, MessageId};
 use messages::problem_report::ProblemReport;
 use messages::proof_presentation::presentation::Presentation;
@@ -471,8 +471,8 @@ pub mod unit_tests {
     use messages::proof_presentation::test_utils::{_ack, _problem_report};
     use crate::test::source_id;
     use crate::utils::devsetup::{SetupEmpty, SetupMocks};
-    use crate::xyz::proofs::proof_request::test_utils::_presentation_request_data;
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::proofs::proof_request::test_utils::_presentation_request_data;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

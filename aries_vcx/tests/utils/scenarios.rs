@@ -5,7 +5,7 @@ pub mod test_utils {
     use std::time::Duration;
 
     use aries_vcx::core::profile::profile::Profile;
-    use aries_vcx::xyz::test_utils::create_and_store_credential_def;
+    use aries_vcx::common::test_utils::create_and_store_credential_def;
     use serde_json::{json, Value};
 
     use aries_vcx::handlers::connection::mediated_connection::{MediatedConnection, ConnectionState};
@@ -31,11 +31,11 @@ pub mod test_utils {
     use aries_vcx::utils::constants::{DEFAULT_PROOF_NAME, TAILS_DIR, TEST_TAILS_URL};
     use aries_vcx::utils::filters::{filter_credential_offers_by_comment, filter_proof_requests_by_name};
     use aries_vcx::utils::get_temp_dir_path;
-    use aries_vcx::xyz::ledger::transactions::into_did_doc;
-    use aries_vcx::xyz::primitives::credential_definition::CredentialDef;
-    use aries_vcx::xyz::primitives::revocation_registry::RevocationRegistry;
-    use aries_vcx::xyz::proofs::proof_request::PresentationRequestData;
-    use aries_vcx::xyz::proofs::proof_request_internal::AttrInfo;
+    use aries_vcx::common::ledger::transactions::into_did_doc;
+    use aries_vcx::common::primitives::credential_definition::CredentialDef;
+    use aries_vcx::common::primitives::revocation_registry::RevocationRegistry;
+    use aries_vcx::common::proofs::proof_request::PresentationRequestData;
+    use aries_vcx::common::proofs::proof_request_internal::AttrInfo;
 
     use crate::utils::devsetup_agent::test_utils::{Alice, Faber};
     use crate::utils::test_macros::ProofStateType;

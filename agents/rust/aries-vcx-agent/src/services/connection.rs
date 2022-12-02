@@ -10,7 +10,7 @@ use aries_vcx::messages::ack::Ack;
 use aries_vcx::messages::connection::invite::Invitation;
 use aries_vcx::messages::connection::request::Request;
 use aries_vcx::messages::connection::response::SignedResponse;
-use aries_vcx::xyz::ledger::transactions::into_did_doc;
+use aries_vcx::common::ledger::transactions::into_did_doc;
 
 pub type ServiceEndpoint = String;
 

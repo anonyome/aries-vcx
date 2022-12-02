@@ -50,7 +50,7 @@ mod integration_tests {
 
     use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
     use crate::utils::devsetup::{SetupProfile, init_holder_setup_in_indy_context};
-    use crate::xyz::test_utils::create_and_store_credential;
+    use crate::common::test_utils::create_and_store_credential;
 
     #[tokio::test]
     async fn test_prover_get_credential() {

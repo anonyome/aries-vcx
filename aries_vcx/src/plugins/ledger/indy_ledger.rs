@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::core::profile::indy_profile::IndySdkProfile;
 
 use crate::indy;
-use crate::xyz::primitives::revocation_registry::RevocationRegistryDefinition;
+use crate::common::primitives::revocation_registry::RevocationRegistryDefinition;
 use crate::{error::VcxResult, messages::connection::did::Did, messages::did_doc::service_aries::AriesService};
 
 use super::base_ledger::BaseLedger;

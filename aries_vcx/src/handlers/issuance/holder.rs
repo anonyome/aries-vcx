@@ -10,7 +10,7 @@ use crate::core::profile::profile::Profile;
 use crate::error::prelude::*;
 use crate::handlers::connection::mediated_connection::MediatedConnection;
 use crate::handlers::revocation_notification::receiver::RevocationNotificationReceiver;
-use crate::xyz::credentials::get_cred_rev_id;
+use crate::common::credentials::get_cred_rev_id;
 use messages::a2a::A2AMessage;
 use messages::issuance::credential_offer::CredentialOffer;
 use messages::issuance::credential_proposal::CredentialProposalData;
@@ -246,7 +246,7 @@ pub mod unit_tests {
     use messages::issuance::credential_proposal::test_utils::_credential_proposal_data;
     use messages::issuance::credential_request::test_utils::_my_pw_did;
     use crate::utils::devsetup::SetupMocks;
-    use crate::xyz::test_utils::mock_profile;
+    use crate::common::test_utils::mock_profile;
 
     use super::*;
 

@@ -253,7 +253,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests {
     use messages::proof_presentation::presentation_request::PresentationRequest;
-    use crate::{utils::devsetup::*, xyz::test_utils::indy_handles_to_profile};
+    use crate::{utils::devsetup::*, common::test_utils::indy_handles_to_profile};
 
     use super::*;
 
