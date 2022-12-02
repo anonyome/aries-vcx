@@ -1,5 +1,6 @@
 use std::ptr;
 
+use aries_vcx::common::ledger::transactions::{write_endpoint_legacy, get_service};
 use aries_vcx::common::signing::unpack_message_to_string;
 use aries_vcx::messages::connection::did::Did;
 use aries_vcx::messages::did_doc::service_aries::AriesService;
@@ -889,8 +890,7 @@ pub extern "C" fn vcx_create_service(
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(
         async move {
-            let ledger = profile.inject_ledger();
-            match ledger.add_service(&institution_did, &service).await {
+            match write_endpoint_legacy(&profile, &institution_did, &service).await {
                 Ok(_res) => {
                     trace!(
                         "vcx_create_service(command_handle: {}, rc: {})",
@@ -946,8 +946,7 @@ pub extern "C" fn vcx_get_service_from_ledger(
 
     execute_async::<BoxFuture<'static, Result<(), ()>>>(
         async move {
-            let ledger = profile.inject_ledger();
-            match ledger.get_service(&institution_did).await {
+            match get_service(&profile, &institution_did).await {
                 Ok(service) => {
                     trace!(
                         "vcx_get_service_from_ledger_cb(command_handle: {}, rc: {})",

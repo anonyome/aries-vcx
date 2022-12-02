@@ -4,9 +4,9 @@ use async_trait::async_trait;
 
 use crate::core::profile::indy_profile::IndySdkProfile;
 
-use crate::indy;
 use crate::common::primitives::revocation_registry::RevocationRegistryDefinition;
-use crate::{error::VcxResult, messages::connection::did::Did, messages::did_doc::service_aries::AriesService};
+use crate::indy;
+use crate::error::VcxResult;
 
 use super::base_ledger::BaseLedger;
 
@@ -37,11 +37,18 @@ impl BaseLedger for IndySdkLedger {
     }
 
     async fn endorse_transaction(&self, endorser_did: &str, request_json: &str) -> VcxResult<()> {
-        indy::ledger::transactions::endorse_transaction(self.profile.indy_wallet_handle, self.profile.indy_pool_handle, endorser_did, request_json).await
+        indy::ledger::transactions::endorse_transaction(
+            self.profile.indy_wallet_handle,
+            self.profile.indy_pool_handle,
+            endorser_did,
+            request_json,
+        )
+        .await
     }
 
     async fn set_endorser(&self, submitter_did: &str, request_json: &str, endorser: &str) -> VcxResult<String> {
-        indy::ledger::transactions::set_endorser(self.profile.indy_wallet_handle, submitter_did, request_json, endorser).await
+        indy::ledger::transactions::set_endorser(self.profile.indy_wallet_handle, submitter_did, request_json, endorser)
+            .await
     }
 
     async fn get_txn_author_agreement(&self) -> VcxResult<String> {
@@ -103,19 +110,20 @@ impl BaseLedger for IndySdkLedger {
             self.profile.indy_pool_handle,
             cred_def_id,
         )
-        .await.map(|(_id, json)| json)
+        .await
+        .map(|(_id, json)| json)
     }
 
-    async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
-        indy::ledger::transactions::get_service(self.profile.indy_pool_handle, did).await
+    async fn get_attr(&self, target_did: &str, attr_name: &str) -> VcxResult<String> {
+        indy::ledger::transactions::get_attr(self.profile.indy_pool_handle, target_did, attr_name).await
     }
 
-    async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String> {
-        indy::ledger::transactions::add_service(
+    async fn add_attr(&self, target_did: &str, attrib_json: &str) -> VcxResult<String> {
+        indy::ledger::transactions::add_attr(
             self.profile.indy_wallet_handle,
             self.profile.indy_pool_handle,
-            did,
-            service,
+            target_did,
+            attrib_json,
         )
         .await
     }

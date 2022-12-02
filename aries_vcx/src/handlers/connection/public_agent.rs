@@ -10,6 +10,7 @@ use agency_client::agency_client::AgencyClient;
 use messages::did_doc::service_aries::AriesService;
 use crate::error::prelude::*;
 use crate::handlers::connection::cloud_agent::CloudAgentInfo;
+use crate::common::ledger::transactions::write_endpoint_legacy;
 use messages::a2a::A2AMessage;
 use messages::connection::did::Did;
 use messages::connection::request::Request;
@@ -38,9 +39,7 @@ impl PublicAgent {
             .set_service_endpoint(agency_client.get_agency_url_full())
             .set_recipient_keys(vec![pairwise_info.pw_vk.clone()])
             .set_routing_keys(agent_info.routing_keys(agency_client)?);
-
-        Arc::clone(profile).inject_ledger().add_service(institution_did, &service).await?;
-        
+        write_endpoint_legacy(profile, institution_did, &service).await?;
         let institution_did = Did::new(institution_did)?;
         let source_id = String::from(source_id);
         Ok(Self {

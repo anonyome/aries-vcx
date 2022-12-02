@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    error::VcxResult, messages::connection::did::Did, messages::did_doc::service_aries::AriesService,
+    error::VcxResult,
     common::primitives::revocation_registry::RevocationRegistryDefinition,
 };
 
@@ -48,15 +48,15 @@ pub trait BaseLedger: Send + Sync {
     // TO CONSIDER - do we need to return the schema ID in a tuple? is it ever different to the input?
     async fn get_schema(&self, schema_id: &str, submitter_did: Option<&str>) -> VcxResult<String>;
 
-
     // if submitter_did provided, try use cache
     // TO CONSIDER - do we need to return the cred def ID in a tuple? is it ever different to the input?
     async fn get_cred_def(&self, cred_def_id: &str, submitter_did: Option<&str>) -> VcxResult<String>;
 
-    async fn get_service(&self, did: &Did) -> VcxResult<AriesService>;
+    // returns request result as JSON
+    async fn get_attr(&self, target_did: &str, attr_name: &str) -> VcxResult<String>;
 
     // returns request result as JSON
-    async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String>;
+    async fn add_attr(&self, target_did: &str, attrib_json: &str) -> VcxResult<String>;
 
     // # Returns
     // Revocation Registry Definition Id and Revocation Registry Definition json.

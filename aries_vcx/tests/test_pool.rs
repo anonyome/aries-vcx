@@ -6,18 +6,19 @@ extern crate serde_json;
 pub mod utils;
 
 #[cfg(test)]
-#[cfg(feature = "pool_test")]
+#[cfg(feature = "pool_tests")]
 mod integration_tests {
     use aries_vcx::messages::connection::did::Did;
     use aries_vcx::messages::did_doc::service_aries::AriesService;
     use aries_vcx::utils::constants::{DEFAULT_SCHEMA_ATTRS, SCHEMA_DATA};
     use aries_vcx::utils::devsetup::{SetupWalletPool, SetupProfile};
     use aries_vcx::common::keys::{get_verkey_from_ledger, rotate_verkey};
-    use aries_vcx::common::ledger::transactions::add_new_did;
+    use aries_vcx::common::ledger::transactions::{add_new_did, write_endpoint_legacy, write_endpoint, get_service, clear_attr};
     use aries_vcx::common::test_utils::create_and_store_nonrevocable_credential_def;
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+    use messages::did_doc::service_aries_public::EndpointDidSov;
 
     #[tokio::test]
     async fn test_open_close_pool() {
@@ -78,15 +79,37 @@ mod integration_tests {
     #[tokio::test]
     async fn test_add_get_service() {
         SetupProfile::run(|setup| async move {
-        let ledger = Arc::clone(&setup.profile).inject_ledger();
         let did = setup.institution_did.clone();
         let expect_service = AriesService::default();
-
-        ledger.add_service(&did, &expect_service).await.unwrap();
+        write_endpoint_legacy(&setup.profile, &did, &expect_service).await.unwrap();
         thread::sleep(Duration::from_millis(50));
-        let service = ledger.get_service(&Did::new(&did).unwrap()).await.unwrap();
+        let service = get_service(&setup.profile, &Did::new(&did).unwrap()).await.unwrap();
+        assert_eq!(expect_service, service);
 
-        assert_eq!(expect_service, service)
+        // clean up written legacy service
+        clear_attr(&setup.profile, &setup.institution_did, "service").await.unwrap();
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn test_add_get_service_public() {
+        SetupProfile::run(|setup| async move {
+            let did = setup.institution_did.clone();
+            let create_service = EndpointDidSov::create()
+                .set_service_endpoint("https://example.org".into())
+                .set_routing_keys(Some(vec!["did:sov:456".into()]));
+            write_endpoint(&setup.profile, &did, &create_service).await.unwrap();
+            thread::sleep(Duration::from_millis(50));
+            let service = get_service(&setup.profile, &Did::new(&did).unwrap()).await.unwrap();
+            let expect_recipient_key = get_verkey_from_ledger(&setup.profile, &setup.institution_did).await.unwrap();
+            let expect_service = AriesService::default()
+                .set_service_endpoint("https://example.org".into())
+                .set_recipient_keys(vec![expect_recipient_key])
+                .set_routing_keys(vec!["did:sov:456".into()]);
+            assert_eq!(expect_service, service);
+            
+            // clean up written endpoint
+            clear_attr(&setup.profile, &setup.institution_did, "endpoint").await.unwrap();
         }).await;
     }
 }

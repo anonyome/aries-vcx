@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use messages::{connection::did::Did, did_doc::service_aries::AriesService};
 
 use crate::{
     error::{VcxError, VcxErrorKind, VcxResult},
@@ -79,11 +78,11 @@ impl BaseLedger for MockLedger {
         Ok(CRED_DEF_JSON.to_string())
     }
 
-    async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
-        Ok(AriesService::default())
+    async fn get_attr(&self, target_did: &str, attr_name: &str) -> VcxResult<String> {
+        Ok(r#"{"rc":"success"}"#.to_string())
     }
 
-    async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String> {
+    async fn add_attr(&self, target_did: &str, attrib_json: &str) -> VcxResult<String> {
         Ok(r#"{"rc":"success"}"#.to_string())
     }
 

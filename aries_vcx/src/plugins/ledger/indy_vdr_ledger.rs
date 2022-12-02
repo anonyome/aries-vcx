@@ -1,5 +1,4 @@
 use indy_vdr as vdr;
-use messages::did_doc::service_aries::AriesService;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -23,7 +22,6 @@ use crate::core::profile::profile::Profile;
 use crate::error::VcxResult;
 use crate::error::{VcxError, VcxErrorKind};
 use crate::global::settings;
-use crate::messages::connection::did::Did;
 use crate::utils::author_agreement::get_txn_author_agreement;
 use crate::utils::json::{AsTypeOrDeserializationError, TryGetIndex};
 use crate::common::primitives::revocation_registry::RevocationRegistryDefinition;
@@ -356,33 +354,17 @@ impl BaseLedger for IndyVdrLedger {
         Ok(cred_def_json)
     }
 
-    async fn get_service(&self, did: &Did) -> VcxResult<AriesService> {
-        let request = self._build_get_attr_request(None, &did.to_string(), "service").await?;
+    async fn get_attr(&self, target_did: &str, attr_name: &str) -> VcxResult<String> {
+        let request = self._build_get_attr_request(None, target_did, attr_name).await?;
 
-        let response = self._submit_request(request).await?;
-
-        let mut data = _get_response_json_data_field(&response)?;
-
-        // convert `data` from JSON string to JSON Value if necessary
-        if let Some(data_str) = data.as_str() {
-            data = serde_json::from_str(data_str)?;
-        }
-        let service = (&data).try_get("service")?;
-
-        serde_json::from_value(service.to_owned()).map_err(|err| {
-            VcxError::from_msg(
-                VcxErrorKind::SerializationError,
-                format!("Failed to deserialize service read from the ledger: {:?}", err),
-            )
-        })
+        self._submit_request(request).await
     }
 
-    async fn add_service(&self, did: &str, service: &AriesService) -> VcxResult<String> {
-        let attrib_json_str = json!({ "service": service }).to_string();
-        let request = self._build_attrib_request(did, did, Some(&attrib_json_str))?;
+    async fn add_attr(&self, target_did: &str, attrib_json: &str) -> VcxResult<String> {
+        let request = self._build_attrib_request(target_did, target_did, Some(&attrib_json))?;
         let request = _append_txn_author_agreement_to_request(request).await?;
 
-        self._sign_and_submit_request(did, request).await
+        self._sign_and_submit_request(target_did, request).await
     }
 
     async fn get_rev_reg_def_json(&self, rev_reg_id: &str) -> VcxResult<String> {

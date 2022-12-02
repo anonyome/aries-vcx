@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use vdrtools::{
     Locator,
     DidValue,
@@ -7,11 +5,10 @@ use vdrtools::{
 
 use vdrtools::{PoolHandle, WalletHandle};
 
-use messages::did_doc::service_aries::AriesService;
+use crate::common::ledger::transactions::{Response, Request};
 use crate::error::prelude::*;
 use crate::global::settings;
 use crate::indy::utils::mocks::pool_mocks::PoolMocks;
-use messages::connection::did::Did;
 use crate::utils;
 use crate::utils::parse_and_validate;
 use crate::utils::constants::{
@@ -138,7 +135,7 @@ pub async fn libindy_get_txn_author_agreement(pool_handle: PoolHandle) -> VcxRes
 
     let get_author_agreement_response =
         libindy_submit_request(pool_handle, &get_author_agreement_request)
-        .await?;
+            .await?;
 
     let get_author_agreement_response =
         serde_json::from_str::<serde_json::Value>(
@@ -496,92 +493,6 @@ pub async fn get_attr(pool_handle: PoolHandle, did: &str, attr_name: &str) -> Vc
         )?;
 
     libindy_submit_request(pool_handle, &get_attrib_req).await
-}
-
-pub async fn get_service(pool_handle: PoolHandle, did: &Did) -> VcxResult<AriesService> {
-    let did_raw = did.to_string();
-    let  did_raw = match  did_raw.rsplit_once(':'){
-        None => {did_raw}
-        Some((_,value)) => {value.to_string()}
-    };
-    let attr_resp = get_attr(pool_handle, &did_raw, "service").await?;
-    let data = get_data_from_response(&attr_resp)?;
-    let ser_service = match data["service"].as_str() {
-        Some(ser_service) => ser_service.to_string(),
-        None => {
-            warn!("Failed converting service read from ledger {:?} to string, falling back to new single-serialized format", data["service"]);
-            data["service"].to_string()
-        }
-    };
-    serde_json::from_str(&ser_service).map_err(|err| {
-        VcxError::from_msg(
-            VcxErrorKind::SerializationError,
-            format!("Failed to deserialize service read from the ledger: {:?}", err),
-        )
-    })
-}
-
-pub async fn add_service(wallet_handle: WalletHandle, pool_handle: PoolHandle, did: &str, service: &AriesService) -> VcxResult<String> {
-    let attrib_json = json!({ "service": service }).to_string();
-    let res = add_attr(wallet_handle, pool_handle, did, &attrib_json).await?;
-    check_response(&res)?;
-    Ok(res)
-}
-
-fn get_data_from_response(resp: &str) -> VcxResult<serde_json::Value> {
-    let resp: serde_json::Value = serde_json::from_str(resp)
-        .map_err(|err| VcxError::from_msg(VcxErrorKind::InvalidLedgerResponse, format!("{:?}", err)))?;
-    serde_json::from_str(resp["result"]["data"].as_str().unwrap_or("{}"))
-        .map_err(|err| VcxError::from_msg(VcxErrorKind::InvalidLedgerResponse, format!("{:?}", err)))
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Request {
-    pub req_id: u64,
-    pub identifier: String,
-    pub signature: Option<String>,
-    pub signatures: Option<HashMap<String, String>>,
-    pub endorser: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "op")]
-pub enum Response {
-    #[serde(rename = "REQNACK")]
-    ReqNACK(Reject),
-    #[serde(rename = "REJECT")]
-    Reject(Reject),
-    #[serde(rename = "REPLY")]
-    Reply(Reply),
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Reject {
-    pub reason: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum Reply {
-    ReplyV0(ReplyV0),
-    ReplyV1(ReplyV1),
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReplyV0 {
-    pub result: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReplyV1 {
-    pub data: ReplyDataV1,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReplyDataV1 {
-    pub result: serde_json::Value,
 }
 
 pub async fn sign_and_submit_to_ledger(wallet_handle: WalletHandle, pool_handle: PoolHandle, submitter_did: &str, req: &str) -> VcxResult<String> {
