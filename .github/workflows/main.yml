@@ -135,7 +135,7 @@ jobs:
       - name: "Git checkout"
         uses: actions/checkout@v3
       - name: "Docker Login"
-        uses: azure/docker-login@v1
+        uses: azure/docker-login@v1 
         with:
           login-server: ${{ env.URL_DOCKER_REGISTRY }}
           username: $GITHUB_ACTOR

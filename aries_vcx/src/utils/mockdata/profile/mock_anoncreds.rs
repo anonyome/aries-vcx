@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use crate::{
     error::{VcxError, VcxErrorKind, VcxResult},
     global::settings,
-    indy::utils::LibindyMock,
     plugins::anoncreds::base_anoncreds::BaseAnonCreds,
     utils::{
         self,
@@ -65,10 +64,7 @@ impl BaseAnonCreds for MockAnoncreds {
     }
 
     async fn issuer_create_credential_offer(&self, _cred_def_id: &str) -> VcxResult<String> {
-        let rc = LibindyMock::get_result();
-        if rc != 0 {
-            return Err(VcxError::from(VcxErrorKind::InvalidState));
-        };
+
         Ok(LIBINDY_CRED_OFFER.to_string())
     }
 

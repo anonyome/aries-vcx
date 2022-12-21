@@ -1,17 +1,8 @@
 extern crate num_traits;
 
-use vdrtools::types::errors::IndyError;
-
-use crate::error::prelude::{MessagesError, MesssagesErrorKind};
 use crate::utils::error;
 
 use self::num_traits::int::PrimInt;
-
-impl From<IndyError> for MessagesError {
-    fn from(_error: IndyError) -> Self {
-        MesssagesErrorKind::InvalidState.into()
-    }
-}
 
 pub fn map_indy_error<T, C: PrimInt>(rtn: T, error_code: C) -> Result<T, u32> {
     if error_code == C::zero() {

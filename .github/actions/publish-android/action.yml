@@ -28,3 +28,4 @@ runs:
         docker cp publish-android-wrapper:/home/indy/artifacts/aar /tmp/artifacts
         docker rm publish-android-wrapper > /dev/null
       shell: bash
+ 

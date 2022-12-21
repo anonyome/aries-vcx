@@ -8,6 +8,7 @@ edition.workspace = true
 
 [lib]
 path = "src/lib.rs"
+crate-type = ["staticlib", "cdylib"]
 doctest = false
 
 [features]
@@ -18,7 +19,7 @@ general_test = ["test_utils", "messages/general_test" ]
 fatal_warnings = []
 warnlog_fetched_messages = []
 mysql_test = ["test_utils" ]
-ios-wrapper = ["libvdrtools/ffi_api"]
+ios-wrapper = []
 modular_dependencies = ["test_utils", "tokio/rt", "tokio/macros"]
 
 [dependencies]
@@ -37,7 +38,7 @@ rust-base58 = "0.0.4"
 base64 = "0.10"
 openssl = { version = "0.10.35" }
 num-traits = "0.2.0"
-libvdrtools = { git = "https://gitlab.com/left-arm/vdr-tools.git", rev = "debf776c8" }
+# libvdrtools = { git = "https://gitlab.com/left-arm/vdr-tools.git", rev = "debf776c8" }
 # vdrtools alternatives ----
 indy-vdr = { version = "0.3.4", default-features = false, features = ["ffi", "log"] }
 # PATCH (TO MONITOR IN FUTURE): The following patch changes the `indy-data-types` (within indy-shared-rs) to depend on

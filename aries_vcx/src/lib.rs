@@ -6,9 +6,6 @@
 
 pub extern crate agency_client;
 
-// TODO: remove reexports
-pub extern crate vdrtools;
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -37,7 +34,6 @@ pub mod handlers;
 
 pub mod error;
 pub mod global;
-pub mod indy;
 pub mod protocols;
 
 pub mod core;

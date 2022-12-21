@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use crate::error::prelude::*;
-use crate::indy::wallet::IssuerConfig;
 
 pub static CONFIG_POOL_NAME: &str = "pool_name";
 pub static CONFIG_SDK_TO_REMOTE_ROLE: &str = "sdk_to_remote_role";
@@ -180,9 +179,4 @@ pub mod unit_tests {
         set_config_value(&key, &value1).unwrap();
         assert_eq!(get_config_value(&key).unwrap(), value1);
     }
-}
-
-pub fn init_issuer_config(config: &IssuerConfig) -> VcxResult<()> {
-    set_config_value(CONFIG_INSTITUTION_DID, &config.institution_did)?;
-    Ok(())
 }

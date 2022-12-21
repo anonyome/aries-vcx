@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::{
     error::{VcxError, VcxErrorKind, VcxResult},
-    indy::utils::mocks::did_mocks::DidMocks,
     plugins::wallet::base_wallet::BaseWallet,
     utils::{self, async_fn_iterator::AsyncFnIterator},
 };
@@ -94,13 +93,9 @@ impl BaseWallet for MockWallet {
 }
 
 fn get_next_mock_did_response_or_fail() -> VcxResult<String> {
-    if DidMocks::has_did_mock_responses() {
-        warn!("key_for_local_did >> retrieving did mock response");
-        Ok(DidMocks::get_next_did_response())
-    } else {
-        Err(VcxError::from_msg(
-            VcxErrorKind::UnimplementedFeature,
-            "DidMocks data for must be set",
-        ))
-    }
+
+    Err(VcxError::from_msg(
+        VcxErrorKind::UnimplementedFeature,
+        "DidMocks data for must be set",
+    ))
 }
