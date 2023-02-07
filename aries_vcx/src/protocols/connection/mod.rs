@@ -43,7 +43,7 @@ pub struct Connection<I, S> {
 }
 
 impl<I, S> Connection<I, S> {
-    pub(crate) fn from_parts(source_id: String, pairwise_info: PairwiseInfo, initiation_type: I, state: S) -> Self {
+    pub fn from_parts(source_id: String, pairwise_info: PairwiseInfo, initiation_type: I, state: S) -> Self {
         Self {
             source_id,
             pairwise_info,
