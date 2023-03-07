@@ -91,6 +91,14 @@ impl HolderSM {
         }
     }
 
+    pub fn from_parts(source_id: String, thread_id: String, state: HolderFullState) -> Self {
+        HolderSM {
+            state,
+            source_id,
+            thread_id,
+        }
+    }
+
     pub fn from_offer(offer: CredentialOffer, source_id: String) -> Self {
         HolderSM {
             thread_id: offer.id.0.clone(),
