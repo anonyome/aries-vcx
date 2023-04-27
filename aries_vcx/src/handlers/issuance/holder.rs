@@ -20,7 +20,7 @@ use messages::protocols::issuance::credential_proposal::CredentialProposalData;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Holder {
-    holder_sm: HolderSM,
+    pub holder_sm: HolderSM,
 }
 
 impl Holder {

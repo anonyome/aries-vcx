@@ -18,7 +18,7 @@ use messages::protocols::proof_presentation::presentation_request::PresentationR
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Prover {
-    prover_sm: ProverSM,
+    pub prover_sm: ProverSM,
 }
 
 impl Prover {
