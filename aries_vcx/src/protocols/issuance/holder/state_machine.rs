@@ -114,6 +114,14 @@ impl HolderSM {
         }
     }
 
+    pub fn from_parts(thread_id: String, source_id: String, state: HolderFullState) -> Self {
+        Self {
+            state,
+            source_id,
+            thread_id,
+        }
+    }
+
     pub fn from_offer(offer: OfferCredential, source_id: String) -> Self {
         HolderSM {
             thread_id: offer.id.clone(),
@@ -137,6 +145,10 @@ impl HolderSM {
                 _ => HolderState::Failed,
             },
         }
+    }
+
+    pub fn get_full_state(&self) -> HolderFullState {
+        self.state.clone()
     }
 
     #[allow(dead_code)]

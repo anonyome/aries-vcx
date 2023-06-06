@@ -19,7 +19,7 @@ use crate::protocols::SendClosure;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Prover {
-    prover_sm: ProverSM,
+    pub prover_sm: ProverSM,
 }
 
 impl Prover {
