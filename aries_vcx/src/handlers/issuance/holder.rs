@@ -22,7 +22,7 @@ use crate::protocols::SendClosure;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Holder {
-    holder_sm: HolderSM,
+    pub holder_sm: HolderSM,
 }
 
 impl Holder {

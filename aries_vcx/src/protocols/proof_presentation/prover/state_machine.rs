@@ -122,6 +122,14 @@ impl ProverSM {
         }
     }
 
+    pub fn from_parts(source_id: String, thread_id: String, state: ProverFullState) -> Self {
+        Self {
+            source_id,
+            thread_id,
+            state,
+        }
+    }
+
     pub async fn send_presentation_proposal(
         self,
         proposal_data: PresentationProposalData,
@@ -527,6 +535,10 @@ impl ProverSM {
                 _ => ProverState::Failed,
             },
         }
+    }
+
+    pub fn get_full_state(&self) -> ProverFullState {
+        self.state.clone()
     }
 
     pub fn progressable_by_message(&self) -> bool {

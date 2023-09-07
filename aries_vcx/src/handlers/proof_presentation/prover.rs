@@ -23,7 +23,7 @@ use super::types::{RetrievedCredentials, SelectedCredentials};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Prover {
-    prover_sm: ProverSM,
+    pub prover_sm: ProverSM,
 }
 
 impl Prover {

@@ -124,6 +124,14 @@ impl HolderSM {
         }
     }
 
+    pub fn from_parts(state: HolderFullState, source_id: String, thread_id: String) -> Self {
+        Self {
+            state,
+            source_id,
+            thread_id,
+        }
+    }
+
     pub fn get_source_id(&self) -> String {
         self.source_id.clone()
     }
@@ -139,6 +147,10 @@ impl HolderSM {
                 _ => HolderState::Failed,
             },
         }
+    }
+
+    pub fn get_full_state(&self) -> HolderFullState {
+        self.state.clone()
     }
 
     #[allow(dead_code)]
