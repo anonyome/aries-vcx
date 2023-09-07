@@ -7,6 +7,7 @@ edition = "2021"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
 time = "=0.3.20"
-indy-vdr = { git = "https://github.com/hyperledger/indy-vdr.git", rev = "879e29e", default-features = false, features = ["log"] }
+# temporarily using fork, see: https://github.com/anonyome/indy-vdr/releases/tag/v000.400.001-dev.16
+indy-vdr = { git = "https://github.com/anonyome/indy-vdr.git", tag = "v000.400.001-dev.16", default-features = false, features = ["log"] }
 thiserror = "1.0.44"
 anoncreds-clsignatures = "0.2.0"

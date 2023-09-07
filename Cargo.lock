@@ -2628,12 +2628,11 @@ dependencies = [
 [[package]]
 name = "indy-data-types"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bc9972c657fd152d394f61b00d677aa8a700abd8c39137164e399a1d9fd0c6d"
+source = "git+https://github.com/anonyome/indy-shared-rs?tag=100.000.101#8ac44093c0e9c15fec04716dca0d69102726e922"
 dependencies = [
  "anoncreds-clsignatures",
  "hex",
- "indy-utils 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "indy-utils 0.6.0 (git+https://github.com/anonyome/indy-shared-rs?tag=100.000.101)",
  "once_cell",
  "regex",
  "serde",
@@ -2694,8 +2693,7 @@ dependencies = [
 [[package]]
 name = "indy-utils"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09d7e0cdcece8d97982e82aba5b0cb8c7e87ffb5f4fa48b935a3647d24db5439"
+source = "git+https://github.com/anonyome/indy-shared-rs?tag=100.000.101#8ac44093c0e9c15fec04716dca0d69102726e922"
 dependencies = [
  "bs58 0.5.0",
  "curve25519-dalek",
@@ -2726,7 +2724,7 @@ dependencies = [
 [[package]]
 name = "indy-vdr"
 version = "0.4.0-dev.16"
-source = "git+https://github.com/hyperledger/indy-vdr.git?rev=879e29e#879e29e8b174b5ca1f031d8d70fa1fcb32a40cf0"
+source = "git+https://github.com/anonyome/indy-vdr.git?tag=v000.400.001-dev.16#ce3e0f3d105397a5bc5364b17fe5d5c3077b7b4c"
 dependencies = [
  "base64 0.21.2",
  "bs58 0.5.0",
@@ -2738,8 +2736,8 @@ dependencies = [
  "futures-util",
  "hex",
  "indy-blssignatures",
- "indy-data-types 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "indy-utils 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "indy-data-types 0.6.1 (git+https://github.com/anonyome/indy-shared-rs?tag=100.000.101)",
+ "indy-utils 0.6.0 (git+https://github.com/anonyome/indy-shared-rs?tag=100.000.101)",
  "log",
  "once_cell",
  "percent-encoding",
@@ -2760,7 +2758,7 @@ dependencies = [
 [[package]]
 name = "indy-vdr-proxy-client"
 version = "0.1.0"
-source = "git+https://github.com/hyperledger/indy-vdr.git?rev=879e29e#879e29e8b174b5ca1f031d8d70fa1fcb32a40cf0"
+source = "git+https://github.com/anonyome/indy-vdr.git?tag=v000.400.001-dev.16#ce3e0f3d105397a5bc5364b17fe5d5c3077b7b4c"
 dependencies = [
  "indy-vdr",
  "reqwest",
