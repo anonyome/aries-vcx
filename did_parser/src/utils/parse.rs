@@ -1,5 +1,4 @@
-use crate::error::ParseError;
-use crate::DidRange;
+use crate::{error::ParseError, DidRange};
 
 pub(crate) fn parse_key_value(
     did_url: &str,
@@ -97,7 +96,7 @@ fn parse_unqualified(did_url: &str) -> Result<(DidRange, Option<DidRange>, DidRa
         ));
     }
 
-    let id = did_url.split("#").next().unwrap_or(did_url);
+    let id = did_url.split('#').next().unwrap_or(did_url);
     shared_vcx::validation::did::validate_did(id)
         .map_err(|_| ParseError::InvalidInput("Unqualified DID failed validation"))?;
 

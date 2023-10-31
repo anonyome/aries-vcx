@@ -1,17 +1,18 @@
-use serde::{Deserialize, Serialize};
-
 use vdrtools::{
-    types::domain::wallet::{default_key_derivation_method, KeyDerivationMethod},
-    types::errors::IndyErrorKind,
+    types::{
+        domain::wallet::{default_key_derivation_method, KeyDerivationMethod},
+        errors::IndyErrorKind,
+    },
     DidMethod, DidValue, KeyInfo, Locator, MyDidInfo, WalletHandle,
 };
 
-use crate::errors::error::{AriesVcxCoreError, AriesVcxCoreErrorKind, VcxCoreResult};
-use crate::global::settings;
-use crate::wallet::indy::did_mocks::{did_mocks_enabled, DidMocks};
-use crate::wallet::indy::{IssuerConfig, RestoreWalletConfigs, WalletConfig};
-use crate::SearchHandle;
-use crate::{secret, utils};
+use crate::{
+    errors::error::{AriesVcxCoreError, AriesVcxCoreErrorKind, VcxCoreResult},
+    wallet::indy::{
+        did_mocks::{did_mocks_enabled, DidMocks},
+        IssuerConfig, RestoreWalletConfigs, WalletConfig,
+    },
+};
 
 pub async fn open_wallet(wallet_config: &WalletConfig) -> VcxCoreResult<WalletHandle> {
     trace!("open_as_main_wallet >>> {}", &wallet_config.wallet_name);
@@ -31,7 +32,9 @@ pub async fn open_wallet(wallet_config: &WalletConfig) -> VcxCoreResult<WalletHa
             },
             vdrtools::types::domain::wallet::Credentials {
                 key: wallet_config.wallet_key.clone(),
-                key_derivation_method: parse_key_derivation_method(&wallet_config.wallet_key_derivation)?,
+                key_derivation_method: parse_key_derivation_method(
+                    &wallet_config.wallet_key_derivation,
+                )?,
 
                 rekey: wallet_config.rekey.clone(),
                 rekey_derivation_method: wallet_config
@@ -113,13 +116,19 @@ pub async fn create_indy_wallet(wallet_config: &WalletConfig) -> VcxCoreResult<(
 
         Err(err) => Err(AriesVcxCoreError::from_msg(
             AriesVcxCoreErrorKind::WalletCreate,
-            format!("could not create wallet {}: {}", wallet_config.wallet_name, err,),
+            format!(
+                "could not create wallet {}: {}",
+                wallet_config.wallet_name, err,
+            ),
         )),
     }
 }
 
 pub async fn delete_wallet(wallet_config: &WalletConfig) -> VcxCoreResult<()> {
-    trace!("delete_wallet >>> wallet_name: {}", &wallet_config.wallet_name);
+    trace!(
+        "delete_wallet >>> wallet_name: {}",
+        &wallet_config.wallet_name
+    );
 
     let credentials = vdrtools::types::domain::wallet::Credentials {
         key: wallet_config.wallet_key.clone(),
@@ -157,18 +166,25 @@ pub async fn delete_wallet(wallet_config: &WalletConfig) -> VcxCoreResult<()> {
     match res {
         Ok(_) => Ok(()),
 
-        Err(err) if err.kind() == IndyErrorKind::WalletAccessFailed => Err(AriesVcxCoreError::from_msg(
-            AriesVcxCoreErrorKind::WalletAccessFailed,
-            format!(
-                "Can not open wallet \"{}\". Invalid key has been provided.",
-                &wallet_config.wallet_name
-            ),
-        )),
+        Err(err) if err.kind() == IndyErrorKind::WalletAccessFailed => {
+            Err(AriesVcxCoreError::from_msg(
+                AriesVcxCoreErrorKind::WalletAccessFailed,
+                format!(
+                    "Can not open wallet \"{}\". Invalid key has been provided.",
+                    &wallet_config.wallet_name
+                ),
+            ))
+        }
 
-        Err(err) if err.kind() == IndyErrorKind::WalletNotFound => Err(AriesVcxCoreError::from_msg(
-            AriesVcxCoreErrorKind::WalletNotFound,
-            format!("Wallet \"{}\" not found or unavailable", &wallet_config.wallet_name,),
-        )),
+        Err(err) if err.kind() == IndyErrorKind::WalletNotFound => {
+            Err(AriesVcxCoreError::from_msg(
+                AriesVcxCoreErrorKind::WalletNotFound,
+                format!(
+                    "Wallet \"{}\" not found or unavailable",
+                    &wallet_config.wallet_name,
+                ),
+            ))
+        }
 
         Err(err) => Err(err.into()),
     }
@@ -215,13 +231,21 @@ pub async fn import(restore_config: &RestoreWalletConfigs) -> VcxCoreResult<()> 
 }
 
 // TODO - FUTURE - can this be moved externally - move to a generic setup util?
-pub async fn wallet_configure_issuer(wallet_handle: WalletHandle, key_seed: &str) -> VcxCoreResult<IssuerConfig> {
-    let (institution_did, _institution_verkey) = create_and_store_my_did(wallet_handle, Some(key_seed), None).await?;
+pub async fn wallet_configure_issuer(
+    wallet_handle: WalletHandle,
+    key_seed: &str,
+) -> VcxCoreResult<IssuerConfig> {
+    let (institution_did, _institution_verkey) =
+        create_and_store_my_did(wallet_handle, Some(key_seed), None).await?;
 
     Ok(IssuerConfig { institution_did })
 }
 
-pub async fn export_wallet(wallet_handle: WalletHandle, path: &str, backup_key: &str) -> VcxCoreResult<()> {
+pub async fn export_wallet(
+    wallet_handle: WalletHandle,
+    path: &str,
+    backup_key: &str,
+) -> VcxCoreResult<()> {
     trace!(
         "export >>> wallet_handle: {:?}, path: {:?}, backup_key: ****",
         wallet_handle,
@@ -245,11 +269,6 @@ pub async fn export_wallet(wallet_handle: WalletHandle, path: &str, backup_key: 
 }
 
 pub async fn create_and_open_wallet(wallet_config: &WalletConfig) -> VcxCoreResult<WalletHandle> {
-    if settings::indy_mocks_enabled() {
-        warn!("create_and_open_wallet ::: Indy mocks enabled, skipping opening main wallet.");
-        return Ok(WalletHandle(0));
-    }
-
     create_indy_wallet(wallet_config).await?;
 
     let handle = open_wallet(wallet_config).await?;
@@ -260,12 +279,10 @@ pub async fn create_and_open_wallet(wallet_config: &WalletConfig) -> VcxCoreResu
 pub async fn close_wallet(wallet_handle: WalletHandle) -> VcxCoreResult<()> {
     trace!("close_wallet >>>");
 
-    if settings::indy_mocks_enabled() {
-        warn!("close_wallet >>> Indy mocks enabled, skipping closing wallet");
-        return Ok(());
-    }
-
-    Locator::instance().wallet_controller.close(wallet_handle).await?;
+    Locator::instance()
+        .wallet_controller
+        .close(wallet_handle)
+        .await?;
 
     Ok(())
 }
@@ -280,10 +297,6 @@ pub async fn create_and_store_my_did(
         seed,
         method_name
     );
-
-    if settings::indy_mocks_enabled() {
-        return Ok((utils::constants::DID.to_string(), utils::constants::VERKEY.to_string()));
-    }
 
     let res = Locator::instance()
         .did_controller
@@ -300,7 +313,10 @@ pub async fn create_and_store_my_did(
     Ok(res)
 }
 
-pub async fn libindy_replace_keys_start(wallet_handle: WalletHandle, did: &str) -> VcxCoreResult<String> {
+pub async fn libindy_replace_keys_start(
+    wallet_handle: WalletHandle,
+    did: &str,
+) -> VcxCoreResult<String> {
     if DidMocks::has_did_mock_responses() {
         warn!("libindy_replace_keys_start >> retrieving did mock response");
         return Ok(DidMocks::get_next_did_response());
@@ -314,7 +330,10 @@ pub async fn libindy_replace_keys_start(wallet_handle: WalletHandle, did: &str) 
     Ok(res)
 }
 
-pub async fn libindy_replace_keys_apply(wallet_handle: WalletHandle, did: &str) -> VcxCoreResult<()> {
+pub async fn libindy_replace_keys_apply(
+    wallet_handle: WalletHandle,
+    did: &str,
+) -> VcxCoreResult<()> {
     if did_mocks_enabled() {
         warn!("libindy_replace_keys_apply >> retrieving did mock response");
         return Ok(());
@@ -328,7 +347,10 @@ pub async fn libindy_replace_keys_apply(wallet_handle: WalletHandle, did: &str) 
     Ok(())
 }
 
-pub async fn get_verkey_from_wallet(wallet_handle: WalletHandle, did: &str) -> VcxCoreResult<String> {
+pub async fn get_verkey_from_wallet(
+    wallet_handle: WalletHandle,
+    did: &str,
+) -> VcxCoreResult<String> {
     if DidMocks::has_did_mock_responses() {
         warn!("get_verkey_from_wallet >> retrieving did mock response");
         return Ok(DidMocks::get_next_did_response());

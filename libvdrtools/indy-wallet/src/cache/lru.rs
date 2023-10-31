@@ -1,15 +1,18 @@
-use crate::cache::{
-    cache::Cache,
-    wallet_cache::{WalletCacheKey, WalletCacheValue},
-};
+use std::num::NonZeroUsize;
+
 use lru::LruCache as InnerCache;
+
+use crate::cache::{
+    wallet_cache::{WalletCacheKey, WalletCacheValue},
+    Cache,
+};
 
 pub struct LruCache {
     inner: InnerCache<WalletCacheKey, WalletCacheValue>,
 }
 
 impl LruCache {
-    pub fn new(size: usize) -> LruCache {
+    pub fn new(size: NonZeroUsize) -> LruCache {
         LruCache {
             inner: InnerCache::new(size),
         }
@@ -42,6 +45,6 @@ impl Cache for LruCache {
     }
 
     fn cap(&self) -> usize {
-        self.inner.cap()
+        self.inner.cap().into()
     }
 }

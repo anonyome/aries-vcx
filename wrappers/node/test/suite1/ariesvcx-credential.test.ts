@@ -6,11 +6,11 @@ import {
   credentialCreateWithOffer,
   dataCredentialCreateWithOffer,
 } from 'helpers/entities';
-import { initVcxTestMode, shouldThrow } from 'helpers/utils';
+import { initVcx, shouldThrow } from 'helpers/utils';
 import { Credential, HolderStateType, VCXCode } from 'src';
 
 describe('Credential:', () => {
-  before(() => initVcxTestMode());
+  before(() => initVcx());
 
   describe('create:', () => {
     it('success', async () => {
@@ -79,7 +79,7 @@ describe('Credential:', () => {
       const credential = await Credential.create(data);
       assert.equal(await credential.getState(), HolderStateType.OfferReceived);
       await credential.sendRequest({ connection });
-      assert.equal(await credential.getState(), HolderStateType.RequestSent);
+      assert.equal(await credential.getState(), HolderStateType.RequestSet);
     });
   });
 
@@ -88,7 +88,7 @@ describe('Credential:', () => {
       const data = await dataCredentialCreateWithOffer();
       const credential = await credentialCreateWithOffer(data);
       await credential.sendRequest({ connection: data.connection });
-      assert.equal(await credential.getState(), HolderStateType.RequestSent);
+      assert.equal(await credential.getState(), HolderStateType.RequestSet);
     });
   });
 

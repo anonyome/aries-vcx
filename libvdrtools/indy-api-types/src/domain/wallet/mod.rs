@@ -1,7 +1,6 @@
-use serde_json::value::Value;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
-use crate::validation::Validatable;
+use serde_json::value::Value;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Config {
@@ -74,7 +73,7 @@ pub struct KeyConfig {
     pub seed: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Record {
     // Wallet record type
     #[serde(rename = "type")]
@@ -87,13 +86,16 @@ pub struct Record {
     pub tags: HashMap<String, String>,
 }
 
-pub type Tags = HashMap<String, String>;
-
-impl Validatable for Config {
-    fn validate(&self) -> Result<(), String> {
-        if self.id.is_empty() {
-            return Err("Wallet id is empty".to_string());
-        }
-        Ok(())
+impl fmt::Debug for Record {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Record")
+            .field("type_", &self.type_)
+            .field("id", &self.id)
+            // Censor the value
+            .field("value", &"******".to_string())
+            .field("tags", &self.tags)
+            .finish()
     }
 }
+
+pub type Tags = HashMap<String, String>;

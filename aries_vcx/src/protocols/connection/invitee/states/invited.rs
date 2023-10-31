@@ -1,5 +1,4 @@
 use diddoc_legacy::aries::diddoc::AriesDidDoc;
-use messages::msg_fields::protocols::connection::invitation::Invitation;
 
 use crate::{
     handlers::util::AnyInvitation,
@@ -14,7 +13,10 @@ pub struct Invited {
 
 impl Invited {
     pub fn new(did_doc: AriesDidDoc, invitation: AnyInvitation) -> Self {
-        Self { did_doc, invitation }
+        Self {
+            did_doc,
+            invitation,
+        }
     }
 }
 
@@ -29,9 +31,7 @@ impl BootstrapDidDoc for Invited {}
 impl ThreadId for Invited {
     fn thread_id(&self) -> &str {
         match &self.invitation {
-            AnyInvitation::Con(Invitation::Public(i)) => i.id.as_str(),
-            AnyInvitation::Con(Invitation::Pairwise(i)) => i.id.as_str(),
-            AnyInvitation::Con(Invitation::PairwiseDID(i)) => i.id.as_str(),
+            AnyInvitation::Con(i) => i.id.as_str(),
             AnyInvitation::Oob(i) => i.id.as_str(),
         }
     }

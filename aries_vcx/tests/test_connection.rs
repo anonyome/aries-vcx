@@ -1,382 +1,208 @@
 #[macro_use]
 extern crate log;
-#[macro_use]
 extern crate serde_json;
 
 pub mod utils;
 
-#[cfg(test)]
-mod integration_tests {
-    use async_channel::bounded;
+use aries_vcx::{
+    common::ledger::transactions::write_endpoint_legacy,
+    protocols::{connection::GenericConnection, mediated_connection::pairwise_info::PairwiseInfo},
+    utils::{devsetup::*, encryption_envelope::EncryptionEnvelope},
+};
+use aries_vcx_core::{
+    anoncreds::base_anoncreds::BaseAnonCreds,
+    ledger::base_ledger::{
+        AnoncredsLedgerRead, AnoncredsLedgerWrite, IndyLedgerRead, IndyLedgerWrite,
+    },
+    wallet::base_wallet::BaseWallet,
+};
+use chrono::Utc;
+use diddoc_legacy::aries::service::AriesService;
+use messages::{
+    decorators::timing::Timing,
+    msg_fields::protocols::basic_message::{
+        BasicMessage, BasicMessageContent, BasicMessageDecorators,
+    },
+    AriesMessage,
+};
+use utils::test_agent::TestAgent;
+use uuid::Uuid;
 
-    use aries_vcx::agency_client::MessageStatusCode;
-    use aries_vcx::common::ledger::transactions::into_did_doc;
-    use aries_vcx::handlers::connection::mediated_connection::ConnectionState;
-    use aries_vcx::handlers::out_of_band::receiver::OutOfBandReceiver;
-    use aries_vcx::handlers::out_of_band::sender::OutOfBandSender;
-    use aries_vcx::handlers::util::AnyInvitation;
-    use aries_vcx::protocols::mediated_connection::invitee::state_machine::InviteeState;
-    use aries_vcx::utils::devsetup::*;
-    use aries_vcx::utils::mockdata::mockdata_proof::REQUESTED_ATTRIBUTES;
-    use messages::msg_fields::protocols::connection::Connection;
-    use messages::msg_fields::protocols::out_of_band::invitation::OobService;
-    use messages::msg_fields::protocols::out_of_band::{OobGoalCode, OutOfBand};
-    use messages::msg_fields::protocols::present_proof::PresentProof;
-    use messages::msg_types::connection::{ConnectionType, ConnectionTypeV1};
-    use messages::msg_types::Protocol;
-    use messages::AriesMessage;
+use crate::utils::{
+    scenarios::{
+        create_connections_via_oob_invite, create_connections_via_pairwise_invite,
+        create_connections_via_public_invite,
+    },
+    test_agent::{create_test_agent, create_test_agent_trustee},
+};
 
-    use crate::utils::devsetup_alice::create_alice;
-    use crate::utils::devsetup_faber::create_faber_trustee;
-    use crate::utils::scenarios::test_utils::{
-        _send_message, connect_using_request_sent_to_public_agent, create_connected_connections,
-        create_connected_connections_via_public_invite, create_proof_request,
-    };
+fn build_basic_message(content: String) -> BasicMessage {
+    let now = Utc::now();
 
-    use super::*;
+    let content = BasicMessageContent::builder()
+        .content(content)
+        .sent_time(now)
+        .build();
 
-    #[tokio::test]
-    #[ignore]
-    async fn test_agency_pool_establish_connection_via_public_invite() {
-        SetupPoolDirectory::run(|setup| async move {
-            let mut institution = create_faber_trustee(setup.genesis_file_path.clone()).await;
-            let mut consumer = create_alice(setup.genesis_file_path).await;
+    let decorators = BasicMessageDecorators::builder()
+        .timing(Timing::builder().out_time(now).build())
+        .build();
 
-            let (consumer_to_institution, institution_to_consumer) =
-                create_connected_connections_via_public_invite(&mut consumer, &mut institution).await;
+    BasicMessage::builder()
+        .id(Uuid::new_v4().to_string())
+        .content(content)
+        .decorators(decorators)
+        .build()
+}
 
-            institution_to_consumer
-                .send_generic_message(&institution.profile.inject_wallet(), "Hello Alice, Faber here")
-                .await
-                .unwrap();
+async fn decrypt_message(
+    consumer: &TestAgent<
+        impl IndyLedgerRead + AnoncredsLedgerRead,
+        impl IndyLedgerWrite + AnoncredsLedgerWrite,
+        impl BaseAnonCreds,
+        impl BaseWallet,
+    >,
+    received: Vec<u8>,
+    consumer_to_institution: &GenericConnection,
+) -> AriesMessage {
+    EncryptionEnvelope::auth_unpack(
+        &consumer.wallet,
+        received,
+        &consumer_to_institution.remote_vk().unwrap(),
+    )
+    .await
+    .unwrap()
+}
 
-            let consumer_msgs = consumer_to_institution
-                .download_messages(&consumer.agency_client, Some(vec![MessageStatusCode::Received]), None)
-                .await
-                .unwrap();
-            assert_eq!(consumer_msgs.len(), 1);
-        })
-        .await;
-    }
+async fn send_and_receive_message(
+    consumer: &TestAgent<
+        impl IndyLedgerRead + AnoncredsLedgerRead,
+        impl IndyLedgerWrite + AnoncredsLedgerWrite,
+        impl BaseAnonCreds,
+        impl BaseWallet,
+    >,
+    insitution: &TestAgent<
+        impl IndyLedgerRead + AnoncredsLedgerRead,
+        impl IndyLedgerWrite + AnoncredsLedgerWrite,
+        impl BaseAnonCreds,
+        impl BaseWallet,
+    >,
+    institution_to_consumer: &GenericConnection,
+    consumer_to_institution: &GenericConnection,
+    message: &AriesMessage,
+) -> AriesMessage {
+    let encrypted_message = institution_to_consumer
+        .encrypt_message(&insitution.wallet, message)
+        .await
+        .unwrap()
+        .0;
+    decrypt_message(consumer, encrypted_message, consumer_to_institution).await
+}
 
-    #[tokio::test]
-    #[ignore]
-    async fn test_agency_pool_oob_connection_bootstrap() {
-        SetupPoolDirectory::run(|setup| async move {
-            let mut institution = create_faber_trustee(setup.genesis_file_path.clone()).await;
-            let mut consumer = create_alice(setup.genesis_file_path).await;
-            let (sender, receiver) = bounded::<AriesMessage>(1);
+async fn create_service(
+    faber: &TestAgent<
+        impl IndyLedgerRead + AnoncredsLedgerRead,
+        impl IndyLedgerWrite + AnoncredsLedgerWrite,
+        impl BaseAnonCreds,
+        impl BaseWallet,
+    >,
+) {
+    let pairwise_info = PairwiseInfo::create(&faber.wallet).await.unwrap();
+    let service = AriesService::create()
+        .set_service_endpoint("http://dummy.org".parse().unwrap())
+        .set_recipient_keys(vec![pairwise_info.pw_vk.clone()]);
+    write_endpoint_legacy(
+        &faber.wallet,
+        &faber.ledger_write,
+        &faber.institution_did,
+        &service,
+    )
+    .await
+    .unwrap();
+}
 
-            let request_sender = create_proof_request(&mut institution, REQUESTED_ATTRIBUTES, "[]", "{}", None).await;
+#[tokio::test]
+#[ignore]
+async fn test_agency_pool_establish_connection_via_public_invite() {
+    SetupPoolDirectory::run(|setup| async move {
+        let mut institution = create_test_agent_trustee(setup.genesis_file_path.clone()).await;
+        let mut consumer = create_test_agent(setup.genesis_file_path).await;
+        create_service(&institution).await;
 
-            let did = institution.institution_did.clone();
-            let oob_sender = OutOfBandSender::create()
-                .set_label("test-label")
-                .set_goal_code(OobGoalCode::P2PMessaging)
-                .set_goal("To exchange message")
-                .append_service(&OobService::Did(did))
-                .append_handshake_protocol(Protocol::ConnectionType(ConnectionType::V1(
-                    ConnectionTypeV1::new_v1_0(),
-                )))
-                .unwrap()
-                .append_a2a_message(AriesMessage::from(request_sender.clone()))
-                .unwrap();
-            let invitation = AnyInvitation::Oob(oob_sender.oob.clone());
-            let ddo = into_did_doc(&consumer.profile.inject_indy_ledger_read(), &invitation)
-                .await
-                .unwrap();
-            let oob_msg = AriesMessage::from(oob_sender.oob.clone());
+        let (consumer_to_institution, institution_to_consumer) =
+            create_connections_via_public_invite(&mut consumer, &mut institution).await;
 
-            let oob_receiver = OutOfBandReceiver::create_from_a2a_msg(&oob_msg).unwrap();
-            let conns = vec![];
-            let conn = oob_receiver
-                .connection_exists(&consumer.profile.inject_indy_ledger_read(), &conns)
-                .await
-                .unwrap();
-            assert!(conn.is_none());
-            let mut conn_receiver = oob_receiver
-                .build_connection(&consumer.profile.inject_wallet(), &consumer.agency_client, ddo, true)
-                .await
-                .unwrap();
-            conn_receiver
-                .connect(
-                    &consumer.profile.inject_wallet(),
-                    &consumer.agency_client,
-                    _send_message(sender),
-                )
-                .await
-                .unwrap();
-            assert_eq!(
-                ConnectionState::Invitee(InviteeState::Requested),
-                conn_receiver.get_state()
-            );
-            assert_eq!(oob_sender.oob.id, oob_receiver.oob.id);
+        let basic_message = build_basic_message("Hello TestAgent".to_string());
+        if let AriesMessage::BasicMessage(message) = send_and_receive_message(
+            &consumer,
+            &institution,
+            &institution_to_consumer,
+            &consumer_to_institution,
+            &basic_message.clone().into(),
+        )
+        .await
+        {
+            assert_eq!(message.content.content, basic_message.content.content);
+        } else {
+            panic!("Unexpected message type");
+        }
+    })
+    .await;
+}
 
-            let request = if let AriesMessage::Connection(Connection::Request(request)) = receiver.recv().await.unwrap()
-            {
-                request
-            } else {
-                panic!("Received invalid message type")
-            };
-            let conn_sender = connect_using_request_sent_to_public_agent(
-                &mut consumer,
-                &mut institution,
-                &mut conn_receiver,
-                request,
-            )
-            .await;
+#[tokio::test]
+#[ignore]
+async fn test_agency_pool_establish_connection_via_pairwise_invite() {
+    SetupPoolDirectory::run(|setup| async move {
+        let mut institution = create_test_agent(setup.genesis_file_path.clone()).await;
+        let mut consumer = create_test_agent(setup.genesis_file_path).await;
 
-            let (conn_receiver_pw1, _conn_sender_pw1) =
-                create_connected_connections(&mut consumer, &mut institution).await;
-            let (conn_receiver_pw2, _conn_sender_pw2) =
-                create_connected_connections(&mut consumer, &mut institution).await;
+        let (consumer_to_institution, institution_to_consumer) =
+            create_connections_via_pairwise_invite(&mut consumer, &mut institution).await;
 
-            let conns = vec![&conn_receiver, &conn_receiver_pw1, &conn_receiver_pw2];
-            let conn = oob_receiver
-                .connection_exists(&consumer.profile.inject_indy_ledger_read(), &conns)
-                .await
-                .unwrap();
-            assert!(conn.is_some());
-            assert!(*conn.unwrap() == conn_receiver);
+        let basic_message = build_basic_message("Hello TestAgent".to_string());
+        if let AriesMessage::BasicMessage(message) = send_and_receive_message(
+            &consumer,
+            &institution,
+            &institution_to_consumer,
+            &consumer_to_institution,
+            &basic_message.clone().into(),
+        )
+        .await
+        {
+            assert_eq!(message.content.content, basic_message.content.content);
+        } else {
+            panic!("Unexpected message type");
+        }
+    })
+    .await;
+}
 
-            let conns = vec![&conn_receiver_pw1, &conn_receiver_pw2];
-            let conn = oob_receiver
-                .connection_exists(&consumer.profile.inject_indy_ledger_read(), &conns)
-                .await
-                .unwrap();
-            assert!(conn.is_none());
+#[tokio::test]
+#[ignore]
+async fn test_agency_pool_establish_connection_via_out_of_band() {
+    SetupPoolDirectory::run(|setup| async move {
+        let mut institution = create_test_agent_trustee(setup.genesis_file_path.clone()).await;
+        let mut consumer = create_test_agent(setup.genesis_file_path).await;
+        create_service(&institution).await;
 
-            let a2a_msg = oob_receiver.extract_a2a_message().unwrap().unwrap();
-            assert!(matches!(
-                a2a_msg,
-                AriesMessage::PresentProof(PresentProof::RequestPresentation(..))
-            ));
-            if let AriesMessage::PresentProof(PresentProof::RequestPresentation(request_receiver)) = a2a_msg {
-                assert_eq!(
-                    request_receiver.content.request_presentations_attach,
-                    request_sender.content.request_presentations_attach
-                );
-            }
+        let (consumer_to_institution, institution_to_consumer) =
+            create_connections_via_oob_invite(&mut consumer, &mut institution).await;
 
-            conn_sender
-                .send_generic_message(
-                    &institution.profile.inject_wallet(),
-                    "Hello oob receiver, from oob sender",
-                )
-                .await
-                .unwrap();
-            conn_receiver
-                .send_generic_message(&consumer.profile.inject_wallet(), "Hello oob sender, from oob receiver")
-                .await
-                .unwrap();
-            let sender_msgs = conn_sender
-                .download_messages(&institution.agency_client, None, None)
-                .await
-                .unwrap();
-            let receiver_msgs = conn_receiver
-                .download_messages(&consumer.agency_client, None, None)
-                .await
-                .unwrap();
-            assert_eq!(sender_msgs.len(), 2);
-            assert_eq!(receiver_msgs.len(), 2);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_agency_pool_oob_connection_reuse() {
-        SetupPoolDirectory::run(|setup| async move {
-            let mut institution = create_faber_trustee(setup.genesis_file_path.clone()).await;
-            let mut consumer = create_alice(setup.genesis_file_path).await;
-
-            let (consumer_to_institution, institution_to_consumer) =
-                create_connected_connections_via_public_invite(&mut consumer, &mut institution).await;
-
-            let did = institution.institution_did.clone();
-            let oob_sender = OutOfBandSender::create()
-                .set_label("test-label")
-                .set_goal_code(OobGoalCode::P2PMessaging)
-                .set_goal("To exchange message")
-                .append_service(&OobService::Did(did));
-            let oob_msg = AriesMessage::from(oob_sender.oob.clone());
-
-            let oob_receiver = OutOfBandReceiver::create_from_a2a_msg(&oob_msg).unwrap();
-            let conns = vec![&consumer_to_institution];
-            let conn = oob_receiver
-                .connection_exists(&consumer.profile.inject_indy_ledger_read(), &conns)
-                .await
-                .unwrap();
-            assert!(conn.is_some());
-            conn.unwrap()
-                .send_generic_message(&consumer.profile.inject_wallet(), "Hello oob sender, from oob receiver")
-                .await
-                .unwrap();
-
-            let msgs = institution_to_consumer
-                .download_messages(&institution.agency_client, None, None)
-                .await
-                .unwrap();
-            assert_eq!(msgs.len(), 2);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_agency_pool_oob_connection_handshake_reuse() {
-        SetupPoolDirectory::run(|setup| async move {
-            let mut institution = create_faber_trustee(setup.genesis_file_path.clone()).await;
-            let mut consumer = create_alice(setup.genesis_file_path).await;
-
-            let (mut consumer_to_institution, mut institution_to_consumer) =
-                create_connected_connections_via_public_invite(&mut consumer, &mut institution).await;
-
-            let did = institution.institution_did.clone();
-            let oob_sender = OutOfBandSender::create()
-                .set_label("test-label")
-                .set_goal_code(OobGoalCode::P2PMessaging)
-                .set_goal("To exchange message")
-                .append_service(&OobService::Did(did));
-            let sender_oob_id = oob_sender.get_id();
-            let oob_msg = AriesMessage::from(oob_sender.oob.clone());
-
-            let oob_receiver = OutOfBandReceiver::create_from_a2a_msg(&oob_msg).unwrap();
-            let conns = vec![&consumer_to_institution];
-            let conn = oob_receiver
-                .connection_exists(&consumer.profile.inject_indy_ledger_read(), &conns)
-                .await
-                .unwrap();
-            assert!(conn.is_some());
-            let receiver_oob_id = oob_receiver.get_id();
-            let receiver_msg = serde_json::to_string(&AriesMessage::from(oob_receiver.oob.clone())).unwrap();
-            conn.unwrap()
-                .send_handshake_reuse(&consumer.profile.inject_wallet(), &receiver_msg)
-                .await
-                .unwrap();
-
-            let mut msgs = institution_to_consumer
-                .download_messages(
-                    &institution.agency_client,
-                    Some(vec![MessageStatusCode::Received]),
-                    None,
-                )
-                .await
-                .unwrap();
-            assert_eq!(msgs.len(), 1);
-            let reuse_msg = match serde_json::from_str::<AriesMessage>(&msgs.pop().unwrap().decrypted_msg).unwrap() {
-                AriesMessage::OutOfBand(OutOfBand::HandshakeReuse(ref a2a_msg)) => {
-                    assert_eq!(
-                        sender_oob_id,
-                        a2a_msg.decorators.thread.pthid.as_ref().unwrap().to_string()
-                    );
-                    assert_eq!(
-                        receiver_oob_id,
-                        a2a_msg.decorators.thread.pthid.as_ref().unwrap().to_string()
-                    );
-                    assert_eq!(a2a_msg.id, a2a_msg.decorators.thread.thid.to_string());
-                    a2a_msg.clone()
-                }
-                _ => {
-                    panic!("Expected OutOfBandHandshakeReuse message type");
-                }
-            };
-            institution_to_consumer
-                .handle_message(
-                    AriesMessage::OutOfBand(OutOfBand::HandshakeReuse(reuse_msg.clone())),
-                    &institution.profile.inject_wallet(),
-                )
-                .await
-                .unwrap();
-
-            let mut msgs = consumer_to_institution
-                .download_messages(&consumer.agency_client, Some(vec![MessageStatusCode::Received]), None)
-                .await
-                .unwrap();
-            assert_eq!(msgs.len(), 1);
-            let _reuse_ack_msg = match serde_json::from_str::<AriesMessage>(&msgs.pop().unwrap().decrypted_msg).unwrap()
-            {
-                AriesMessage::OutOfBand(OutOfBand::HandshakeReuseAccepted(ref a2a_msg)) => {
-                    assert_eq!(
-                        sender_oob_id,
-                        a2a_msg.decorators.thread.pthid.as_ref().unwrap().to_string()
-                    );
-                    assert_eq!(
-                        receiver_oob_id,
-                        a2a_msg.decorators.thread.pthid.as_ref().unwrap().to_string()
-                    );
-                    assert_eq!(reuse_msg.id, a2a_msg.decorators.thread.thid.to_string());
-                    a2a_msg.clone()
-                }
-                _ => {
-                    panic!("Expected OutOfBandHandshakeReuseAccepted message type");
-                }
-            };
-            consumer_to_institution
-                .find_and_handle_message(&consumer.profile.inject_wallet(), &consumer.agency_client)
-                .await
-                .unwrap();
-            assert_eq!(
-                consumer_to_institution
-                    .download_messages(&consumer.agency_client, Some(vec![MessageStatusCode::Received]), None)
-                    .await
-                    .unwrap()
-                    .len(),
-                0
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    pub async fn test_agency_pool_two_enterprise_connections() {
-        SetupPoolDirectory::run(|setup| async move {
-            let mut institution = create_faber_trustee(setup.genesis_file_path.clone()).await;
-            let mut consumer1 = create_alice(setup.genesis_file_path).await;
-
-            let (_faber, _alice) = create_connected_connections(&mut consumer1, &mut institution).await;
-            let (_faber, _alice) = create_connected_connections(&mut consumer1, &mut institution).await;
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_agency_pool_aries_demo_handle_connection_related_messages() {
-        SetupPoolDirectory::run(|setup| async move {
-            let mut faber = create_faber_trustee(setup.genesis_file_path.clone()).await;
-            let mut alice = create_alice(setup.genesis_file_path).await;
-
-            // Connection
-            let invite = faber.create_invite().await;
-            alice.accept_invite(&invite).await;
-
-            faber.update_state(3).await;
-            alice.update_state(4).await;
-            faber.update_state(4).await;
-
-            // Ping
-            faber.ping().await;
-
-            alice.handle_messages().await;
-
-            faber.handle_messages().await;
-
-            let faber_connection_info = faber.connection_info().await;
-            assert!(faber_connection_info["their"]["protocols"].as_array().is_none());
-
-            // Discovery Features
-            faber.discovery_features().await;
-
-            alice.handle_messages().await;
-
-            faber.handle_messages().await;
-
-            let faber_connection_info = faber.connection_info().await;
-            warn!("faber_connection_info: {}", faber_connection_info);
-            assert!(faber_connection_info["their"]["protocols"].as_array().unwrap().len() > 0);
-        })
-        .await;
-    }
+        let basic_message = build_basic_message("Hello TestAgent".to_string());
+        if let AriesMessage::BasicMessage(message) = send_and_receive_message(
+            &consumer,
+            &institution,
+            &institution_to_consumer,
+            &consumer_to_institution,
+            &basic_message.clone().into(),
+        )
+        .await
+        {
+            assert_eq!(message.content.content, basic_message.content.content);
+        } else {
+            panic!("Unexpected message type");
+        }
+    })
+    .await;
 }

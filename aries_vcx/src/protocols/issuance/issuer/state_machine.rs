@@ -1,55 +1,58 @@
-use std::collections::HashMap;
 use std::fmt::Display;
-use std::sync::Arc;
 
-use crate::handlers::util::{
-    get_attach_as_string, make_attach_from_str, matches_opt_thread_id, matches_thread_id, AttachmentId, OfferInfo,
-    Status,
+use aries_vcx_core::{
+    anoncreds::base_anoncreds::BaseAnonCreds, ledger::base_ledger::AnoncredsLedgerRead,
+    wallet::base_wallet::BaseWallet,
 };
-use aries_vcx_core::anoncreds::base_anoncreds::BaseAnonCreds;
-use aries_vcx_core::ledger::base_ledger::AnoncredsLedgerRead;
 use chrono::Utc;
-use messages::decorators::please_ack::PleaseAck;
-use messages::decorators::thread::Thread;
-use messages::decorators::timing::Timing;
-use messages::msg_fields::protocols::cred_issuance::ack::AckCredential;
-use messages::msg_fields::protocols::cred_issuance::issue_credential::{
-    IssueCredential, IssueCredentialContent, IssueCredentialDecorators,
+use messages::{
+    decorators::{please_ack::PleaseAck, thread::Thread, timing::Timing},
+    msg_fields::protocols::{
+        cred_issuance::{
+            v1::{
+                ack::AckCredentialV1,
+                issue_credential::{
+                    IssueCredentialV1, IssueCredentialV1Content, IssueCredentialV1Decorators,
+                },
+                offer_credential::{
+                    OfferCredentialV1, OfferCredentialV1Content, OfferCredentialV1Decorators,
+                },
+                propose_credential::ProposeCredentialV1,
+                request_credential::RequestCredentialV1,
+                CredentialIssuanceV1, CredentialPreviewV1,
+            },
+            CredentialIssuance,
+        },
+        report_problem::ProblemReport,
+    },
+    AriesMessage,
 };
-use messages::msg_fields::protocols::cred_issuance::offer_credential::{
-    OfferCredential, OfferCredentialContent, OfferCredentialDecorators,
-};
-use messages::msg_fields::protocols::cred_issuance::propose_credential::ProposeCredential;
-use messages::msg_fields::protocols::cred_issuance::request_credential::RequestCredential;
-use messages::msg_fields::protocols::cred_issuance::{CredentialIssuance, CredentialPreview};
-use messages::msg_fields::protocols::notification::Notification;
-use messages::msg_fields::protocols::report_problem::ProblemReport;
-use messages::AriesMessage;
 use uuid::Uuid;
 
-use crate::common::credentials::encoding::encode_attributes;
-use crate::common::credentials::is_cred_revoked;
-use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
-use crate::protocols::common::build_problem_report_msg;
-use crate::protocols::issuance::actions::CredentialIssuanceAction;
-use crate::protocols::issuance::issuer::states::credential_sent::CredentialSentState;
-use crate::protocols::issuance::issuer::states::finished::FinishedState;
-use crate::protocols::issuance::issuer::states::initial::InitialIssuerState;
-use crate::protocols::issuance::issuer::states::offer_sent::OfferSentState;
-use crate::protocols::issuance::issuer::states::offer_set::OfferSetState;
-use crate::protocols::issuance::issuer::states::proposal_received::ProposalReceivedState;
-use crate::protocols::issuance::issuer::states::requested_received::RequestReceivedState;
-use crate::protocols::issuance::verify_thread_id;
-use crate::protocols::SendClosure;
+use crate::{
+    common::credentials::{encoding::encode_attributes, is_cred_revoked},
+    errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult},
+    handlers::util::{
+        get_attach_as_string, make_attach_from_str, matches_opt_thread_id, verify_thread_id,
+        AttachmentId, OfferInfo, Status,
+    },
+    protocols::{
+        common::build_problem_report_msg,
+        issuance::issuer::states::{
+            credential_set::CredentialSetState, finished::FinishedState,
+            initial::InitialIssuerState, offer_set::OfferSetState,
+            proposal_received::ProposalReceivedState, requested_received::RequestReceivedState,
+        },
+    },
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IssuerFullState {
     Initial(InitialIssuerState),
     OfferSet(OfferSetState),
     ProposalReceived(ProposalReceivedState),
-    OfferSent(OfferSentState),
     RequestReceived(RequestReceivedState),
-    CredentialSent(CredentialSentState),
+    CredentialSet(CredentialSetState),
     Finished(FinishedState),
 }
 
@@ -58,9 +61,8 @@ pub enum IssuerState {
     Initial,
     OfferSet,
     ProposalReceived,
-    OfferSent,
     RequestReceived,
-    CredentialSent,
+    CredentialSet,
     Finished,
     Failed,
 }
@@ -72,9 +74,8 @@ impl Display for IssuerFullState {
             IssuerFullState::Initial(_) => f.write_str("Initial"),
             IssuerFullState::OfferSet(_) => f.write_str("OfferSet"),
             IssuerFullState::ProposalReceived(_) => f.write_str("ProposalReceived"),
-            IssuerFullState::OfferSent(_) => f.write_str("OfferSent"),
             IssuerFullState::RequestReceived(_) => f.write_str("RequestReceived"),
-            IssuerFullState::CredentialSent(_) => f.write_str("CredentialSent"),
+            IssuerFullState::CredentialSet(_) => f.write_str("CredentialSet"),
             IssuerFullState::Finished(_) => f.write_str("Finished"),
         }
     }
@@ -95,50 +96,63 @@ impl Default for IssuerFullState {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct IssuerSM {
-    source_id: String,
-    thread_id: String,
-    state: IssuerFullState,
+    pub(crate) source_id: String,
+    pub(crate) thread_id: String,
+    pub(crate) state: IssuerFullState,
 }
 
-fn build_credential_message(libindy_credential: String) -> VcxResult<IssueCredential> {
+fn build_credential_message(libindy_credential: String, thread_id: String) -> IssueCredentialV1 {
     let id = Uuid::new_v4().to_string();
 
-    let content = IssueCredentialContent::new(vec![make_attach_from_str!(
-        &libindy_credential,
-        AttachmentId::Credential.as_ref().to_string()
-    )]);
+    let content = IssueCredentialV1Content::builder()
+        .credentials_attach(vec![make_attach_from_str!(
+            &libindy_credential,
+            AttachmentId::Credential.as_ref().to_string()
+        )])
+        .build();
 
-    let mut decorators = IssueCredentialDecorators::new(Thread::new(id.clone())); // this needs a Thread per RFC...
-    let mut timing = Timing::default();
-    timing.out_time = Some(Utc::now());
-    decorators.timing = Some(timing);
+    let decorators = IssueCredentialV1Decorators::builder()
+        .thread(Thread::builder().thid(thread_id).build())
+        .please_ack(PleaseAck::builder().on(vec![]).build())
+        .build();
 
-    Ok(IssueCredential::with_decorators(id, content, decorators))
+    IssueCredentialV1::builder()
+        .id(id)
+        .content(content)
+        .decorators(decorators)
+        .build()
 }
 
 fn build_credential_offer(
     thread_id: &str,
     credential_offer: &str,
-    credential_preview: CredentialPreview,
+    credential_preview: CredentialPreviewV1,
     comment: Option<String>,
-) -> VcxResult<OfferCredential> {
+) -> VcxResult<OfferCredentialV1> {
     let id = thread_id.to_owned();
 
-    let mut content = OfferCredentialContent::new(
-        credential_preview,
-        vec![make_attach_from_str!(
+    let content = OfferCredentialV1Content::builder()
+        .credential_preview(credential_preview)
+        .offers_attach(vec![make_attach_from_str!(
             &credential_offer,
             AttachmentId::CredentialOffer.as_ref().to_string()
-        )],
-    );
-    content.comment = comment;
+        )]);
 
-    let mut decorators = OfferCredentialDecorators::default();
-    let mut timing = Timing::default();
-    timing.out_time = Some(Utc::now());
-    decorators.timing = Some(timing);
+    let content = if let Some(comment) = comment {
+        content.comment(comment).build()
+    } else {
+        content.build()
+    };
 
-    Ok(OfferCredential::with_decorators(id, content, decorators))
+    let decorators = OfferCredentialV1Decorators::builder()
+        .timing(Timing::builder().out_time(Utc::now()).build())
+        .build();
+
+    Ok(OfferCredentialV1::builder()
+        .id(id)
+        .content(content)
+        .decorators(decorators)
+        .build())
 }
 
 impl IssuerSM {
@@ -150,11 +164,14 @@ impl IssuerSM {
         }
     }
 
-    pub fn from_proposal(source_id: &str, credential_proposal: &ProposeCredential) -> Self {
+    pub fn from_proposal(source_id: &str, credential_proposal: &ProposeCredentialV1) -> Self {
         Self {
             thread_id: credential_proposal.id.clone(),
             source_id: source_id.to_string(),
-            state: IssuerFullState::ProposalReceived(ProposalReceivedState::new(credential_proposal.clone(), None)),
+            state: IssuerFullState::ProposalReceived(ProposalReceivedState::new(
+                credential_proposal.clone(),
+                None,
+            )),
         }
     }
 
@@ -172,7 +189,7 @@ impl IssuerSM {
 
     pub fn get_revocation_info(&self) -> Option<RevocationInfoV1> {
         match &self.state {
-            IssuerFullState::CredentialSent(state) => state.revocation_info_v1.clone(),
+            IssuerFullState::CredentialSet(state) => state.revocation_info_v1.clone(),
             IssuerFullState::Finished(state) => state.revocation_info_v1.clone(),
             _ => None,
         }
@@ -184,8 +201,18 @@ impl IssuerSM {
             "No revocation info found - is this credential revokable?",
         );
         let rev_id = match &self.state {
-            IssuerFullState::CredentialSent(state) => state.revocation_info_v1.as_ref().ok_or(err)?.cred_rev_id.clone(),
-            IssuerFullState::Finished(state) => state.revocation_info_v1.as_ref().ok_or(err)?.cred_rev_id.clone(),
+            IssuerFullState::CredentialSet(state) => state
+                .revocation_info_v1
+                .as_ref()
+                .ok_or(err)?
+                .cred_rev_id
+                .clone(),
+            IssuerFullState::Finished(state) => state
+                .revocation_info_v1
+                .as_ref()
+                .ok_or(err)?
+                .cred_rev_id
+                .clone(),
             _ => None,
         };
         rev_id.ok_or(AriesVcxError::from_msg(
@@ -207,9 +234,8 @@ impl IssuerSM {
                 Some(offer_info) => offer_info.rev_reg_id.clone(),
                 _ => None,
             },
-            IssuerFullState::OfferSent(state) => state.rev_reg_id.clone(),
             IssuerFullState::RequestReceived(state) => state.rev_reg_id.clone(),
-            IssuerFullState::CredentialSent(state) => {
+            IssuerFullState::CredentialSet(state) => {
                 state
                     .revocation_info_v1
                     .clone()
@@ -244,13 +270,13 @@ impl IssuerSM {
             }
         }
         match &self.state {
-            IssuerFullState::CredentialSent(state) => _is_revokable(&state.revocation_info_v1),
+            IssuerFullState::CredentialSet(state) => _is_revokable(&state.revocation_info_v1),
             IssuerFullState::Finished(state) => _is_revokable(&state.revocation_info_v1),
             _ => false,
         }
     }
 
-    pub async fn is_revoked(&self, ledger: &Arc<dyn AnoncredsLedgerRead>) -> VcxResult<bool> {
+    pub async fn is_revoked(&self, ledger: &impl AnoncredsLedgerRead) -> VcxResult<bool> {
         if self.is_revokable() {
             let rev_reg_id = self.get_rev_reg_id()?;
             let rev_id = self.get_rev_id()?;
@@ -263,71 +289,13 @@ impl IssuerSM {
         }
     }
 
-    pub fn find_message_to_handle(&self, messages: HashMap<String, AriesMessage>) -> Option<(String, AriesMessage)> {
-        trace!(
-            "IssuerSM::find_message_to_handle >>> messages: {:?}, state: {:?}",
-            messages,
-            self.state
-        );
-
-        for (uid, message) in messages {
-            match self.state {
-                IssuerFullState::Initial(_) => {
-                    if let AriesMessage::CredentialIssuance(CredentialIssuance::ProposeCredential(_)) = &message {
-                        return Some((uid, message));
-                    }
-                }
-                IssuerFullState::OfferSent(_) => match &message {
-                    AriesMessage::CredentialIssuance(CredentialIssuance::RequestCredential(msg)) => {
-                        if matches_opt_thread_id!(msg, self.thread_id.as_str()) {
-                            return Some((uid, message));
-                        }
-                    }
-                    AriesMessage::CredentialIssuance(CredentialIssuance::ProposeCredential(msg)) => {
-                        if matches_opt_thread_id!(msg, self.thread_id.as_str()) {
-                            return Some((uid, message));
-                        }
-                    }
-                    AriesMessage::ReportProblem(msg) => {
-                        if matches_opt_thread_id!(msg, self.thread_id.as_str()) {
-                            return Some((uid, message));
-                        }
-                    }
-                    _ => {}
-                },
-                IssuerFullState::CredentialSent(_) => match &message {
-                    AriesMessage::CredentialIssuance(CredentialIssuance::Ack(msg)) => {
-                        if matches_thread_id!(msg, self.thread_id.as_str()) {
-                            return Some((uid, message));
-                        }
-                    }
-                    AriesMessage::Notification(Notification::Ack(msg)) => {
-                        if matches_thread_id!(msg, self.thread_id.as_str()) {
-                            return Some((uid, message));
-                        }
-                    }
-                    AriesMessage::ReportProblem(msg) => {
-                        if matches_opt_thread_id!(msg, self.thread_id.as_str()) {
-                            return Some((uid, message));
-                        }
-                    }
-                    _ => {}
-                },
-                _ => {}
-            };
-        }
-
-        None
-    }
-
     pub fn get_state(&self) -> IssuerState {
         match self.state {
             IssuerFullState::Initial(_) => IssuerState::Initial,
             IssuerFullState::ProposalReceived(_) => IssuerState::ProposalReceived,
             IssuerFullState::OfferSet(_) => IssuerState::OfferSet,
-            IssuerFullState::OfferSent(_) => IssuerState::OfferSent,
             IssuerFullState::RequestReceived(_) => IssuerState::RequestReceived,
-            IssuerFullState::CredentialSent(_) => IssuerState::CredentialSent,
+            IssuerFullState::CredentialSet(_) => IssuerState::CredentialSet,
             IssuerFullState::Finished(ref status) => match status.status {
                 Status::Success => IssuerState::Finished,
                 _ => IssuerState::Failed,
@@ -335,7 +303,7 @@ impl IssuerSM {
         }
     }
 
-    pub fn get_proposal(&self) -> VcxResult<ProposeCredential> {
+    pub fn get_proposal(&self) -> VcxResult<ProposeCredentialV1> {
         match &self.state {
             IssuerFullState::ProposalReceived(state) => Ok(state.credential_proposal.clone()),
             _ => Err(AriesVcxError::from_msg(
@@ -348,7 +316,7 @@ impl IssuerSM {
     pub fn build_credential_offer_msg(
         self,
         credential_offer: &str,
-        credential_preview: CredentialPreview,
+        credential_preview: CredentialPreviewV1,
         comment: Option<String>,
         offer_info: &OfferInfo,
     ) -> VcxResult<Self> {
@@ -357,9 +325,17 @@ impl IssuerSM {
             source_id,
             thread_id,
         } = self;
+        warn!("IssuerSM::build_credential_offer_msg >>> thread_id: {thread_id}");
         let state = match state {
-            IssuerFullState::Initial(_) | IssuerFullState::OfferSet(_) | IssuerFullState::ProposalReceived(_) => {
-                let cred_offer_msg = build_credential_offer(&thread_id, credential_offer, credential_preview, comment)?;
+            IssuerFullState::Initial(_)
+            | IssuerFullState::OfferSet(_)
+            | IssuerFullState::ProposalReceived(_) => {
+                let cred_offer_msg = build_credential_offer(
+                    &thread_id,
+                    credential_offer,
+                    credential_preview,
+                    comment,
+                )?;
                 IssuerFullState::OfferSet(OfferSetState::new(
                     cred_offer_msg,
                     &offer_info.credential_json,
@@ -378,53 +354,36 @@ impl IssuerSM {
         Ok(Self::step(source_id, thread_id, state))
     }
 
-    pub fn get_credential_offer_msg(&self) -> VcxResult<OfferCredential> {
+    pub fn get_credential_offer_msg(&self) -> VcxResult<OfferCredentialV1> {
         match &self.state {
             IssuerFullState::OfferSet(state) => Ok(state.offer.clone()),
-            IssuerFullState::OfferSent(state) => Ok(state.offer.clone()),
             _ => Err(AriesVcxError::from_msg(
                 AriesVcxErrorKind::InvalidState,
-                format!("Can not get_credential_offer in current state {}.", self.state),
+                format!(
+                    "Can not get_credential_offer in current state {}.",
+                    self.state
+                ),
             )),
         }
     }
 
-    pub fn mark_credential_offer_msg_sent(self) -> VcxResult<Self> {
-        let Self {
-            state,
-            source_id,
-            thread_id,
-        } = self;
-        let state = match state {
-            IssuerFullState::OfferSet(state) => IssuerFullState::OfferSent(state.into()),
-            IssuerFullState::OfferSent(state) => IssuerFullState::OfferSent(state),
-            _ => {
-                return Err(AriesVcxError::from_msg(
-                    AriesVcxErrorKind::InvalidState,
-                    format!("Can not mark_as_offer_sent in current state {}.", state),
-                ))
-            }
-        };
-        Ok(Self::step(source_id, thread_id, state))
-    }
-
-    pub fn receive_proposal(self, proposal: ProposeCredential) -> VcxResult<Self> {
+    pub fn receive_proposal(self, proposal: ProposeCredentialV1) -> VcxResult<Self> {
         verify_thread_id(
             &self.thread_id,
-            &CredentialIssuanceAction::CredentialProposal(proposal.clone()),
+            &AriesMessage::CredentialIssuance(CredentialIssuance::V1(
+                CredentialIssuanceV1::ProposeCredential(proposal.clone()),
+            )),
         )?;
         let (state, thread_id) = match self.state {
             IssuerFullState::Initial(_) => {
                 let thread_id = proposal.id.to_string();
-                let state = IssuerFullState::ProposalReceived(ProposalReceivedState::new(proposal, None));
+                let state =
+                    IssuerFullState::ProposalReceived(ProposalReceivedState::new(proposal, None));
                 (state, thread_id)
             }
-            IssuerFullState::OfferSent(_) => {
-                verify_thread_id(
-                    &self.thread_id,
-                    &CredentialIssuanceAction::CredentialProposal(proposal.clone()),
-                )?;
-                let state = IssuerFullState::ProposalReceived(ProposalReceivedState::new(proposal, None));
+            IssuerFullState::OfferSet(_) => {
+                let state =
+                    IssuerFullState::ProposalReceived(ProposalReceivedState::new(proposal, None));
                 (state, self.thread_id.clone())
             }
             s => {
@@ -439,26 +398,17 @@ impl IssuerSM {
         })
     }
 
-    pub async fn send_credential_offer(self, send_message: SendClosure) -> VcxResult<Self> {
-        Ok(match self.state {
-            IssuerFullState::OfferSet(ref state_data) => {
-                let cred_offer_msg = state_data.offer.clone().into();
-                send_message(cred_offer_msg).await?;
-                self.mark_credential_offer_msg_sent()?
-            }
-            _ => {
-                return Err(AriesVcxError::from_msg(AriesVcxErrorKind::NotReady, "Invalid action"));
-            }
-        })
-    }
-
-    pub fn receive_request(self, request: RequestCredential) -> VcxResult<Self> {
+    pub fn receive_request(self, request: RequestCredentialV1) -> VcxResult<Self> {
         verify_thread_id(
             &self.thread_id,
-            &CredentialIssuanceAction::CredentialRequest(request.clone()),
+            &AriesMessage::CredentialIssuance(CredentialIssuance::V1(
+                CredentialIssuanceV1::RequestCredential(request.clone()),
+            )),
         )?;
         let state = match self.state {
-            IssuerFullState::OfferSent(state_data) => IssuerFullState::RequestReceived((state_data, request).into()),
+            IssuerFullState::OfferSet(state_data) => IssuerFullState::RequestReceived(
+                RequestReceivedState::from_offer_set_and_request(state_data, request),
+            ),
             s => {
                 warn!("Unable to receive credential request in state {}", s);
                 s
@@ -467,53 +417,91 @@ impl IssuerSM {
         Ok(Self { state, ..self })
     }
 
-    pub async fn send_credential(
+    pub async fn build_credential(
         self,
-        anoncreds: &Arc<dyn BaseAnonCreds>,
-        send_message: SendClosure,
+        wallet: &impl BaseWallet,
+        anoncreds: &impl BaseAnonCreds,
     ) -> VcxResult<Self> {
         let state = match self.state {
             IssuerFullState::RequestReceived(state_data) => {
-                match _create_credential(
+                match create_credential(
+                    wallet,
                     anoncreds,
                     &state_data.request,
                     &state_data.rev_reg_id,
                     &state_data.tails_file,
                     &state_data.offer,
                     &state_data.cred_data,
-                    &self.thread_id,
+                    self.thread_id.clone(),
                 )
                 .await
                 {
-                    Ok((mut credential_msg, cred_rev_id)) => {
-                        credential_msg.decorators.thread.thid = self.thread_id.clone();
-                        credential_msg.decorators.please_ack = Some(PleaseAck::new(vec![])); // ask_for_ack sets this to an empty vec
-
-                        send_message(credential_msg.into()).await?;
-                        IssuerFullState::CredentialSent((state_data, cred_rev_id).into())
+                    Ok((msg_issue_credential, cred_rev_id)) => {
+                        // todo: have constructor for this
+                        IssuerFullState::CredentialSet(CredentialSetState {
+                            msg_issue_credential,
+                            revocation_info_v1: Some(RevocationInfoV1 {
+                                cred_rev_id,
+                                rev_reg_id: state_data.rev_reg_id,
+                                tails_file: state_data.tails_file,
+                            }),
+                        })
                     }
+                    // todo: 1. Don't transition, throw error, add to_failed transition() api which
+                    // SM consumer can call       2. Also create separate
+                    // "Failed" state
                     Err(err) => {
-                        let problem_report = build_problem_report_msg(Some(err.to_string()), &self.thread_id);
+                        let problem_report =
+                            build_problem_report_msg(Some(err.to_string()), &self.thread_id);
                         error!(
-                            "Failed to create credential, sending problem report {:?}",
-                            problem_report
+                            "Failed to create credential, generated problem report \
+                             {problem_report:?}",
                         );
-                        send_message(problem_report.clone().into()).await?;
-                        IssuerFullState::Finished((state_data, problem_report).into())
+                        IssuerFullState::Finished(FinishedState::from_request_and_error(
+                            state_data,
+                            problem_report,
+                        ))
                     }
                 }
             }
             _ => {
-                return Err(AriesVcxError::from_msg(AriesVcxErrorKind::NotReady, "Invalid action"));
+                return Err(AriesVcxError::from_msg(
+                    AriesVcxErrorKind::NotReady,
+                    "Invalid action",
+                ));
             }
         };
         Ok(Self { state, ..self })
     }
 
-    pub fn receive_ack(self, ack: AckCredential) -> VcxResult<Self> {
-        verify_thread_id(&self.thread_id, &CredentialIssuanceAction::CredentialAck(ack))?;
+    pub fn get_msg_issue_credential(self) -> VcxResult<IssueCredentialV1> {
+        match self.state {
+            IssuerFullState::CredentialSet(ref state_data) => {
+                let mut msg_issue_credential: IssueCredentialV1 =
+                    state_data.msg_issue_credential.clone();
+                let timing = Timing::builder().out_time(Utc::now()).build();
+
+                msg_issue_credential.decorators.timing = Some(timing);
+                Ok(msg_issue_credential)
+            }
+            _ => Err(AriesVcxError::from_msg(
+                AriesVcxErrorKind::NotReady,
+                "Invalid action",
+            )),
+        }
+    }
+
+    pub fn receive_ack(self, ack: AckCredentialV1) -> VcxResult<Self> {
+        verify_thread_id(
+            &self.thread_id,
+            &AriesMessage::CredentialIssuance(CredentialIssuance::V1(CredentialIssuanceV1::Ack(
+                ack.clone(),
+            ))),
+        )?;
         let state = match self.state {
-            IssuerFullState::CredentialSent(state_data) => IssuerFullState::Finished(state_data.into()),
+            IssuerFullState::CredentialSet(state_data) => {
+                IssuerFullState::Finished(FinishedState::from_credential_set_state(state_data))
+            }
             s => {
                 warn!("Unable to receive credential ack in state {}", s);
                 s
@@ -525,42 +513,21 @@ impl IssuerSM {
     pub fn receive_problem_report(self, problem_report: ProblemReport) -> VcxResult<Self> {
         verify_thread_id(
             &self.thread_id,
-            &CredentialIssuanceAction::ProblemReport(problem_report.clone()),
+            &AriesMessage::ReportProblem(problem_report.clone()),
         )?;
         let state = match self.state {
-            IssuerFullState::OfferSent(state_data) => IssuerFullState::Finished((state_data, problem_report).into()),
-            IssuerFullState::CredentialSent(state_data) => IssuerFullState::Finished((state_data).into()),
+            IssuerFullState::OfferSet(state_data) => IssuerFullState::Finished(
+                FinishedState::from_offer_set_and_error(state_data, problem_report),
+            ),
+            IssuerFullState::CredentialSet(state_data) => {
+                IssuerFullState::Finished(FinishedState::from_credential_set_state(state_data))
+            }
             s => {
                 warn!("Unable to receive credential ack in state {}", s);
                 s
             }
         };
         Ok(Self { state, ..self })
-    }
-
-    pub async fn handle_message(
-        self,
-        anoncreds: &Arc<dyn BaseAnonCreds>,
-        cim: CredentialIssuanceAction,
-        send_message: Option<SendClosure>,
-    ) -> VcxResult<Self> {
-        trace!("IssuerSM::handle_message >>> cim: {:?}, state: {:?}", cim, self.state);
-        verify_thread_id(&self.thread_id, &cim)?;
-        let issuer_sm = match cim {
-            CredentialIssuanceAction::CredentialProposal(proposal) => self.receive_proposal(proposal)?,
-            CredentialIssuanceAction::CredentialRequest(request) => self.receive_request(request)?,
-            CredentialIssuanceAction::CredentialSend() => {
-                let send_message = send_message.ok_or(AriesVcxError::from_msg(
-                    AriesVcxErrorKind::InvalidState,
-                    "Attempted to call undefined send_message callback",
-                ))?;
-                self.send_credential(anoncreds, send_message).await?
-            }
-            CredentialIssuanceAction::CredentialAck(ack) => self.receive_ack(ack)?,
-            CredentialIssuanceAction::ProblemReport(problem_report) => self.receive_problem_report(problem_report)?,
-            _ => self,
-        };
-        Ok(issuer_sm)
     }
 
     pub fn credential_status(&self) -> u32 {
@@ -579,24 +546,52 @@ impl IssuerSM {
     pub fn thread_id(&self) -> VcxResult<String> {
         Ok(self.thread_id.clone())
     }
+
+    pub fn get_problem_report(&self) -> VcxResult<ProblemReport> {
+        match self.state {
+            IssuerFullState::Finished(ref state) => match &state.status {
+                Status::Failed(problem_report) => Ok(problem_report.clone()),
+                Status::Declined(problem_report) => Ok(problem_report.clone()),
+                _ => Err(AriesVcxError::from_msg(
+                    AriesVcxErrorKind::NotReady,
+                    "No problem report available in current state",
+                )),
+            },
+            _ => Err(AriesVcxError::from_msg(
+                AriesVcxErrorKind::NotReady,
+                "No problem report available in current state",
+            )),
+        }
+    }
 }
 
-async fn _create_credential(
-    anoncreds: &Arc<dyn BaseAnonCreds>,
-    request: &RequestCredential,
+#[allow(clippy::too_many_arguments)]
+async fn create_credential(
+    wallet: &impl BaseWallet,
+    anoncreds: &impl BaseAnonCreds,
+    request: &RequestCredentialV1,
     rev_reg_id: &Option<String>,
     tails_file: &Option<String>,
-    offer: &OfferCredential,
+    offer: &OfferCredentialV1,
     cred_data: &str,
-    thread_id: &str,
-) -> VcxResult<(IssueCredential, Option<String>)> {
+    thread_id: String,
+) -> VcxResult<(IssueCredentialV1, Option<String>)> {
     let offer = get_attach_as_string!(&offer.content.offers_attach);
 
-    trace!("Issuer::_create_credential >>> request: {:?}, rev_reg_id: {:?}, tails_file: {:?}, offer: {}, cred_data: {}, thread_id: {}", request, rev_reg_id, tails_file, offer, cred_data, thread_id);
-    if !matches_opt_thread_id!(request, thread_id) {
+    trace!(
+        "Issuer::_create_credential >>> request: {:?}, rev_reg_id: {:?}, tails_file: {:?}, offer: \
+         {}, cred_data: {}, thread_id: {}",
+        request,
+        rev_reg_id,
+        tails_file,
+        offer,
+        cred_data,
+        thread_id
+    );
+    if !matches_opt_thread_id!(request, thread_id.as_str()) {
         return Err(AriesVcxError::from_msg(
             AriesVcxErrorKind::InvalidJson,
-            format!("Cannot handle credential request: thread id does not match"),
+            "Cannot handle credential request: thread id does not match",
         ));
     };
 
@@ -604,735 +599,15 @@ async fn _create_credential(
 
     let cred_data = encode_attributes(cred_data)?;
     let (libindy_credential, cred_rev_id, _) = anoncreds
-        .issuer_create_credential(&offer, &request, &cred_data, rev_reg_id.clone(), tails_file.clone())
+        .issuer_create_credential(
+            wallet,
+            &offer,
+            &request,
+            &cred_data,
+            rev_reg_id.clone(),
+            tails_file.clone(),
+        )
         .await?;
-    let credential = build_credential_message(libindy_credential)?;
-    Ok((credential, cred_rev_id))
+    let msg_issue_credential = build_credential_message(libindy_credential, thread_id);
+    Ok((msg_issue_credential, cred_rev_id))
 }
-
-// #[cfg(test)]
-// pub mod unit_tests {
-//     use crate::common::test_utils::mock_profile;
-//     use crate::test::source_id;
-//     use crate::utils::constants::LIBINDY_CRED_OFFER;
-//     use crate::utils::devsetup::SetupMocks;
-//     use messages::a2a::A2AMessage;
-//     use messages::concepts::problem_report::ProblemReport;
-//     use messages::protocols::issuance::credential::test_utils::_credential;
-//     use messages::protocols::issuance::credential_offer::test_utils::{_credential_offer, _offer_info};
-//     use messages::protocols::issuance::credential_proposal::test_utils::_credential_proposal;
-//     use messages::protocols::issuance::credential_request::test_utils::{_credential_request, _credential_request_1};
-//     use messages::protocols::issuance::test_utils::{_credential_ack, _problem_report};
-
-//     use super::*;
-
-//     pub fn _rev_reg_id() -> String {
-//         String::from("TEST_REV_REG_ID")
-//     }
-
-//     pub fn _tails_file() -> String {
-//         String::from("TEST_TAILS_FILE")
-//     }
-
-//     pub fn _send_message() -> Option<SendClosure> {
-//         Some(Box::new(|_: A2AMessage| Box::pin(async { VcxResult::Ok(()) })))
-//     }
-
-//     fn _issuer_sm() -> IssuerSM {
-//         IssuerSM::new(&source_id())
-//     }
-
-//     fn _issuer_sm_from_proposal() -> IssuerSM {
-//         IssuerSM::from_proposal(&source_id(), &_credential_proposal())
-//     }
-
-//     impl IssuerSM {
-//         fn to_proposal_received_state(self) -> IssuerSM {
-//             Self::from_proposal(&source_id(), &_credential_proposal())
-//         }
-
-//         fn to_offer_sent_state(mut self) -> IssuerSM {
-//             let cred_info = _offer_info();
-//             self = self
-//                 .build_credential_offer_msg(
-//                     LIBINDY_CRED_OFFER,
-//                     CredentialPreviewData::new(),
-//                     Some("foo".into()),
-//                     &cred_info,
-//                 )
-//                 .unwrap();
-//             self = self.mark_credential_offer_msg_sent().unwrap();
-//             self
-//         }
-
-//         async fn to_request_received_state(mut self) -> IssuerSM {
-//             self = self.to_offer_sent_state();
-//             self = self
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             self
-//         }
-
-//         async fn to_finished_state(mut self) -> IssuerSM {
-//             self = self.to_request_received_state().await;
-//             self = self
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialSend(),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             self = self
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialAck(_credential_ack()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             self
-//         }
-//     }
-
-//     mod build_messages {
-//         use crate::protocols::issuance::issuer::state_machine::{build_credential_message, build_credential_offer};
-//         use crate::utils::constants::LIBINDY_CRED_OFFER;
-//         use crate::utils::devsetup::{was_in_past, SetupMocks};
-//         use messages::a2a::MessageId;
-//         use messages::protocols::issuance::CredentialPreviewData;
-
-//         #[test]
-//         fn test_issuer_build_credential_offer() {
-//             let _setup = SetupMocks::init();
-//             let msg = build_credential_offer(
-//                 "12345",
-//                 LIBINDY_CRED_OFFER,
-//                 CredentialPreviewData::new(),
-//                 Some("foo".into()),
-//             )
-//             .unwrap();
-
-//             assert_eq!(msg.id, MessageId("12345".into()));
-//             assert!(msg.thread.is_none());
-//             assert!(was_in_past(
-//                 &msg.timing.unwrap().out_time.unwrap(),
-//                 chrono::Duration::milliseconds(100)
-//             )
-//             .unwrap());
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_build_credential_message() {
-//             let _setup = SetupMocks::init();
-
-//             let msg = build_credential_message("{}".into()).unwrap();
-
-//             assert_eq!(msg.id, MessageId::default());
-//             assert!(msg.thread.thid.is_none()); // todo: should have thread_id
-//             assert!(was_in_past(
-//                 &msg.timing.unwrap().out_time.unwrap(),
-//                 chrono::Duration::milliseconds(100)
-//             )
-//             .unwrap());
-//         }
-//     }
-
-//     mod new {
-//         use super::*;
-
-//         #[test]
-//         fn test_issuer_new() {
-//             let _setup = SetupMocks::init();
-
-//             let issuer_sm = _issuer_sm();
-
-//             assert_match!(IssuerFullState::Initial(_), issuer_sm.state);
-//             assert_eq!(source_id(), issuer_sm.get_source_id());
-//         }
-
-//         #[test]
-//         fn test_issuer_from_proposal() {
-//             let _setup = SetupMocks::init();
-
-//             let issuer_sm = _issuer_sm_from_proposal();
-
-//             assert_match!(IssuerFullState::ProposalReceived(_), issuer_sm.state);
-//             assert_eq!(source_id(), issuer_sm.get_source_id());
-//         }
-//     }
-
-//     mod handle_message {
-//         use super::*;
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_credential_proposal_message_from_initial_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialProposal(_credential_proposal()),
-//                     None,
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::ProposalReceived(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_set_credential_offer_message_in_initial_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             let _cred_offer = CredentialOffer::create().set_offers_attach(LIBINDY_CRED_OFFER).unwrap();
-//             let cred_info = _offer_info();
-//             issuer_sm = issuer_sm
-//                 .build_credential_offer_msg(
-//                     LIBINDY_CRED_OFFER,
-//                     CredentialPreviewData::new(),
-//                     Some("foo".into()),
-//                     &cred_info,
-//                 )
-//                 .unwrap();
-//             issuer_sm = issuer_sm.mark_credential_offer_msg_sent().unwrap();
-
-//             assert_match!(IssuerFullState::OfferSent(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_other_messages_from_initial_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::Credential(_credential()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::Initial(_), issuer_sm.state);
-
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::Initial(_), issuer_sm.state);
-//         }
-
-//         #[test]
-//         fn test_issuer_handle_credential_offer_send_message_from_proposal_received() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm_from_proposal();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-
-//             assert_match!(IssuerFullState::OfferSent(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_other_messages_from_proposal_received_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm_from_proposal();
-
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::Credential(_credential()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::ProposalReceived(_), issuer_sm.state);
-
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::ProposalReceived(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_credential_request_message_from_offer_sent_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::RequestReceived(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_credential_proposal_message_from_offer_sent_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialProposal(_credential_proposal()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::ProposalReceived(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_problem_report_message_from_offer_sent_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::ProblemReport(_problem_report()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-//             assert_eq!(
-//                 Status::Failed(ProblemReport::default()).code(),
-//                 issuer_sm.credential_status()
-//             );
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_other_messages_from_offer_sent_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::Credential(_credential()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::OfferSent(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_credential_send_message_from_request_received_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialSend(),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::CredentialSent(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_credential_send_message_from_request_received_state_with_invalid_request() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(CredentialRequest::create()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialSend(),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-//             assert_eq!(
-//                 Status::Failed(ProblemReport::default()).code(),
-//                 issuer_sm.credential_status()
-//             );
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_other_messages_from_request_received_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialSend(),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::CredentialSent(_), issuer_sm.state);
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialAck(_credential_ack()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_credential_send_fails_with_incorrect_thread_id() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_offer_sent_state();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request_1()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialSend(),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-//             assert_eq!(
-//                 Status::Failed(ProblemReport::default()).code(),
-//                 issuer_sm.credential_status()
-//             );
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_handle_messages_from_finished_state() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_finished_state().await;
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::CredentialRequest(_credential_request()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-
-//             issuer_sm = issuer_sm
-//                 .handle_message(
-//                     &mock_profile(),
-//                     CredentialIssuanceAction::Credential(_credential()),
-//                     _send_message(),
-//                 )
-//                 .await
-//                 .unwrap();
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_in_finished_state_returns_error_on_set_offer() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_finished_state().await;
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-//             let _cred_offer = CredentialOffer::create().set_offers_attach(LIBINDY_CRED_OFFER).unwrap();
-//             let cred_info = _offer_info();
-
-//             let res1 = issuer_sm.build_credential_offer_msg(
-//                 LIBINDY_CRED_OFFER,
-//                 CredentialPreviewData::new(),
-//                 Some("foo".into()),
-//                 &cred_info,
-//             );
-//             assert!(res1.is_err());
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_in_finished_state_returns_error_on_mark_credential_offer_msg_sent() {
-//             let _setup = SetupMocks::init();
-
-//             let mut issuer_sm = _issuer_sm();
-//             issuer_sm = issuer_sm.to_finished_state().await;
-//             assert_match!(IssuerFullState::Finished(_), issuer_sm.state);
-
-//             let res1 = issuer_sm.mark_credential_offer_msg_sent();
-//             assert!(res1.is_err());
-//         }
-//     }
-
-//     mod find_message_to_handle {
-//         use super::*;
-
-//         #[tokio::test]
-//         async fn test_issuer_find_message_to_handle_from_initial_state() {
-//             let _setup = SetupMocks::init();
-
-//             let issuer = _issuer_sm();
-
-//             let messages = map!(
-//                 "key_1".to_string() => A2AMessage::CredentialProposal(_credential_proposal()),
-//                 "key_2".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                 "key_3".to_string() => A2AMessage::CredentialRequest(_credential_request()),
-//                 "key_4".to_string() => A2AMessage::Credential(_credential()),
-//                 "key_5".to_string() => A2AMessage::CredentialAck(_credential_ack()),
-//                 "key_6".to_string() => A2AMessage::CommonProblemReport(_problem_report())
-//             );
-//             let (uid, message) = issuer.find_message_to_handle(messages).unwrap();
-//             assert_eq!("key_1", uid);
-//             assert_match!(A2AMessage::CredentialProposal(_), message);
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_find_message_to_handle_from_offer_sent_state() {
-//             let _setup = SetupMocks::init();
-
-//             let issuer = _issuer_sm().to_offer_sent_state();
-
-//             // CredentialRequest
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                     "key_2".to_string() => A2AMessage::Credential(_credential()),
-//                     "key_3".to_string() => A2AMessage::CredentialRequest(_credential_request())
-//                 );
-
-//                 let (uid, message) = issuer.find_message_to_handle(messages).unwrap();
-//                 assert_eq!("key_3", uid);
-//                 assert_match!(A2AMessage::CredentialRequest(_), message);
-//             }
-
-//             // CredentialProposal
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                     "key_2".to_string() => A2AMessage::CredentialAck(_credential_ack()),
-//                     "key_3".to_string() => A2AMessage::Credential(_credential()),
-//                     "key_4".to_string() => A2AMessage::CredentialProposal(_credential_proposal())
-//                 );
-
-//                 let (uid, message) = issuer.find_message_to_handle(messages).unwrap();
-//                 assert_eq!("key_4", uid);
-//                 assert_match!(A2AMessage::CredentialProposal(_), message);
-//             }
-
-//             // Problem Report
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                     "key_2".to_string() => A2AMessage::CredentialAck(_credential_ack()),
-//                     "key_3".to_string() => A2AMessage::CommonProblemReport(_problem_report())
-//                 );
-
-//                 let (uid, message) = issuer.find_message_to_handle(messages).unwrap();
-//                 assert_eq!("key_3", uid);
-//                 assert_match!(A2AMessage::CommonProblemReport(_), message);
-//             }
-
-//             // No messages for different Thread ID
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer().set_thread_id("")),
-//                     "key_2".to_string() => A2AMessage::CredentialRequest(_credential_request().set_thread_id("")),
-//                     "key_3".to_string() => A2AMessage::CredentialProposal(_credential_proposal().set_thread_id("")),
-//                     "key_4".to_string() => A2AMessage::Credential(_credential().set_thread_id("")),
-//                     "key_5".to_string() => A2AMessage::CredentialAck(_credential_ack().set_thread_id("")),
-//                     "key_6".to_string() => A2AMessage::CommonProblemReport(_problem_report().set_thread_id(""))
-//                 );
-
-//                 assert!(issuer.find_message_to_handle(messages).is_none());
-//             }
-
-//             // No messages
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                     "key_2".to_string() => A2AMessage::CredentialAck(_credential_ack())
-//                 );
-
-//                 assert!(issuer.find_message_to_handle(messages).is_none());
-//             }
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_find_message_to_handle_from_request_state() {
-//             let _setup = SetupMocks::init();
-
-//             let issuer = _issuer_sm().to_finished_state().await;
-
-//             // No messages
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                     "key_2".to_string() => A2AMessage::CredentialRequest(_credential_request()),
-//                     "key_3".to_string() => A2AMessage::CredentialProposal(_credential_proposal()),
-//                     "key_4".to_string() => A2AMessage::Credential(_credential()),
-//                     "key_5".to_string() => A2AMessage::CredentialAck(_credential_ack()),
-//                     "key_6".to_string() => A2AMessage::CommonProblemReport(_problem_report())
-//                 );
-
-//                 assert!(issuer.find_message_to_handle(messages).is_none());
-//             }
-//         }
-
-//         #[tokio::test]
-//         async fn test_issuer_find_message_to_handle_from_credential_sent_state() {
-//             let _setup = SetupMocks::init();
-
-//             let issuer = _issuer_sm().to_finished_state().await;
-
-//             // No messages
-//             {
-//                 let messages = map!(
-//                     "key_1".to_string() => A2AMessage::CredentialOffer(_credential_offer()),
-//                     "key_2".to_string() => A2AMessage::CredentialRequest(_credential_request()),
-//                     "key_3".to_string() => A2AMessage::CredentialProposal(_credential_proposal()),
-//                     "key_4".to_string() => A2AMessage::Credential(_credential()),
-//                     "key_5".to_string() => A2AMessage::CredentialAck(_credential_ack()),
-//                     "key_6".to_string() => A2AMessage::CommonProblemReport(_problem_report())
-//                 );
-
-//                 assert!(issuer.find_message_to_handle(messages).is_none());
-//             }
-//         }
-//     }
-
-//     mod get_state {
-//         use super::*;
-
-//         #[tokio::test]
-//         async fn test_get_state() {
-//             let _setup = SetupMocks::init();
-
-//             assert_eq!(IssuerState::Initial, _issuer_sm().get_state());
-//             assert_eq!(
-//                 IssuerState::ProposalReceived,
-//                 _issuer_sm().to_proposal_received_state().get_state()
-//             );
-//             assert_eq!(IssuerState::OfferSent, _issuer_sm().to_offer_sent_state().get_state());
-//             assert_eq!(
-//                 IssuerState::RequestReceived,
-//                 _issuer_sm().to_request_received_state().await.get_state()
-//             );
-//             assert_eq!(
-//                 IssuerState::Finished,
-//                 _issuer_sm().to_finished_state().await.get_state()
-//             );
-//         }
-//     }
-
-//     mod get_rev_reg_id {
-//         use super::*;
-
-//         #[tokio::test]
-//         async fn test_get_rev_reg_id() {
-//             let _setup = SetupMocks::init();
-
-//             assert_eq!(
-//                 AriesVcxErrorKind::InvalidState,
-//                 _issuer_sm().get_rev_reg_id().unwrap_err().kind()
-//             );
-//             assert_eq!(
-//                 AriesVcxErrorKind::InvalidState,
-//                 _issuer_sm()
-//                     .to_proposal_received_state()
-//                     .get_rev_reg_id()
-//                     .unwrap_err()
-//                     .kind()
-//             );
-//             assert_eq!(
-//                 _rev_reg_id(),
-//                 _issuer_sm().to_offer_sent_state().get_rev_reg_id().unwrap()
-//             );
-//             assert_eq!(
-//                 _rev_reg_id(),
-//                 _issuer_sm().to_request_received_state().await.get_rev_reg_id().unwrap()
-//             );
-//             assert_eq!(
-//                 _rev_reg_id(),
-//                 _issuer_sm().to_finished_state().await.get_rev_reg_id().unwrap()
-//             );
-//         }
-//     }
-
-//     mod is_revokable {
-//         use super::*;
-
-//         #[tokio::test]
-//         async fn test_is_revokable() {
-//             let _setup = SetupMocks::init();
-
-//             assert_eq!(false, _issuer_sm().is_revokable());
-//             assert_eq!(false, _issuer_sm().to_proposal_received_state().is_revokable());
-//             assert_eq!(false, _issuer_sm().to_offer_sent_state().is_revokable());
-//             assert_eq!(false, _issuer_sm().to_request_received_state().await.is_revokable());
-//             assert_eq!(false, _issuer_sm().to_finished_state().await.is_revokable());
-//         }
-//     }
-// }

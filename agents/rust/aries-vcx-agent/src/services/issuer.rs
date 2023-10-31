@@ -1,19 +1,24 @@
 use std::sync::Arc;
 
-use crate::error::*;
-use crate::http_client::HttpClient;
-use crate::services::connection::ServiceConnections;
-use crate::storage::object_cache::ObjectCache;
-use crate::storage::Storage;
-use aries_vcx::core::profile::profile::Profile;
-use aries_vcx::handlers::issuance::issuer::Issuer;
-use aries_vcx::handlers::util::OfferInfo;
-use aries_vcx::messages::msg_fields::protocols::cred_issuance::ack::AckCredential;
-use aries_vcx::messages::msg_fields::protocols::cred_issuance::propose_credential::ProposeCredential;
-use aries_vcx::messages::msg_fields::protocols::cred_issuance::request_credential::RequestCredential;
-use aries_vcx::messages::AriesMessage;
-use aries_vcx::protocols::issuance::issuer::state_machine::IssuerState;
-use aries_vcx::protocols::SendClosure;
+use aries_vcx::{
+    handlers::{issuance::issuer::Issuer, util::OfferInfo},
+    messages::{
+        msg_fields::protocols::cred_issuance::v1::{
+            ack::AckCredentialV1, propose_credential::ProposeCredentialV1,
+            request_credential::RequestCredentialV1,
+        },
+        AriesMessage,
+    },
+    protocols::{issuance::issuer::state_machine::IssuerState, SendClosure},
+};
+use aries_vcx_core::{anoncreds::credx_anoncreds::IndyCredxAnonCreds, wallet::indy::IndySdkWallet};
+
+use crate::{
+    error::*,
+    http_client::HttpClient,
+    services::connection::ServiceConnections,
+    storage::{object_cache::ObjectCache, Storage},
+};
 
 #[derive(Clone)]
 struct IssuerWrapper {
@@ -31,17 +36,23 @@ impl IssuerWrapper {
 }
 
 pub struct ServiceCredentialsIssuer {
-    profile: Arc<dyn Profile>,
+    anoncreds: IndyCredxAnonCreds,
+    wallet: Arc<IndySdkWallet>,
     creds_issuer: ObjectCache<IssuerWrapper>,
     service_connections: Arc<ServiceConnections>,
 }
 
 impl ServiceCredentialsIssuer {
-    pub fn new(profile: Arc<dyn Profile>, service_connections: Arc<ServiceConnections>) -> Self {
+    pub fn new(
+        anoncreds: IndyCredxAnonCreds,
+        wallet: Arc<IndySdkWallet>,
+        service_connections: Arc<ServiceConnections>,
+    ) -> Self {
         Self {
-            profile,
             service_connections,
             creds_issuer: ObjectCache::new("creds-issuer"),
+            anoncreds,
+            wallet,
         }
     }
 
@@ -55,10 +66,16 @@ impl ServiceCredentialsIssuer {
         Ok(connection_id)
     }
 
-    pub async fn accept_proposal(&self, connection_id: &str, proposal: &ProposeCredential) -> AgentResult<String> {
+    pub async fn accept_proposal(
+        &self,
+        connection_id: &str,
+        proposal: &ProposeCredentialV1,
+    ) -> AgentResult<String> {
         let issuer = Issuer::create_from_proposal("", proposal)?;
-        self.creds_issuer
-            .insert(&issuer.get_thread_id()?, IssuerWrapper::new(issuer, connection_id))
+        self.creds_issuer.insert(
+            &issuer.get_thread_id()?,
+            IssuerWrapper::new(issuer, connection_id),
+        )
     }
 
     pub async fn send_credential_offer(
@@ -75,39 +92,50 @@ impl ServiceCredentialsIssuer {
         };
         let connection = self.service_connections.get_by_id(&connection_id)?;
         issuer
-            .build_credential_offer_msg(&self.profile.inject_anoncreds(), offer_info, None)
+            .build_credential_offer_msg(self.wallet.as_ref(), &self.anoncreds, offer_info, None)
             .await?;
 
-        let wallet = self.profile.inject_wallet();
+        let wallet = self.wallet.as_ref();
 
         let send_closure: SendClosure = Box::new(|msg: AriesMessage| {
-            Box::pin(async move { connection.send_message(&wallet, &msg, &HttpClient).await })
+            Box::pin(async move { connection.send_message(wallet, &msg, &HttpClient).await })
         });
 
-        issuer.send_credential_offer(send_closure).await?;
-        self.creds_issuer
-            .insert(&issuer.get_thread_id()?, IssuerWrapper::new(issuer, &connection_id))
+        let credential_offer = issuer.get_credential_offer_msg()?;
+        send_closure(credential_offer).await?;
+        self.creds_issuer.insert(
+            &issuer.get_thread_id()?,
+            IssuerWrapper::new(issuer, &connection_id),
+        )
     }
 
-    pub fn process_credential_request(&self, thread_id: &str, request: RequestCredential) -> AgentResult<()> {
+    pub fn process_credential_request(
+        &self,
+        thread_id: &str,
+        request: RequestCredentialV1,
+    ) -> AgentResult<()> {
         let IssuerWrapper {
             mut issuer,
             connection_id,
         } = self.creds_issuer.get(thread_id)?;
         issuer.process_credential_request(request)?;
-        self.creds_issuer
-            .insert(&issuer.get_thread_id()?, IssuerWrapper::new(issuer, &connection_id))?;
+        self.creds_issuer.insert(
+            &issuer.get_thread_id()?,
+            IssuerWrapper::new(issuer, &connection_id),
+        )?;
         Ok(())
     }
 
-    pub fn process_credential_ack(&self, thread_id: &str, ack: AckCredential) -> AgentResult<()> {
+    pub fn process_credential_ack(&self, thread_id: &str, ack: AckCredentialV1) -> AgentResult<()> {
         let IssuerWrapper {
             mut issuer,
             connection_id,
         } = self.creds_issuer.get(thread_id)?;
         issuer.process_credential_ack(ack)?;
-        self.creds_issuer
-            .insert(&issuer.get_thread_id()?, IssuerWrapper::new(issuer, &connection_id))?;
+        self.creds_issuer.insert(
+            &issuer.get_thread_id()?,
+            IssuerWrapper::new(issuer, &connection_id),
+        )?;
         Ok(())
     }
 
@@ -118,17 +146,29 @@ impl ServiceCredentialsIssuer {
         } = self.creds_issuer.get(thread_id)?;
         let connection = self.service_connections.get_by_id(&connection_id)?;
 
-        let wallet = self.profile.inject_wallet();
+        let wallet = self.wallet.as_ref();
 
         let send_closure: SendClosure = Box::new(|msg: AriesMessage| {
-            Box::pin(async move { connection.send_message(&wallet, &msg, &HttpClient).await })
+            Box::pin(async move { connection.send_message(wallet, &msg, &HttpClient).await })
         });
 
         issuer
-            .send_credential(&self.profile.inject_anoncreds(), send_closure)
+            .build_credential(self.wallet.as_ref(), &self.anoncreds)
             .await?;
-        self.creds_issuer
-            .insert(&issuer.get_thread_id()?, IssuerWrapper::new(issuer, &connection_id))?;
+        match issuer.get_state() {
+            IssuerState::Failed => {
+                let problem_report = issuer.get_problem_report()?;
+                send_closure(problem_report.into()).await?;
+            }
+            _ => {
+                let msg_issue_credential = issuer.get_msg_issue_credential()?;
+                send_closure(msg_issue_credential.into()).await?;
+            }
+        }
+        self.creds_issuer.insert(
+            &issuer.get_thread_id()?,
+            IssuerWrapper::new(issuer, &connection_id),
+        )?;
         Ok(())
     }
 
@@ -146,7 +186,7 @@ impl ServiceCredentialsIssuer {
         issuer.get_rev_id().map_err(|err| err.into())
     }
 
-    pub fn get_proposal(&self, thread_id: &str) -> AgentResult<ProposeCredential> {
+    pub fn get_proposal(&self, thread_id: &str) -> AgentResult<ProposeCredentialV1> {
         let issuer = self.get_issuer(thread_id)?;
         issuer.get_proposal().map_err(|err| err.into())
     }

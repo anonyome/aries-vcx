@@ -1,22 +1,20 @@
 use std::{
     cell,
     cell::RefCell,
+    error::Error,
     ffi::{CString, NulError},
     fmt, io, ptr,
     sync::Arc,
 };
 
+use libc::c_char;
 use log;
-use std::error::Error;
-use thiserror::Error as ThisError;
-
 #[cfg(feature = "casting_errors_wallet")]
 use sqlx;
-
+use thiserror::Error as ThisError;
+use ursa::errors::{UrsaCryptoError, UrsaCryptoErrorKind};
 #[cfg(feature = "casting_errors_misc")]
 use ursa::errors::{UrsaCryptoError, UrsaCryptoErrorKind};
-
-use libc::c_char;
 
 use crate::ErrorCode;
 
@@ -248,7 +246,6 @@ impl From<log::SetLoggerError> for IndyError {
     }
 }
 
-#[cfg(feature = "casting_errors_misc")]
 impl From<UrsaCryptoError> for IndyError {
     fn from(err: UrsaCryptoError) -> Self {
         match err.kind() {
@@ -278,7 +275,6 @@ impl From<UrsaCryptoError> for IndyError {
     }
 }
 
-#[cfg(feature = "casting_errors_misc")]
 impl From<bs58::decode::Error> for IndyError {
     fn from(_err: bs58::decode::Error) -> Self {
         IndyError::from_msg(
@@ -288,7 +284,6 @@ impl From<bs58::decode::Error> for IndyError {
     }
 }
 
-#[cfg(feature = "casting_errors_misc")]
 impl From<openssl::error::ErrorStack> for IndyError {
     fn from(err: openssl::error::ErrorStack) -> IndyError {
         // TODO: FIXME: Analyze ErrorStack and split invalid structure errors from other errors
@@ -296,7 +291,6 @@ impl From<openssl::error::ErrorStack> for IndyError {
     }
 }
 
-#[cfg(feature = "casting_errors_wallet")]
 impl From<sqlx::Error> for IndyError {
     fn from(err: sqlx::Error) -> IndyError {
         match &err {
@@ -616,8 +610,8 @@ pub fn set_current_error(err: &IndyError) {
 ///     1) synchronous  - in the same application thread
 ///     2) asynchronous - inside of function callback
 ///
-/// NOTE: Error is stored until the next one occurs in the same execution thread or until asynchronous callback finished.
-///       Returning pointer has the same lifetime.
+/// NOTE: Error is stored until the next one occurs in the same execution thread or until
+/// asynchronous callback finished.       Returning pointer has the same lifetime.
 ///
 /// #Params
 /// * `error_json_p` - Reference that will contain error details (if any error has occurred before)
@@ -629,7 +623,6 @@ pub fn set_current_error(err: &IndyError) {
 ///             2) calling `indy_set_runtime_config` API function with `collect_backtrace: true`
 ///     "message": str - human-readable error description
 /// }
-///
 pub fn get_current_error_c_json() -> *const c_char {
     let mut value = ptr::null();
 

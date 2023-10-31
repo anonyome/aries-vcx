@@ -1,23 +1,19 @@
-use aries_vcx_core::anoncreds::base_anoncreds::BaseAnonCreds;
-use std::sync::Arc;
-
-use aries_vcx_core::errors::error::AriesVcxCoreErrorKind;
-use aries_vcx_core::ledger::base_ledger::AnoncredsLedgerWrite;
-
-use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
-use crate::global::settings;
-use crate::utils::constants::REV_REG_ID;
+use aries_vcx_core::{
+    anoncreds::base_anoncreds::BaseAnonCreds, errors::error::AriesVcxCoreErrorKind,
+    ledger::base_ledger::AnoncredsLedgerWrite, wallet::base_wallet::BaseWallet,
+};
 
 use super::credential_definition::PublicEntityStateType;
+use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
 
 #[derive(Clone, Deserialize, Debug, Serialize, PartialEq, Eq)]
 pub struct RevocationRegistry {
     cred_def_id: String,
     issuer_did: String,
     pub rev_reg_id: String,
-    pub(in crate::common) rev_reg_def: RevocationRegistryDefinition,
+    rev_reg_def: RevocationRegistryDefinition,
     pub(in crate::common) rev_reg_entry: String,
-    pub(in crate::common) tails_dir: String,
+    pub tails_dir: String,
     pub(in crate::common) max_creds: u32,
     pub(in crate::common) tag: u32,
     rev_reg_def_state: PublicEntityStateType,
@@ -26,7 +22,8 @@ pub struct RevocationRegistry {
 
 impl RevocationRegistry {
     pub async fn create(
-        anoncreds: &Arc<dyn BaseAnonCreds>,
+        wallet: &impl BaseWallet,
+        anoncreds: &impl BaseAnonCreds,
         issuer_did: &str,
         cred_def_id: &str,
         tails_dir: &str,
@@ -34,7 +31,8 @@ impl RevocationRegistry {
         tag: u32,
     ) -> VcxResult<RevocationRegistry> {
         trace!(
-            "RevocationRegistry::create >>> issuer_did: {}, cred_def_id: {}, tails_dir: {}, max_creds: {}, tag_no: {}",
+            "RevocationRegistry::create >>> issuer_did: {}, cred_def_id: {}, tails_dir: {}, \
+             max_creds: {}, tag_no: {}",
             issuer_did,
             cred_def_id,
             tails_dir,
@@ -42,6 +40,7 @@ impl RevocationRegistry {
             tag
         );
         let (rev_reg_id, rev_reg_def, rev_reg_entry) = generate_rev_reg(
+            wallet,
             anoncreds,
             issuer_did,
             cred_def_id,
@@ -53,7 +52,10 @@ impl RevocationRegistry {
         .map_err(|err| {
             AriesVcxError::from_msg(
                 AriesVcxErrorKind::SerializationError,
-                format!("Failed to locally create a new Revocation Registry: {:?}", err),
+                format!(
+                    "Failed to locally create a new Revocation Registry: {:?}",
+                    err
+                ),
             )
         })?;
         Ok(RevocationRegistry {
@@ -96,19 +98,21 @@ impl RevocationRegistry {
 
     pub async fn publish_rev_reg_def(
         &mut self,
-        ledger: &Arc<dyn AnoncredsLedgerWrite>,
+        wallet: &impl BaseWallet,
+        ledger: &impl AnoncredsLedgerWrite,
         issuer_did: &str,
         tails_url: &str,
     ) -> VcxResult<()> {
         trace!(
-            "RevocationRegistry::publish_rev_reg_def >>> issuer_did:{}, rev_reg_id: {}, rev_reg_def:{:?}",
+            "RevocationRegistry::publish_rev_reg_def >>> issuer_did:{}, rev_reg_id: {}, \
+             rev_reg_def:{:?}",
             issuer_did,
             &self.rev_reg_id,
             &self.rev_reg_def
         );
         self.rev_reg_def.value.tails_location = String::from(tails_url);
         ledger
-            .publish_rev_reg_def(&json!(self.rev_reg_def).to_string(), issuer_did)
+            .publish_rev_reg_def(wallet, &json!(self.rev_reg_def).to_string(), issuer_did)
             .await
             .map_err(|err| {
                 err.map(
@@ -122,7 +126,8 @@ impl RevocationRegistry {
 
     pub async fn publish_rev_reg_delta(
         &mut self,
-        ledger_write: &Arc<dyn AnoncredsLedgerWrite>,
+        wallet: &impl BaseWallet,
+        ledger_write: &impl AnoncredsLedgerWrite,
         issuer_did: &str,
     ) -> VcxResult<()> {
         trace!(
@@ -131,7 +136,7 @@ impl RevocationRegistry {
             self.rev_reg_id
         );
         ledger_write
-            .publish_rev_reg_delta(&self.rev_reg_id, &self.rev_reg_entry, issuer_did)
+            .publish_rev_reg_delta(wallet, &self.rev_reg_id, &self.rev_reg_entry, issuer_did)
             .await
             .map_err(|err| {
                 err.map(
@@ -145,37 +150,46 @@ impl RevocationRegistry {
 
     pub async fn publish_revocation_primitives(
         &mut self,
-        ledger_write: &Arc<dyn AnoncredsLedgerWrite>,
+        wallet: &impl BaseWallet,
+        ledger_write: &impl AnoncredsLedgerWrite,
         tails_url: &str,
     ) -> VcxResult<()> {
         trace!(
             "RevocationRegistry::publish_revocation_primitives >>> tails_url: {}",
             tails_url
         );
-        self.publish_built_rev_reg_def(ledger_write, tails_url).await?;
-        self.publish_built_rev_reg_delta(ledger_write).await
+        self.publish_built_rev_reg_def(wallet, ledger_write, tails_url)
+            .await?;
+        self.publish_built_rev_reg_delta(wallet, ledger_write).await
     }
 
-    async fn publish_built_rev_reg_delta(&mut self, ledger_write: &Arc<dyn AnoncredsLedgerWrite>) -> VcxResult<()> {
+    async fn publish_built_rev_reg_delta(
+        &mut self,
+        wallet: &impl BaseWallet,
+        ledger_write: &impl AnoncredsLedgerWrite,
+    ) -> VcxResult<()> {
         let issuer_did = &self.issuer_did.clone();
         if self.was_rev_reg_delta_published() {
             info!("No unpublished revocation registry delta found, nothing to publish")
         } else {
-            self.publish_rev_reg_delta(ledger_write, issuer_did).await?;
+            self.publish_rev_reg_delta(wallet, ledger_write, issuer_did)
+                .await?;
         }
         Ok(())
     }
 
     async fn publish_built_rev_reg_def(
         &mut self,
-        ledger_write: &Arc<dyn AnoncredsLedgerWrite>,
+        wallet: &impl BaseWallet,
+        ledger_write: &impl AnoncredsLedgerWrite,
         tails_url: &str,
     ) -> VcxResult<()> {
         let issuer_did = &self.issuer_did.clone();
         if self.was_rev_reg_def_published() {
             info!("No unpublished revocation registry definition found, nothing to publish")
         } else {
-            self.publish_rev_reg_def(ledger_write, issuer_did, tails_url).await?;
+            self.publish_rev_reg_def(wallet, ledger_write, issuer_did, tails_url)
+                .await?;
         }
         Ok(())
     }
@@ -200,24 +214,29 @@ impl RevocationRegistry {
 
     pub async fn revoke_credential_local(
         &self,
-        anoncreds: &Arc<dyn BaseAnonCreds>,
+        wallet: &impl BaseWallet,
+        anoncreds: &impl BaseAnonCreds,
         cred_rev_id: &str,
     ) -> VcxResult<()> {
         anoncreds
-            .revoke_credential_local(&self.tails_dir, &self.rev_reg_id, cred_rev_id)
+            .revoke_credential_local(wallet, &self.tails_dir, &self.rev_reg_id, cred_rev_id)
             .await
             .map_err(|err| err.into())
     }
 
     pub async fn publish_local_revocations(
         &self,
-        anoncreds: &Arc<dyn BaseAnonCreds>,
-        ledger_write: &Arc<dyn AnoncredsLedgerWrite>,
+        wallet: &impl BaseWallet,
+        anoncreds: &impl BaseAnonCreds,
+        ledger_write: &impl AnoncredsLedgerWrite,
         submitter_did: &str,
     ) -> VcxResult<()> {
-        if let Some(delta) = anoncreds.get_rev_reg_delta(&self.rev_reg_id).await? {
+        if let Some(delta) = anoncreds
+            .get_rev_reg_delta(wallet, &self.rev_reg_id)
+            .await?
+        {
             ledger_write
-                .publish_rev_reg_delta(&self.rev_reg_id, &delta, submitter_did)
+                .publish_rev_reg_delta(wallet, &self.rev_reg_id, &delta, submitter_did)
                 .await?;
 
             info!(
@@ -225,10 +244,14 @@ impl RevocationRegistry {
                 self.rev_reg_id
             );
 
-            match anoncreds.clear_rev_reg_delta(&self.rev_reg_id).await {
+            match anoncreds
+                .clear_rev_reg_delta(wallet, &self.rev_reg_id)
+                .await
+            {
                 Ok(_) => {
                     info!(
-                        "publish_local_revocations >>> rev_reg_delta storage cleared for rev_reg_id {}",
+                        "publish_local_revocations >>> rev_reg_delta storage cleared for \
+                         rev_reg_id {}",
                         self.rev_reg_id
                     );
                     Ok(())
@@ -242,8 +265,14 @@ impl RevocationRegistry {
                 )),
             }
         } else {
-            Err(AriesVcxError::from_msg(AriesVcxErrorKind::RevDeltaNotFound,
-                                        format!("Failed to publish revocation delta for revocation registry {}, no delta found. Possibly already published?", self.rev_reg_id)))
+            Err(AriesVcxError::from_msg(
+                AriesVcxErrorKind::RevDeltaNotFound,
+                format!(
+                    "Failed to publish revocation delta for revocation registry {}, no delta \
+                     found. Possibly already published?",
+                    self.rev_reg_id
+                ),
+            ))
         }
     }
 }
@@ -269,7 +298,8 @@ pub struct RevocationRegistryDefinition {
     pub ver: String,
 }
 pub async fn generate_rev_reg(
-    anoncreds: &Arc<dyn BaseAnonCreds>,
+    wallet: &impl BaseWallet,
+    anoncreds: &impl BaseAnonCreds,
     issuer_did: &str,
     cred_def_id: &str,
     tails_dir: &str,
@@ -277,38 +307,36 @@ pub async fn generate_rev_reg(
     tag: &str,
 ) -> VcxResult<(String, RevocationRegistryDefinition, String)> {
     trace!(
-        "generate_rev_reg >>> issuer_did: {}, cred_def_id: {}, tails_file: {}, max_creds: {}, tag: {}",
+        "generate_rev_reg >>> issuer_did: {}, cred_def_id: {}, tails_file: {}, max_creds: {}, \
+         tag: {}",
         issuer_did,
         cred_def_id,
         tails_dir,
         max_creds,
         tag
     );
-    if settings::indy_mocks_enabled() {
-        debug!("generate_rev_reg >>> returning mocked value");
-        return Ok((
-            REV_REG_ID.to_string(),
-            RevocationRegistryDefinition::default(),
-            "".to_string(),
-        ));
-    }
 
     let (rev_reg_id, rev_reg_def_json, rev_reg_entry_json) = anoncreds
-        .issuer_create_and_store_revoc_reg(issuer_did, cred_def_id, tails_dir, max_creds, tag)
+        .issuer_create_and_store_revoc_reg(
+            wallet,
+            issuer_did,
+            cred_def_id,
+            tails_dir,
+            max_creds,
+            tag,
+        )
         .await?;
 
-    let rev_reg_def: RevocationRegistryDefinition = serde_json::from_str(&rev_reg_def_json).map_err(|err| {
-        AriesVcxError::from_msg(
-            AriesVcxErrorKind::SerializationError,
-            format!(
-                "Failed to deserialize rev_reg_def: {:?}, error: {:?}",
-                rev_reg_def_json, err
-            ),
-        )
-    })?;
+    let rev_reg_def: RevocationRegistryDefinition = serde_json::from_str(&rev_reg_def_json)
+        .map_err(|err| {
+            AriesVcxError::from_msg(
+                AriesVcxErrorKind::SerializationError,
+                format!(
+                    "Failed to deserialize rev_reg_def: {:?}, error: {:?}",
+                    rev_reg_def_json, err
+                ),
+            )
+        })?;
 
     Ok((rev_reg_id, rev_reg_def, rev_reg_entry_json))
 }
-
-// consider impl revoke_credential_local in a generic (non-vdrtools) fashion
-// consider impl publish_local_revocations in a generic (non-vdrtools) fashion

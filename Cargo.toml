@@ -1,4 +1,6 @@
 [workspace]
+resolver = "2"
+
 members = [
     "aries_vcx",
     "libvcx_core",
@@ -8,6 +10,9 @@ members = [
     "messages",
     "shared_vcx",
     "diddoc_legacy",
+    "agents/rust/mediator",
+    "agents/rust/mediator/client-webapi",
+    "agents/rust/mediator/client-tui",
     "agents/rust/aries-vcx-agent",
     "wrappers/vcx-napi-rs",
     "aries_vcx_core",
@@ -28,7 +33,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.58.0"
+version = "0.61.0"
 authors = ["Absa Group Limited", "Hyperledger Indy Contributors <hyperledger-indy@lists.hyperledger.org>"]
 description = "Library to work with Aries protocols & collection of supporting components"
 license = "Apache-2.0"
@@ -38,3 +43,32 @@ edition = "2021"
 debug = 0
 panic = 'unwind'
 incremental = false
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+struct_excessive_bools = "allow"
+trivially_copy_pass_by_ref = "allow"
+must_use_candidate = "allow"
+match_bool = "allow"
+no_effect_underscore_binding = "allow"
+module_name_repetitions = "allow"
+
+[lints.rust]
+meta_variable_misuse = "warn"
+missing_abi = "warn"
+missing_copy_implementations = "warn"
+missing_debug_implementations = "warn"
+non_ascii_idents = "warn"
+pointer_structural_match = "warn"
+rust_2018_idioms = "warn"
+rust_2021_compatibility = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+let_underscore_drop = "allow"
+
+

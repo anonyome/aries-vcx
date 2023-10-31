@@ -50,7 +50,7 @@ fn get_txn_time_from_response(resp: &str) -> Result<i64, DidSovError> {
 
 fn unix_to_datetime(posix_timestamp: i64) -> Option<DateTime<Utc>> {
     NaiveDateTime::from_timestamp_opt(posix_timestamp, 0)
-        .map(|date_time| DateTime::<Utc>::from_utc(date_time, Utc))
+        .map(|date_time| DateTime::<Utc>::from_naive_utc_and_offset(date_time, Utc))
 }
 
 pub(super) fn is_valid_sovrin_did_id(id: &str) -> bool {
@@ -96,7 +96,7 @@ pub(super) async fn ledger_response_to_ddo<E: Default>(
         did.to_string().try_into()?,
         VerificationMethodType::Ed25519VerificationKey2018,
     )
-    .add_public_key_base58(verkey.to_string())
+    .add_public_key_base58(verkey)
     .build();
 
     let ddo = DidDocument::builder(ddo_id)
@@ -124,9 +124,10 @@ pub(super) async fn ledger_response_to_ddo<E: Default>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
     use did_resolver::did_doc::schema::verification_method::PublicKeyField;
+
+    use super::*;
 
     #[test]
     fn test_prepare_ids() {

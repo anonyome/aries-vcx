@@ -1,12 +1,11 @@
 use std::{collections::HashMap, sync::Arc};
 
+use futures::future::join;
 use indy_api_types::errors::prelude::*;
-
 use indy_utils::{
     crypto::{chacha20poly1305_ietf, hmacsha256},
     wql::Query,
 };
-
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
@@ -19,7 +18,6 @@ use crate::{
     storage::StorageRecord,
     RecordOptions, WalletRecord,
 };
-use futures::future::join;
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct Keys {
@@ -121,7 +119,8 @@ impl EncryptedValue {
 
     #[allow(dead_code)]
     pub fn from_bytes(joined_data: &[u8]) -> IndyResult<Self> {
-        // value_key is stored as NONCE || CYPHERTEXT. Lenth of CYPHERTHEXT is length of DATA + length of TAG.
+        // value_key is stored as NONCE || CYPHERTEXT. Lenth of CYPHERTHEXT is length of DATA +
+        // length of TAG.
         if joined_data.len() < ENCRYPTED_KEY_LEN {
             return Err(err_msg(
                 IndyErrorKind::InvalidStructure,
@@ -166,6 +165,7 @@ impl Wallet {
         name: &str,
         value: &str,
         tags: &HashMap<String, String>,
+        cache_record: bool,
     ) -> IndyResult<()> {
         let etype = encrypt_as_searchable(
             type_.as_bytes(),
@@ -189,7 +189,9 @@ impl Wallet {
         );
 
         self.storage.add(&etype, &ename, &evalue, &etags).await?;
-        self.cache.add(type_, &etype, &ename, &evalue, &etags);
+        if cache_record {
+            self.cache.add(type_, &etype, &ename, &evalue, &etags);
+        }
 
         Ok(())
     }
@@ -472,7 +474,7 @@ impl Wallet {
         Ok(WalletIterator::new(all_items, self.keys.clone()))
     }
 
-    pub fn get_id<'a>(&'a self) -> &'a str {
+    pub fn get_id(&self) -> &str {
         &self.id
     }
 }

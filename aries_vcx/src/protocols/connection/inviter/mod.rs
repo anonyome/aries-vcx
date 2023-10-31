@@ -1,31 +1,31 @@
 pub mod states;
 
-use std::sync::Arc;
-
 use ::uuid::Uuid;
+use aries_vcx_core::wallet::base_wallet::BaseWallet;
 use chrono::Utc;
 use diddoc_legacy::aries::diddoc::AriesDidDoc;
-use messages::decorators::thread::Thread;
-use messages::decorators::timing::Timing;
-use messages::msg_fields::protocols::connection::invitation::{
-    Invitation, PairwiseInvitation, PairwiseInvitationContent, PwInvitationDecorators,
+use messages::{
+    decorators::{thread::Thread, timing::Timing},
+    msg_fields::protocols::connection::{
+        invitation::{Invitation, InvitationContent},
+        request::Request,
+        response::{Response, ResponseContent, ResponseDecorators},
+        ConnectionData,
+    },
+    AriesMessage,
 };
-use messages::msg_fields::protocols::connection::request::Request;
-use messages::msg_fields::protocols::connection::response::{Response, ResponseContent, ResponseDecorators};
-use messages::msg_fields::protocols::connection::ConnectionData;
-use messages::AriesMessage;
 use url::Url;
 
-use crate::handlers::util::{verify_thread_id, AnyInvitation};
-use crate::protocols::connection::trait_bounds::ThreadId;
-use crate::transport::Transport;
-use crate::{common::signing::sign_connection_response, errors::error::VcxResult};
-
 use self::states::{
-    completed::Completed, initial::Initial, invited::Invited, requested::Requested, responded::Responded,
+    completed::Completed, initial::Initial, invited::Invited, requested::Requested,
 };
 use super::{initiation_type::Inviter, pairwise_info::PairwiseInfo, Connection};
-use aries_vcx_core::wallet::base_wallet::BaseWallet;
+use crate::{
+    common::signing::sign_connection_response,
+    errors::error::VcxResult,
+    handlers::util::{verify_thread_id, AnyInvitation},
+    protocols::connection::trait_bounds::ThreadId,
+};
 
 pub type InviterConnection<S> = Connection<Inviter, S>;
 
@@ -44,20 +44,22 @@ impl InviterConnection<Initial> {
     }
 
     /// Generates a pairwise [`Invitation`] and transitions to [`InviterConnection<Invited>`].
-    pub fn create_invitation(self, routing_keys: Vec<String>, service_endpoint: Url) -> InviterConnection<Invited> {
+    pub fn create_invitation(
+        self,
+        routing_keys: Vec<String>,
+        service_endpoint: Url,
+    ) -> InviterConnection<Invited> {
         let id = Uuid::new_v4().to_string();
-        let content = PairwiseInvitationContent::new(
-            self.source_id.clone(),
-            vec![self.pairwise_info.pw_vk.clone()],
-            routing_keys,
-            service_endpoint,
-        );
+        let content = InvitationContent::builder_pairwise()
+            .label(self.source_id.clone())
+            .recipient_keys(vec![self.pairwise_info.pw_vk.clone()])
+            .routing_keys(routing_keys)
+            .service_endpoint(service_endpoint)
+            .build();
 
-        let decorators = PwInvitationDecorators::default();
+        let invite = Invitation::builder().id(id).content(content).build();
 
-        let invite = PairwiseInvitation::with_decorators(id, content, decorators);
-
-        let invitation = AnyInvitation::Con(Invitation::Pairwise(invite));
+        let invitation = AnyInvitation::Con(invite);
 
         Connection {
             source_id: self.source_id,
@@ -84,18 +86,20 @@ impl InviterConnection<Initial> {
     // for backwards compatibility.
     pub fn into_invited(self, thread_id: &str) -> InviterConnection<Invited> {
         let id = thread_id.to_owned();
-        let content = PairwiseInvitationContent::new(
-            self.source_id.clone(),
-            vec![self.pairwise_info.pw_vk.clone()],
-            vec![],
-            "https://dummy.dummy/dummy".parse().expect("url should be valid"),
-        );
 
-        let decorators = PwInvitationDecorators::default();
+        let content = InvitationContent::builder_pairwise()
+            .label(self.source_id.clone())
+            .recipient_keys(vec![self.pairwise_info.pw_vk.clone()])
+            .service_endpoint(
+                "https://dummy.dummy/dummy"
+                    .parse()
+                    .expect("url should be valid"),
+            )
+            .build();
 
-        let invite = PairwiseInvitation::with_decorators(id, content, decorators);
+        let invite = Invitation::builder().id(id).content(content).build();
 
-        let invitation = AnyInvitation::Con(Invitation::Pairwise(invite));
+        let invitation = AnyInvitation::Con(invite);
 
         Connection {
             source_id: self.source_id,
@@ -111,7 +115,7 @@ impl InviterConnection<Invited> {
     // but was placed here to retro-fit the previous API.
     async fn build_response_content(
         &self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &impl BaseWallet,
         thread_id: String,
         new_pairwise_info: &PairwiseInfo,
         new_service_endpoint: Url,
@@ -130,16 +134,21 @@ impl InviterConnection<Invited> {
 
         let id = Uuid::new_v4().to_string();
 
-        let con_sig = sign_connection_response(wallet, &self.pairwise_info.pw_vk, &con_data).await?;
+        let con_sig =
+            sign_connection_response(wallet, &self.pairwise_info.pw_vk, &con_data).await?;
 
-        let content = ResponseContent::new(con_sig);
+        let content = ResponseContent::builder().connection_sig(con_sig).build();
 
-        let mut decorators = ResponseDecorators::new(Thread::new(thread_id));
-        let mut timing = Timing::default();
-        timing.out_time = Some(Utc::now());
-        decorators.timing = Some(timing);
+        let decorators = ResponseDecorators::builder()
+            .thread(Thread::builder().thid(thread_id).build())
+            .timing(Timing::builder().out_time(Utc::now()).build())
+            .build();
 
-        Ok(Response::with_decorators(id, content, decorators))
+        Ok(Response::builder()
+            .id(id)
+            .content(content)
+            .decorators(decorators)
+            .build())
     }
 
     /// Processes a [`Request`] and transitions to [`InviterConnection<Requested>`].
@@ -147,56 +156,38 @@ impl InviterConnection<Invited> {
     /// # Errors
     ///
     /// Will return an error if either:
-    ///     * the [`Request`]'s thread ID does not match with the expected thread ID from an invitation
+    ///     * the [`Request`]'s thread ID does not match with the expected thread ID from an
+    ///       invitation
     ///     * the [`Request`]'s DidDoc is not valid
     ///     * generating new [`PairwiseInfo`] fails
-    pub async fn handle_request<T>(
+    pub async fn handle_request(
         self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &impl BaseWallet,
         request: Request,
         new_service_endpoint: Url,
         new_routing_keys: Vec<String>,
-        transport: &T,
-    ) -> VcxResult<InviterConnection<Requested>>
-    where
-        T: Transport,
-    {
+    ) -> VcxResult<InviterConnection<Requested>> {
         trace!(
-            "Connection::process_request >>> request: {:?}, service_endpoint: {}, routing_keys: {:?}",
+            "Connection::process_request >>> request: {:?}, service_endpoint: {}, routing_keys: \
+             {:?}",
             request,
             new_service_endpoint,
             new_routing_keys,
         );
 
-        // There must be some other way to validate the thread ID other than cloning the entire Request
+        // There must be some other way to validate the thread ID other than cloning the entire
+        // Request
         verify_thread_id(self.thread_id(), &request.clone().into())?;
-
-        // If the request's DidDoc validation fails, we generate and send a ProblemReport.
-        // We then return early with the provided error.
-        if let Err(err) = request.content.connection.did_doc.validate() {
-            error!("Request DidDoc validation failed! Sending ProblemReport...");
-
-            self.send_problem_report(
-                wallet,
-                &err,
-                request
-                    .decorators
-                    .thread
-                    .as_ref()
-                    .map(|t| t.thid.as_str())
-                    .unwrap_or(request.id.as_str()),
-                &request.content.connection.did_doc,
-                transport,
-            )
-            .await;
-
-            Err(err)?;
-        }
+        request.content.connection.did_doc.validate()?;
 
         // Generate new pairwise info that will be used from this point on
         // and incorporate that into the response.
         let new_pairwise_info = PairwiseInfo::create(wallet).await?;
-        let thread_id = request.decorators.thread.map(|t| t.thid).unwrap_or(request.id);
+        let thread_id = request
+            .decorators
+            .thread
+            .map(|t| t.thid)
+            .unwrap_or(request.id);
         let did_doc = request.content.connection.did_doc;
 
         let content = self
@@ -233,41 +224,15 @@ impl InviterConnection<Invited> {
 }
 
 impl InviterConnection<Requested> {
-    /// Sends a [`Response`] to the invitee and transitions to [`InviterConnection<Responded>`].
+    /// Returns pre-built [`Response`] message which shall be delivered to counterparty
     ///
     /// # Errors
     ///
     /// Will return an error if sending the response fails.
-    pub async fn send_response<T>(
-        self,
-        wallet: &Arc<dyn BaseWallet>,
-        transport: &T,
-    ) -> VcxResult<InviterConnection<Responded>>
-    where
-        T: Transport,
-    {
-        trace!(
-            "Connection::send_response >>> signed_response: {:?}",
-            &self.state.signed_response
-        );
-
-        let thread_id = self.state.signed_response.decorators.thread.thid.clone();
-
-        self.send_message(wallet, &self.state.signed_response.clone().into(), transport)
-            .await?;
-
-        let state = Responded::new(self.state.did_doc, thread_id);
-
-        Ok(Connection {
-            state,
-            source_id: self.source_id,
-            pairwise_info: self.pairwise_info,
-            initiation_type: self.initiation_type,
-        })
+    pub fn get_connection_response_msg(&self) -> Response {
+        self.state.signed_response.clone()
     }
-}
 
-impl InviterConnection<Responded> {
     /// Acknowledges an invitee's connection by processing their first message
     /// and transitions to [`InviterConnection<Completed>`].
     ///
@@ -275,9 +240,16 @@ impl InviterConnection<Responded> {
     ///
     /// Will error out if the message's thread ID does not match
     /// the ID of the thread context used in this connection.
-    pub fn acknowledge_connection(self, msg: &AriesMessage) -> VcxResult<InviterConnection<Completed>> {
+    pub fn acknowledge_connection(
+        self,
+        msg: &AriesMessage,
+    ) -> VcxResult<InviterConnection<Completed>> {
         verify_thread_id(self.state.thread_id(), msg)?;
-        let state = Completed::new(self.state.did_doc, self.state.thread_id, None);
+        let state = Completed::new(
+            self.state.did_doc,
+            self.state.signed_response.decorators.thread.thid,
+            None,
+        );
 
         Ok(Connection {
             source_id: self.source_id,

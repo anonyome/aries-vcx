@@ -11,14 +11,9 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 doctest = false
 
-[features]
-default = ["anoncreds_vdrtools"]
-
-anoncreds_credx = ["libvcx_core/anoncreds_credx"]
-anoncreds_vdrtools = ["libvcx_core/anoncreds_vdrtools"]
-
 [dependencies]
 libvcx_core = { path = "../../libvcx_core"  }
+wallet_migrator = { path = "../../wallet_migrator" }
 log = "0.4.16"
 napi = { version = "2.10.14", default-features = false, features = [ "async" ] }
 napi-derive = { version = "2.10.1" }

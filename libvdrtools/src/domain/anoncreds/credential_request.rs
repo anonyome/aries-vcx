@@ -1,12 +1,9 @@
-use super::super::crypto::did::DidValue;
 use ursa::cl::{
     BlindedCredentialSecrets, BlindedCredentialSecretsCorrectnessProof,
     CredentialSecretsBlindingFactors, Nonce,
 };
 
-use super::credential_definition::CredentialDefinitionId;
-
-use indy_api_types::validation::Validatable;
+use super::{super::crypto::did::DidValue, credential_definition::CredentialDefinitionId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CredentialRequest {
@@ -35,13 +32,3 @@ impl CredentialRequest {
         }
     }
 }
-
-impl Validatable for CredentialRequest {
-    fn validate(&self) -> Result<(), String> {
-        self.cred_def_id.validate()?;
-        self.prover_did.validate()?;
-        Ok(())
-    }
-}
-
-impl Validatable for CredentialRequestMetadata {}

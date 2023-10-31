@@ -1,18 +1,25 @@
+use libvcx_core::{
+    api_vcx::api_handle::{revocation_registry, revocation_registry::RevocationRegistryConfig},
+    errors::error::{LibvcxError, LibvcxErrorKind},
+    serde_json,
+};
 use napi_derive::napi;
-
-use libvcx_core::api_vcx::api_handle::revocation_registry;
-use libvcx_core::api_vcx::api_handle::revocation_registry::RevocationRegistryConfig;
-use libvcx_core::errors::error::{LibvcxError, LibvcxErrorKind};
-use libvcx_core::serde_json;
 
 use crate::error::to_napi_err;
 
 #[napi]
 async fn revocation_registry_create(config: String) -> napi::Result<u32> {
     let config = serde_json::from_str::<RevocationRegistryConfig>(&config)
-        .map_err(|err| LibvcxError::from_msg(LibvcxErrorKind::InvalidJson, format!("Serialization error: {:?}", err)))
+        .map_err(|err| {
+            LibvcxError::from_msg(
+                LibvcxErrorKind::InvalidJson,
+                format!("Serialization error: {:?}", err),
+            )
+        })
         .map_err(to_napi_err)?;
-    revocation_registry::create(config).await.map_err(to_napi_err)
+    revocation_registry::create(config)
+        .await
+        .map_err(to_napi_err)
 }
 
 #[napi]
@@ -23,8 +30,11 @@ async fn revocation_registry_publish(handle: u32, tails_url: String) -> napi::Re
 }
 
 #[napi]
-async fn revocation_registry_publish_revocations(handle: u32) -> napi::Result<()> {
-    revocation_registry::publish_revocations(handle)
+async fn revocation_registry_publish_revocations(
+    handle: u32,
+    submitter_did: String,
+) -> napi::Result<()> {
+    revocation_registry::publish_revocations(handle, &submitter_did)
         .await
         .map_err(to_napi_err)
 }

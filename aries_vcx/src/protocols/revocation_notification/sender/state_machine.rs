@@ -1,15 +1,23 @@
-use messages::decorators::please_ack::{AckOn, PleaseAck};
-use messages::msg_fields::protocols::revocation::ack::AckRevoke;
-use messages::msg_fields::protocols::revocation::revoke::{RevocationFormat, Revoke, RevokeContent, RevokeDecorators};
+use messages::{
+    decorators::please_ack::{AckOn, PleaseAck},
+    msg_fields::protocols::revocation::{
+        ack::AckRevoke,
+        revoke::{RevocationFormat, Revoke, RevokeContent, RevokeDecorators},
+    },
+};
 use shared_vcx::maybe_known::MaybeKnown;
 use uuid::Uuid;
 
-use crate::errors::error::prelude::*;
-use crate::handlers::util::verify_thread_id;
-use crate::protocols::revocation_notification::sender::states::finished::FinishedState;
-use crate::protocols::revocation_notification::sender::states::initial::InitialState;
-use crate::protocols::revocation_notification::sender::states::sent::NotificationSentState;
-use crate::protocols::SendClosure;
+use crate::{
+    errors::error::prelude::*,
+    handlers::util::verify_thread_id,
+    protocols::{
+        revocation_notification::sender::states::{
+            finished::FinishedState, initial::InitialState, sent::NotificationSentState,
+        },
+        SendClosure,
+    },
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RevocationNotificationSenderSM {
@@ -34,7 +42,7 @@ pub struct SenderConfig {
 impl RevocationNotificationSenderSM {
     pub fn create() -> Self {
         Self {
-            state: SenderFullState::Initial(InitialState::new()),
+            state: SenderFullState::Initial(InitialState),
         }
     }
 
@@ -60,7 +68,11 @@ impl RevocationNotificationSenderSM {
         }
     }
 
-    pub async fn send(self, config: SenderConfig, send_message: SendClosure) -> VcxResult<Self> {
+    pub async fn send(
+        self,
+        config: SenderConfig,
+        send_message: SendClosure<'_>,
+    ) -> VcxResult<Self> {
         let state = match self.state {
             SenderFullState::Initial(_) | SenderFullState::NotificationSent(_) => {
                 let SenderConfig {
@@ -72,26 +84,35 @@ impl RevocationNotificationSenderSM {
 
                 let id = Uuid::new_v4().to_string();
 
-                let mut content = RevokeContent::new(
-                    format!("{rev_reg_id}::{cred_rev_id}"),
-                    MaybeKnown::Known(RevocationFormat::IndyAnoncreds),
-                );
-                content.comment = comment;
+                let content = RevokeContent::builder()
+                    .credential_id(format!("{rev_reg_id}::{cred_rev_id}"))
+                    .revocation_format(MaybeKnown::Known(RevocationFormat::IndyAnoncreds));
 
-                let mut decorators = RevokeDecorators::default();
-                let please_ack = PleaseAck::new(ack_on);
-                decorators.please_ack = Some(please_ack);
+                let content = if let Some(comment) = comment {
+                    content.comment(comment).build()
+                } else {
+                    content.build()
+                };
 
-                let rev_msg = Revoke::with_decorators(id, content, decorators);
+                let decorators = RevokeDecorators::builder()
+                    .please_ack(PleaseAck::builder().on(ack_on).build())
+                    .build();
+
+                let rev_msg: Revoke = Revoke::builder()
+                    .id(id)
+                    .content(content)
+                    .decorators(decorators)
+                    .build();
                 send_message(rev_msg.clone().into()).await?;
 
-                if !rev_msg
+                let is_finished = !rev_msg
                     .decorators
                     .please_ack
                     .as_ref()
                     .map(|d| d.on.is_empty())
-                    .unwrap_or(false)
-                {
+                    .unwrap_or(false);
+
+                if is_finished {
                     SenderFullState::Finished(FinishedState::new(rev_msg, None))
                 } else {
                     SenderFullState::NotificationSent(NotificationSentState::new(rev_msg))
@@ -134,15 +155,16 @@ impl RevocationNotificationSenderSM {
 
 #[allow(clippy::unwrap_used)]
 pub mod test_utils {
-    use crate::protocols::revocation_notification::test_utils::{_comment, _cred_rev_id, _rev_reg_id};
-
     use super::*;
+    use crate::protocols::revocation_notification::test_utils::{
+        _comment, _cred_rev_id, _rev_reg_id,
+    };
 
     pub fn _sender_config(ack_on: Vec<AckOn>) -> SenderConfig {
         SenderConfigBuilder::default()
             .rev_reg_id(_rev_reg_id())
             .cred_rev_id(_cred_rev_id())
-            .comment(_comment())
+            .comment(Some(_comment()))
             .ack_on(ack_on)
             .build()
             .unwrap()

@@ -31,10 +31,15 @@ enum ConnectionProtocolState {
     "Completed",
 };
 
-
 dictionary PairwiseInfo {
     string pw_did;
     string pw_vk;
+};
+
+dictionary UnpackMessage {
+    string message;
+    string recipient_verkey;
+    string? sender_verkey;
 };
 
 interface Connection {
@@ -68,6 +73,7 @@ enum VcxUniFFIError {
     "AriesVcxError",
     "SerializationError",
     "InternalError",
+    "StringParseError"
 };
 
 namespace vcx {
@@ -78,5 +84,8 @@ namespace vcx {
     Connection create_inviter(ProfileHolder profile);
 
     [Throws=VcxUniFFIError]
-    Connection create_invitee(ProfileHolder profile, string did_doc);
+    Connection create_invitee(ProfileHolder profile);
+
+    [Throws=VcxUniFFIError]
+    UnpackMessage unpack_message(ProfileHolder profile, string packed_msg);
 };

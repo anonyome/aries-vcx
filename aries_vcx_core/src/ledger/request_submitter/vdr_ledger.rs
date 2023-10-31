@@ -7,29 +7,31 @@ use std::{
 use async_trait::async_trait;
 use indy_vdr::{
     common::error::VdrError,
-    pool::{PoolTransactions, RequestResult},
-};
-use indy_vdr::{
     config::PoolConfig,
-    pool::{PoolBuilder, PoolRunner, PreparedRequest},
+    pool::{PoolBuilder, PoolRunner, PoolTransactions, PreparedRequest, RequestResult},
 };
 use tokio::sync::oneshot;
 
+use super::RequestSubmitter;
 use crate::errors::error::{AriesVcxCoreError, AriesVcxCoreErrorKind, VcxCoreResult};
 
-use super::RequestSubmitter;
-
+#[derive(Clone)]
 pub struct IndyVdrLedgerPool {
-    pub(self) runner: Option<PoolRunner>,
+    runner: Arc<PoolRunner>,
 }
 
 impl IndyVdrLedgerPool {
     pub fn new_from_runner(runner: PoolRunner) -> Self {
-        IndyVdrLedgerPool { runner: Some(runner) }
+        IndyVdrLedgerPool {
+            runner: Arc::new(runner),
+        }
     }
 
     fn generate_exclusion_weights(exclude_nodes: Vec<String>) -> HashMap<String, f32> {
-        exclude_nodes.into_iter().map(|node| (node, 0.0f32)).collect()
+        exclude_nodes
+            .into_iter()
+            .map(|node| (node, 0.0f32))
+            .collect()
     }
 
     pub fn new(
@@ -37,7 +39,10 @@ impl IndyVdrLedgerPool {
         indy_vdr_config: PoolConfig,
         exclude_nodes: Vec<String>,
     ) -> VcxCoreResult<Self> {
-        info!("IndyVdrLedgerPool::new >> genesis_file_path: {genesis_file_path}, indy_vdr_config: {indy_vdr_config:?}");
+        info!(
+            "IndyVdrLedgerPool::new >> genesis_file_path: {genesis_file_path}, indy_vdr_config: \
+             {indy_vdr_config:?}"
+        );
         let txns = PoolTransactions::from_json_file(genesis_file_path)?;
         let runner = PoolBuilder::new(
             indy_vdr_config,
@@ -47,7 +52,9 @@ impl IndyVdrLedgerPool {
         .transactions(txns)?
         .into_runner()?;
 
-        Ok(IndyVdrLedgerPool { runner: Some(runner) })
+        Ok(IndyVdrLedgerPool {
+            runner: Arc::new(runner),
+        })
     }
 }
 
@@ -59,12 +66,13 @@ impl Debug for IndyVdrLedgerPool {
     }
 }
 
+#[derive(Clone)]
 pub struct IndyVdrSubmitter {
-    pool: Arc<IndyVdrLedgerPool>,
+    pool: IndyVdrLedgerPool,
 }
 
 impl IndyVdrSubmitter {
-    pub fn new(pool: Arc<IndyVdrLedgerPool>) -> Self {
+    pub fn new(pool: IndyVdrLedgerPool) -> Self {
         Self { pool }
     }
 }
@@ -74,26 +82,21 @@ impl RequestSubmitter for IndyVdrSubmitter {
     async fn submit(&self, request: PreparedRequest) -> VcxCoreResult<String> {
         // indyvdr send_request is Async via a callback.
         // Use oneshot channel to send result from callback, converting the fn to future.
-        type VdrSendRequestResult =
-            Result<(RequestResult<String>, Option<HashMap<String, f32, RandomState>>), VdrError>;
+        type VdrSendRequestResult = Result<
+            (
+                RequestResult<String>,
+                Option<HashMap<String, f32, RandomState>>,
+            ),
+            VdrError,
+        >;
         let (sender, recv) = oneshot::channel::<VdrSendRequestResult>();
-        self.pool
-            .runner
-            .as_ref()
-            .ok_or(
-                // should not happen - strictly for unit testing
-                AriesVcxCoreError::from_msg(
-                    AriesVcxCoreErrorKind::NoPoolOpen,
-                    "IndyVdrLedgerPool runner was not provided",
-                ),
-            )?
-            .send_request(
-                request,
-                Box::new(move |result| {
-                    // unable to handle a failure from `send` here
-                    sender.send(result).ok();
-                }),
-            )?;
+        self.pool.runner.send_request(
+            request,
+            Box::new(move |result| {
+                // unable to handle a failure from `send` here
+                sender.send(result).ok();
+            }),
+        )?;
 
         let send_req_result: VdrSendRequestResult = recv
             .await

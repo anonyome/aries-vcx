@@ -12,9 +12,8 @@ use numalgo1::Numalgo1;
 use numalgo2::Numalgo2;
 use numalgo3::Numalgo3;
 
-use crate::error::DidPeerError;
-
 use self::traits::Numalgo;
+use crate::error::DidPeerError;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NumalgoKind {
@@ -24,14 +23,20 @@ pub enum NumalgoKind {
     DidShortening(Numalgo3),
 }
 
+impl NumalgoKind {
+    pub fn to_char(&self) -> char {
+        match self {
+            NumalgoKind::InceptionKeyWithoutDoc(_) => Numalgo0::NUMALGO_CHAR,
+            NumalgoKind::GenesisDoc(_) => Numalgo1::NUMALGO_CHAR,
+            NumalgoKind::MultipleInceptionKeys(_) => Numalgo2::NUMALGO_CHAR,
+            NumalgoKind::DidShortening(_) => Numalgo3::NUMALGO_CHAR,
+        }
+    }
+}
+
 impl Display for NumalgoKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NumalgoKind::InceptionKeyWithoutDoc(_) => Numalgo0::NUMALGO_CHAR.fmt(f),
-            NumalgoKind::GenesisDoc(_) => Numalgo1::NUMALGO_CHAR.fmt(f),
-            NumalgoKind::MultipleInceptionKeys(_) => Numalgo2::NUMALGO_CHAR.fmt(f),
-            NumalgoKind::DidShortening(_) => Numalgo3::NUMALGO_CHAR.fmt(f),
-        }
+        self.to_char().fmt(f)
     }
 }
 
@@ -44,7 +49,7 @@ impl TryFrom<char> for NumalgoKind {
             Numalgo1::NUMALGO_CHAR => Ok(NumalgoKind::GenesisDoc(Numalgo1)),
             Numalgo2::NUMALGO_CHAR => Ok(NumalgoKind::MultipleInceptionKeys(Numalgo2)),
             Numalgo3::NUMALGO_CHAR => Ok(NumalgoKind::DidShortening(Numalgo3)),
-            c @ _ => Err(DidPeerError::InvalidNumalgoCharacter(c)),
+            c => Err(DidPeerError::InvalidNumalgoCharacter(c)),
         }
     }
 }

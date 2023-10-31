@@ -1,15 +1,18 @@
-use std::sync::Arc;
-
 use aries_vcx_core::wallet::base_wallet::BaseWallet;
-use base64;
-use messages::msg_fields::protocols::connection::response::{ConnectionSignature, ResponseContent};
-use messages::msg_fields::protocols::connection::ConnectionData;
+use base64::{self, engine::general_purpose, Engine};
+use messages::msg_fields::protocols::connection::{
+    response::{ConnectionSignature, ResponseContent},
+    ConnectionData,
+};
 use time;
 
 use crate::errors::error::prelude::*;
-use crate::global::settings;
 
-async fn get_signature_data(wallet: &Arc<dyn BaseWallet>, data: String, key: &str) -> VcxResult<(Vec<u8>, Vec<u8>)> {
+async fn get_signature_data(
+    wallet: &impl BaseWallet,
+    data: String,
+    key: &str,
+) -> VcxResult<(Vec<u8>, Vec<u8>)> {
     let now: u64 = time::OffsetDateTime::now_utc().unix_timestamp() as u64;
     let mut sig_data = now.to_be_bytes().to_vec();
     sig_data.extend(data.as_bytes());
@@ -20,15 +23,15 @@ async fn get_signature_data(wallet: &Arc<dyn BaseWallet>, data: String, key: &st
 }
 
 pub async fn sign_connection_response(
-    wallet: &Arc<dyn BaseWallet>,
+    wallet: &impl BaseWallet,
     key: &str,
     con_data: &ConnectionData,
 ) -> VcxResult<ConnectionSignature> {
     let con_data = json!(con_data).to_string();
     let (signature, sig_data) = get_signature_data(wallet, con_data, key).await?;
 
-    let sig_data = base64::encode_config(&sig_data, base64::URL_SAFE);
-    let signature = base64::encode_config(&signature, base64::URL_SAFE);
+    let sig_data = general_purpose::URL_SAFE.encode(sig_data);
+    let signature = general_purpose::URL_SAFE.encode(signature);
 
     let connection_sig = ConnectionSignature::new(signature, sig_data, key.to_string());
 
@@ -36,20 +39,22 @@ pub async fn sign_connection_response(
 }
 
 pub async fn decode_signed_connection_response(
-    wallet: &Arc<dyn BaseWallet>,
+    wallet: &impl BaseWallet,
     response: ResponseContent,
     their_vk: &str,
 ) -> VcxResult<ConnectionData> {
-    let signature =
-        base64::decode_config(&response.connection_sig.signature.as_bytes(), base64::URL_SAFE).map_err(|err| {
+    let signature = general_purpose::URL_SAFE
+        .decode(response.connection_sig.signature.as_bytes())
+        .map_err(|err| {
             AriesVcxError::from_msg(
                 AriesVcxErrorKind::InvalidJson,
                 format!("Cannot decode ConnectionResponse: {:?}", err),
             )
         })?;
 
-    let sig_data =
-        base64::decode_config(&response.connection_sig.sig_data.as_bytes(), base64::URL_SAFE).map_err(|err| {
+    let sig_data = general_purpose::URL_SAFE
+        .decode(response.connection_sig.sig_data.as_bytes())
+        .map_err(|err| {
             AriesVcxError::from_msg(
                 AriesVcxErrorKind::InvalidJson,
                 format!("Cannot decode ConnectionResponse: {:?}", err),
@@ -66,7 +71,8 @@ pub async fn decode_signed_connection_response(
     if response.connection_sig.signer != their_vk {
         return Err(AriesVcxError::from_msg(
             AriesVcxErrorKind::InvalidJson,
-            "Signer declared in ConnectionResponse signed response is not matching the actual signer. Connection ",
+            "Signer declared in ConnectionResponse signed response is not matching the actual \
+             signer. Connection ",
         ));
     }
 
@@ -76,25 +82,6 @@ pub async fn decode_signed_connection_response(
         .map_err(|err| AriesVcxError::from_msg(AriesVcxErrorKind::InvalidJson, err.to_string()))?;
 
     Ok(connection)
-}
-
-pub async fn unpack_message_to_string(wallet: &Arc<dyn BaseWallet>, msg: &[u8]) -> VcxResult<String> {
-    if settings::indy_mocks_enabled() {
-        return Ok(String::new());
-    }
-
-    String::from_utf8(
-        wallet
-            .unpack_message(msg)
-            .await
-            .map_err(|_| AriesVcxError::from_msg(AriesVcxErrorKind::InvalidMessagePack, "Failed to unpack message"))?,
-    )
-    .map_err(|_| {
-        AriesVcxError::from_msg(
-            AriesVcxErrorKind::InvalidMessageFormat,
-            "Failed to convert message to utf8 string",
-        )
-    })
 }
 
 // #[cfg(test)]
@@ -132,8 +119,8 @@ pub async fn unpack_message_to_string(wallet: &Arc<dyn BaseWallet>, msg: &[u8]) 
 //                     .unwrap();
 //             assert_eq!(
 //                 _response(),
-//                 decode_signed_connection_response(&profile.inject_wallet(), signed_response, &trustee_key)
-//                     .await
+//                 decode_signed_connection_response(&profile.inject_wallet(), signed_response,
+// &trustee_key)                     .await
 //                     .unwrap()
 //             );
 //         })
@@ -150,8 +137,9 @@ pub async fn unpack_message_to_string(wallet: &Arc<dyn BaseWallet>, msg: &[u8]) 
 //                 sign_connection_response(&profile.inject_wallet(), &trustee_key, _response())
 //                     .await
 //                     .unwrap();
-//             signed_response.connection_sig.signer = String::from("AAAAAAAAAAAAAAAAXkaJdrQejfztN4XqdsiV4ct3LXKL");
-//             decode_signed_connection_response(&profile.inject_wallet(), signed_response, &trustee_key)
+//             signed_response.connection_sig.signer =
+// String::from("AAAAAAAAAAAAAAAAXkaJdrQejfztN4XqdsiV4ct3LXKL");
+// decode_signed_connection_response(&profile.inject_wallet(), signed_response, &trustee_key)
 //                 .await
 //                 .unwrap_err();
 //         })

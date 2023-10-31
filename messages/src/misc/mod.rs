@@ -12,13 +12,12 @@ pub mod test_utils {
     use serde_json::{json, Value};
     use shared_vcx::misc::utils::CowStr;
 
+    use super::utils;
     use crate::{
         msg_parts::MsgParts,
         msg_types::{traits::MessageKind, MessageType, Protocol},
         AriesMessage,
     };
-
-    use super::utils;
 
     pub struct DateTimeRfc3339<'a>(pub &'a DateTime<Utc>);
 
@@ -84,7 +83,11 @@ pub mod test_utils {
         obj.insert("@id".to_owned(), json!(id));
         obj.insert("@type".to_owned(), json!(msg_type));
 
-        let msg = MsgParts::with_decorators(id, content, decorators);
+        let msg = MsgParts::<T, U>::builder()
+            .id(id)
+            .content(content)
+            .decorators(decorators)
+            .build();
         let msg = AriesMessage::from(msg);
 
         test_serde(msg, expected);

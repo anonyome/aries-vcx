@@ -1,33 +1,38 @@
-use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
 use chrono::Utc;
-use messages::decorators::thread::Thread;
-use messages::decorators::timing::Timing;
-use messages::msg_fields::protocols::out_of_band::invitation::Invitation;
-use messages::msg_fields::protocols::out_of_band::reuse::{
-    HandshakeReuse, HandshakeReuseContent, HandshakeReuseDecorators,
+use messages::{
+    decorators::{thread::Thread, timing::Timing},
+    msg_fields::protocols::out_of_band::{
+        invitation::Invitation,
+        reuse::{HandshakeReuse, HandshakeReuseDecorators},
+        reuse_accepted::{HandshakeReuseAccepted, HandshakeReuseAcceptedDecorators},
+    },
 };
-use messages::msg_fields::protocols::out_of_band::reuse_accepted::{
-    HandshakeReuseAccepted, HandshakeReuseAcceptedContent, HandshakeReuseAcceptedDecorators,
-};
-
 use uuid::Uuid;
+
+use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
 
 pub fn build_handshake_reuse_msg(oob_invitation: &Invitation) -> HandshakeReuse {
     let id = Uuid::new_v4().to_string();
-    let content = HandshakeReuseContent::default();
 
-    let mut thread = Thread::new(id.clone());
-    thread.pthid = Some(oob_invitation.id.clone());
+    let decorators = HandshakeReuseDecorators::builder()
+        .thread(
+            Thread::builder()
+                .thid(id.clone())
+                .pthid(oob_invitation.id.clone())
+                .build(),
+        )
+        .timing(Timing::builder().out_time(Utc::now()).build())
+        .build();
 
-    let mut decorators = HandshakeReuseDecorators::new(thread);
-    let mut timing = Timing::default();
-    timing.out_time = Some(Utc::now());
-    decorators.timing = Some(timing);
-
-    HandshakeReuse::with_decorators(id, content, decorators)
+    HandshakeReuse::builder()
+        .id(id)
+        .decorators(decorators)
+        .build()
 }
 
-pub fn build_handshake_reuse_accepted_msg(handshake_reuse: &HandshakeReuse) -> VcxResult<HandshakeReuseAccepted> {
+pub fn build_handshake_reuse_accepted_msg(
+    handshake_reuse: &HandshakeReuse,
+) -> VcxResult<HandshakeReuseAccepted> {
     let thread = &handshake_reuse.decorators.thread;
 
     let thread_id = thread.thid.clone();
@@ -40,19 +45,15 @@ pub fn build_handshake_reuse_accepted_msg(handshake_reuse: &HandshakeReuse) -> V
         ))?
         .to_owned();
 
-    let content = HandshakeReuseAcceptedContent::default();
-    let mut thread = Thread::new(thread_id);
-    thread.pthid = Some(pthread_id);
+    let decorators = HandshakeReuseAcceptedDecorators::builder()
+        .thread(Thread::builder().thid(thread_id).pthid(pthread_id).build())
+        .timing(Timing::builder().out_time(Utc::now()).build())
+        .build();
 
-    let decorators = HandshakeReuseAcceptedDecorators::new(thread);
-    let mut timing = Timing::default();
-    timing.out_time = Some(Utc::now());
-
-    Ok(HandshakeReuseAccepted::with_decorators(
-        Uuid::new_v4().to_string(),
-        content,
-        decorators,
-    ))
+    Ok(HandshakeReuseAccepted::builder()
+        .id(Uuid::new_v4().to_string())
+        .decorators(decorators)
+        .build())
 }
 
 // #[cfg(test)]

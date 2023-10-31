@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use did_doc_sov::extra_fields::ExtraFieldsSov;
 use did_resolver::{
@@ -13,25 +11,24 @@ use did_resolver::{
 };
 use serde_json::Value;
 
+use super::utils::{is_valid_sovrin_did_id, ledger_response_to_ddo};
 use crate::{
     error::{parsing::ParsingErrorSource, DidSovError},
     reader::AttrReader,
 };
 
-use super::utils::{is_valid_sovrin_did_id, ledger_response_to_ddo};
-
-pub struct DidSovResolver {
-    ledger: Arc<dyn AttrReader>,
+pub struct DidSovResolver<'a, T: AttrReader> {
+    ledger: &'a T,
 }
 
-impl DidSovResolver {
-    pub fn new(ledger: Arc<dyn AttrReader>) -> Self {
+impl<'a, T: AttrReader> DidSovResolver<'a, T> {
+    pub fn new(ledger: &'a T) -> Self {
         DidSovResolver { ledger }
     }
 }
 
 #[async_trait]
-impl DidResolvable for DidSovResolver {
+impl<'a, T: AttrReader> DidResolvable for DidSovResolver<'a, T> {
     type ExtraFieldsService = ExtraFieldsSov;
     type ExtraFieldsOptions = ();
 
@@ -69,7 +66,7 @@ impl DidResolvable for DidSovResolver {
     }
 }
 
-impl DidSovResolver {
+impl<'a, T: AttrReader> DidSovResolver<'a, T> {
     async fn get_verkey(&self, did: &str) -> Result<String, DidSovError> {
         let nym_response = self.ledger.get_nym(did).await?;
         let nym_json: Value = serde_json::from_str(&nym_response)?;

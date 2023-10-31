@@ -37,9 +37,8 @@ pub fn method(entity: &str) -> Option<String> {
                 (Some(type_), None) => Some(type_.as_str().to_owned()),
                 _ => {
                     warn!(
-                        "Unrecognized FQ method for {}, parsed items are \
-                    (where 2nd is method type, and 3rd is sub-method (namespace, ledger, type, etc)\
-                     {:?}",
+                        "Unrecognized FQ method for {}, parsed items are (where 2nd is method \
+                         type, and 3rd is sub-method (namespace, ledger, type, etc){:?}",
                         entity, caps
                     );
                     None
@@ -50,7 +49,7 @@ pub fn method(entity: &str) -> Option<String> {
 }
 
 pub fn is_fully_qualified(entity: &str) -> bool {
-    REGEX.is_match(&entity)
+    REGEX.is_match(entity)
 }
 
 macro_rules! qualifiable_type (($newtype:ident) => (

@@ -2,6 +2,9 @@ name: "setup-testing-nodejs"
 description: 'Install library deps, build libvcx'
 
 inputs:
+  rust-toolchain-version:
+    description: 'The Rust toolchain version to use'
+    required: true
   skip-docker-setup:
     description: 'If true, skip spinning up docker containers'
     required: false
@@ -23,7 +26,7 @@ runs:
         npm install -g npm@8.19.3
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.65.0
+        toolchain: ${{ inputs.rust-toolchain-version }}
     - uses: Swatinem/rust-cache@v2
     - name: "Install dependencies"
       shell: bash
@@ -37,7 +40,7 @@ runs:
         docker run --rm -d --name mysql     --network host -e MYSQL_ROOT_PASSWORD=mysecretpassword mysql:5.7.35
         docker run --rm -d --name indypool  --network host ${{ env.DOCKER_IMAGE_POOL }}
         sleep 5
-        docker-compose -f ./ci/agency/docker-compose.yml up -d
+        docker-compose -f ./.github/ci/agency/docker-compose.yml up -d
     - name: "Build binding module"
       shell: bash
       run: (cd wrappers/vcx-napi-rs && npm install && npm run build:napi:debug)

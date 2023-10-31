@@ -13,12 +13,11 @@ use did_resolver::{
     },
 };
 
-use crate::resolution::DidSovResolver;
-
 use super::utils::dereference_did_document;
+use crate::{reader::AttrReader, resolution::DidSovResolver};
 
 #[async_trait]
-impl DidDereferenceable for DidSovResolver {
+impl<'a, T: AttrReader> DidDereferenceable for DidSovResolver<'a, T> {
     type Output = Cursor<Vec<u8>>;
 
     async fn dereference(

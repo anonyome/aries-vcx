@@ -1,11 +1,14 @@
-use aries_vcx::common::primitives::revocation_registry::RevocationRegistry;
-use aries_vcx::common::primitives::revocation_registry::RevocationRegistryDefinition;
-use aries_vcx::global::settings::CONFIG_INSTITUTION_DID;
+use aries_vcx::common::primitives::revocation_registry::{
+    RevocationRegistry, RevocationRegistryDefinition,
+};
 
-use crate::api_vcx::api_global::profile::{get_main_anoncreds, get_main_anoncreds_ledger_write, get_main_profile};
-use crate::api_vcx::api_global::settings::get_config_value;
-use crate::api_vcx::api_handle::object_cache::ObjectCache;
-use crate::errors::error::{LibvcxError, LibvcxErrorKind, LibvcxResult};
+use crate::{
+    api_vcx::{
+        api_global::profile::{get_main_anoncreds, get_main_ledger_write, get_main_wallet},
+        api_handle::object_cache::ObjectCache,
+    },
+    errors::error::{LibvcxError, LibvcxErrorKind, LibvcxResult},
+};
 lazy_static! {
     pub static ref REV_REG_MAP: ObjectCache<RevocationRegistry> =
         ObjectCache::<RevocationRegistry>::new("revocation-registry-cache");
@@ -29,7 +32,8 @@ pub async fn create(config: RevocationRegistryConfig) -> LibvcxResult<u32> {
         tag,
     } = config;
     let rev_reg = RevocationRegistry::create(
-        &get_main_anoncreds()?,
+        get_main_wallet()?.as_ref(),
+        get_main_anoncreds()?.as_ref(),
         &issuer_did,
         &cred_def_id,
         &tails_dir,
@@ -44,20 +48,24 @@ pub async fn create(config: RevocationRegistryConfig) -> LibvcxResult<u32> {
 pub async fn publish(handle: u32, tails_url: &str) -> LibvcxResult<u32> {
     let mut rev_reg = REV_REG_MAP.get_cloned(handle)?;
     rev_reg
-        .publish_revocation_primitives(&get_main_anoncreds_ledger_write()?, tails_url)
+        .publish_revocation_primitives(
+            get_main_wallet()?.as_ref(),
+            get_main_ledger_write()?.as_ref(),
+            tails_url,
+        )
         .await?;
     REV_REG_MAP.insert(handle, rev_reg)?;
     Ok(handle)
 }
 
-pub async fn publish_revocations(handle: u32) -> LibvcxResult<()> {
-    let submitter_did = get_config_value(CONFIG_INSTITUTION_DID)?;
+pub async fn publish_revocations(handle: u32, submitter_did: &str) -> LibvcxResult<()> {
     let rev_reg = REV_REG_MAP.get_cloned(handle)?;
     rev_reg
         .publish_local_revocations(
-            &get_main_anoncreds()?,
-            &get_main_anoncreds_ledger_write()?,
-            &submitter_did,
+            get_main_wallet()?.as_ref(),
+            get_main_anoncreds()?.as_ref(),
+            get_main_ledger_write()?.as_ref(),
+            submitter_did,
         )
         .await?;
 
@@ -69,7 +77,9 @@ pub fn get_rev_reg_id(handle: u32) -> LibvcxResult<String> {
 }
 
 pub fn to_string(handle: u32) -> LibvcxResult<String> {
-    REV_REG_MAP.get(handle, |rev_reg| rev_reg.to_string().map_err(|err| err.into()))
+    REV_REG_MAP.get(handle, |rev_reg| {
+        rev_reg.to_string().map_err(|err| err.into())
+    })
 }
 
 pub fn from_string(rev_reg_data: &str) -> LibvcxResult<u32> {
@@ -84,7 +94,9 @@ pub fn release(handle: u32) -> LibvcxResult<()> {
 }
 
 pub fn get_tails_hash(handle: u32) -> LibvcxResult<String> {
-    REV_REG_MAP.get(handle, |rev_reg| Ok(rev_reg.get_rev_reg_def().value.tails_hash))
+    REV_REG_MAP.get(handle, |rev_reg| {
+        Ok(rev_reg.get_rev_reg_def().value.tails_hash)
+    })
 }
 
 pub fn get_rev_reg_def(handle: u32) -> LibvcxResult<RevocationRegistryDefinition> {

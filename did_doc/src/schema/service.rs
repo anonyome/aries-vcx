@@ -2,12 +2,11 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::DidDocumentBuilderError;
-
 use super::{
     types::{uri::Uri, url::Url},
     utils::OneOrList,
 };
+use crate::error::DidDocumentBuilderError;
 
 pub type ServiceTypeAlias = OneOrList<String>;
 
@@ -226,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_service_serde() {
-        let service_serialized = r##"{
+        let service_serialized = r#"{
           "id": "did:sov:HR6vs6GEZ8rHaVgjg2WodM#did-communication",
           "type": "did-communication",
           "priority": 0,
@@ -238,7 +237,7 @@ mod tests {
             "didcomm/aip2;env=rfc19"
           ],
           "serviceEndpoint": "https://example.com/endpoint"
-        }"##;
+        }"#;
 
         let service: Service<ExtraSov> = serde_json::from_str(service_serialized).unwrap();
         assert_eq!(

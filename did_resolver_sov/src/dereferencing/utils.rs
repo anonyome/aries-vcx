@@ -91,13 +91,16 @@ pub(crate) fn dereference_did_document<E: Default + Serialize>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use did_resolver::did_doc::schema::did_doc::DidDocumentBuilder;
-    use did_resolver::did_doc::schema::verification_method::VerificationMethodType;
-    use did_resolver::did_parser::DidUrl;
-    use did_resolver::traits::resolvable::resolution_output::DidResolutionOutput;
+    use did_resolver::{
+        did_doc::schema::{
+            did_doc::DidDocumentBuilder, verification_method::VerificationMethodType,
+        },
+        did_parser::DidUrl,
+        traits::resolvable::resolution_output::DidResolutionOutput,
+    };
     use serde_json::Value;
+
+    use super::*;
 
     fn example_did_document_builder() -> DidDocumentBuilder<()> {
         let verification_method = VerificationMethod::builder(
@@ -114,7 +117,7 @@ mod tests {
         let agent_service = Service::builder(
             "did:example:123456789abcdefghi#agent".parse().unwrap(),
             "https://agent.example.com/8377464".try_into().unwrap(),
-            Default::default(),
+            (),
         )
         .add_service_type("AgentService".to_string())
         .unwrap()
@@ -123,7 +126,7 @@ mod tests {
         let messaging_service = Service::builder(
             "did:example:123456789abcdefghi#messages".parse().unwrap(),
             "https://example.com/messages/8377464".try_into().unwrap(),
-            Default::default(),
+            (),
         )
         .add_service_type("MessagingService".to_string())
         .unwrap()
@@ -202,7 +205,7 @@ mod tests {
             let additional_service = Service::builder(
                 "did:example:123456789abcdefghi#keys-1".parse().unwrap(),
                 "https://example.com/duplicated/8377464".try_into().unwrap(),
-                Default::default(),
+                (),
             )
             .add_service_type("DuplicatedService".to_string())
             .unwrap()

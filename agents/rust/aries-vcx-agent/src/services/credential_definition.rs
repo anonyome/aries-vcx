@@ -1,30 +1,45 @@
 use std::sync::{Arc, Mutex};
 
-use crate::error::*;
-use crate::storage::object_cache::ObjectCache;
-use crate::storage::Storage;
 use aries_vcx::{
     common::primitives::credential_definition::{CredentialDef, CredentialDefConfig},
-    core::profile::profile::Profile,
+    utils::devsetup::{DefaultIndyLedgerRead, DefaultIndyLedgerWrite},
+};
+use aries_vcx_core::{anoncreds::credx_anoncreds::IndyCredxAnonCreds, wallet::indy::IndySdkWallet};
+
+use crate::{
+    error::*,
+    storage::{object_cache::ObjectCache, Storage},
 };
 
 pub struct ServiceCredentialDefinitions {
-    profile: Arc<dyn Profile>,
+    ledger_read: Arc<DefaultIndyLedgerRead>,
+    ledger_write: Arc<DefaultIndyLedgerWrite>,
+    anoncreds: IndyCredxAnonCreds,
+    wallet: Arc<IndySdkWallet>,
     cred_defs: ObjectCache<CredentialDef>,
 }
 
 impl ServiceCredentialDefinitions {
-    pub fn new(profile: Arc<dyn Profile>) -> Self {
+    pub fn new(
+        ledger_read: Arc<DefaultIndyLedgerRead>,
+        ledger_write: Arc<DefaultIndyLedgerWrite>,
+        anoncreds: IndyCredxAnonCreds,
+        wallet: Arc<IndySdkWallet>,
+    ) -> Self {
         Self {
-            profile,
             cred_defs: ObjectCache::new("cred-defs"),
+            ledger_read,
+            ledger_write,
+            anoncreds,
+            wallet,
         }
     }
 
     pub async fn create_cred_def(&self, config: CredentialDefConfig) -> AgentResult<String> {
         let cd = CredentialDef::create(
-            &self.profile.inject_anoncreds_ledger_read(),
-            &self.profile.inject_anoncreds(),
+            self.wallet.as_ref(),
+            self.ledger_read.as_ref(),
+            &self.anoncreds,
             "".to_string(),
             config,
             true,
@@ -37,8 +52,9 @@ impl ServiceCredentialDefinitions {
         let cred_def = self.cred_defs.get(thread_id)?;
         let cred_def = cred_def
             .publish_cred_def(
-                &self.profile.inject_anoncreds_ledger_read(),
-                &self.profile.inject_anoncreds_ledger_write(),
+                self.wallet.as_ref(),
+                self.ledger_read.as_ref(),
+                self.ledger_write.as_ref(),
             )
             .await?;
         self.cred_defs.insert(thread_id, cred_def)?;
@@ -46,7 +62,10 @@ impl ServiceCredentialDefinitions {
     }
 
     pub fn cred_def_json(&self, thread_id: &str) -> AgentResult<String> {
-        self.cred_defs.get(thread_id)?.get_data_json().map_err(|err| err.into())
+        self.cred_defs
+            .get(thread_id)?
+            .get_data_json()
+            .map_err(|err| err.into())
     }
 
     pub fn find_by_schema_id(&self, schema_id: &str) -> AgentResult<Vec<String>> {

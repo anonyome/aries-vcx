@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
 use crate::{
     decorators::{localization::MsgLocalization, thread::Thread, timing::Timing},
@@ -7,11 +8,13 @@ use crate::{
 
 pub type ProblemReport = MsgParts<ProblemReportContent, ProblemReportDecorators>;
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq, TypedBuilder)]
 pub struct ProblemReportContent {
+    #[builder(default, setter(strip_option))]
     #[serde(rename = "problem-code")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub problem_code: Option<ProblemCode>,
+    #[builder(default, setter(strip_option))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub explain: Option<String>,
 }
@@ -25,26 +28,18 @@ pub enum ProblemCode {
     ResponseProcessingError,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 pub struct ProblemReportDecorators {
     #[serde(rename = "~thread")]
     pub thread: Thread,
+    #[builder(default, setter(strip_option))]
     #[serde(rename = "~l10n")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub localization: Option<MsgLocalization>,
+    #[builder(default, setter(strip_option))]
     #[serde(rename = "~timing")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timing: Option<Timing>,
-}
-
-impl ProblemReportDecorators {
-    pub fn new(thread: Thread) -> Self {
-        Self {
-            thread,
-            localization: None,
-            timing: None,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -56,8 +51,8 @@ mod tests {
     use super::*;
     use crate::{
         decorators::{
-            localization::tests::make_extended_msg_localization, thread::tests::make_extended_thread,
-            timing::tests::make_extended_timing,
+            localization::tests::make_extended_msg_localization,
+            thread::tests::make_extended_thread, timing::tests::make_extended_timing,
         },
         misc::test_utils,
         msg_types::connection::ConnectionTypeV1_0,
@@ -67,24 +62,34 @@ mod tests {
     fn test_minimal_conn_problem_report() {
         let content = ProblemReportContent::default();
 
-        let decorators = ProblemReportDecorators::new(make_extended_thread());
+        let decorators = ProblemReportDecorators::builder()
+            .thread(make_extended_thread())
+            .build();
 
         let expected = json!({
             "~thread": decorators.thread
         });
 
-        test_utils::test_msg(content, decorators, ConnectionTypeV1_0::ProblemReport, expected);
+        test_utils::test_msg(
+            content,
+            decorators,
+            ConnectionTypeV1_0::ProblemReport,
+            expected,
+        );
     }
 
     #[test]
     fn test_extended_conn_problem_report() {
-        let mut content = ProblemReportContent::default();
-        content.problem_code = Some(ProblemCode::RequestNotAccepted);
-        content.explain = Some("test_conn_problem_report_explain".to_owned());
+        let content = ProblemReportContent::builder()
+            .problem_code(ProblemCode::RequestNotAccepted)
+            .explain("test_conn_problem_report_explain".to_owned())
+            .build();
 
-        let mut decorators = ProblemReportDecorators::new(make_extended_thread());
-        decorators.timing = Some(make_extended_timing());
-        decorators.localization = Some(make_extended_msg_localization());
+        let decorators = ProblemReportDecorators::builder()
+            .thread(make_extended_thread())
+            .timing(make_extended_timing())
+            .localization(make_extended_msg_localization())
+            .build();
 
         let expected = json!({
             "problem-code": content.problem_code,
@@ -94,6 +99,11 @@ mod tests {
             "~l10n": decorators.localization
         });
 
-        test_utils::test_msg(content, decorators, ConnectionTypeV1_0::ProblemReport, expected);
+        test_utils::test_msg(
+            content,
+            decorators,
+            ConnectionTypeV1_0::ProblemReport,
+            expected,
+        );
     }
 }

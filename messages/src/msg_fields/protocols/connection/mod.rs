@@ -10,7 +10,7 @@ use diddoc_legacy::aries::diddoc::AriesDidDoc;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 use self::{
-    invitation::Invitation,
+    invitation::{Invitation, InvitationContent, InvitationDecorators},
     problem_report::{ProblemReport, ProblemReportContent, ProblemReportDecorators},
     request::{Request, RequestContent, RequestDecorators},
     response::{Response, ResponseContent, ResponseDecorators},
@@ -19,7 +19,9 @@ use crate::{
     misc::utils::{into_msg_with_type, transit_to_aries_msg},
     msg_fields::traits::DelayedSerde,
     msg_types::{
-        protocols::connection::{ConnectionType as ConnectionKind, ConnectionTypeV1, ConnectionTypeV1_0},
+        protocols::connection::{
+            ConnectionType as ConnectionKind, ConnectionTypeV1, ConnectionTypeV1_0,
+        },
         MsgWithType,
     },
 };
@@ -35,7 +37,10 @@ pub enum Connection {
 impl DelayedSerde for Connection {
     type MsgType<'a> = (ConnectionKind, &'a str);
 
-    fn delayed_deserialize<'de, D>(msg_type: Self::MsgType<'de>, deserializer: D) -> Result<Self, D::Error>
+    fn delayed_deserialize<'de, D>(
+        msg_type: Self::MsgType<'de>,
+        deserializer: D,
+    ) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -49,7 +54,9 @@ impl DelayedSerde for Connection {
             ConnectionTypeV1_0::Invitation => Invitation::deserialize(deserializer).map(From::from),
             ConnectionTypeV1_0::Request => Request::deserialize(deserializer).map(From::from),
             ConnectionTypeV1_0::Response => Response::deserialize(deserializer).map(From::from),
-            ConnectionTypeV1_0::ProblemReport => ProblemReport::deserialize(deserializer).map(From::from),
+            ConnectionTypeV1_0::ProblemReport => {
+                ProblemReport::deserialize(deserializer).map(From::from)
+            }
         }
     }
 
@@ -80,6 +87,7 @@ impl ConnectionData {
     }
 }
 
+transit_to_aries_msg!(InvitationContent: InvitationDecorators, Connection);
 transit_to_aries_msg!(RequestContent: RequestDecorators, Connection);
 transit_to_aries_msg!(ResponseContent: ResponseDecorators, Connection);
 transit_to_aries_msg!(ProblemReportContent: ProblemReportDecorators, Connection);

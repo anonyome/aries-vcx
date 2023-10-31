@@ -122,12 +122,12 @@ impl MySqlStorageType {
             return Ok(connection.clone());
         }
 
-        let mut my_sql_connect_options = MySqlConnectOptions::new()
+        let my_sql_connect_options = MySqlConnectOptions::new()
             .host(host_addr)
             .database(&config.db_name)
             .username(&credentials.user)
-            .password(&credentials.pass);
-        my_sql_connect_options.log_statements(LevelFilter::Debug);
+            .password(&credentials.pass)
+            .log_statements(LevelFilter::Debug);
 
         let connection = MySqlPoolOptions::default()
             .max_connections(config.connection_limit)
@@ -169,7 +169,6 @@ impl WalletStorage for MySqlStorage {
     ///  * `IndyError::Closed` - Storage is closed
     ///  * `IndyError::ItemNotFound` - Item is not found in database
     ///  * `IOError("IO error during storage operation:...")` - Failed connection or SQL query
-    ///
     async fn get(&self, type_: &[u8], id: &[u8], options: &str) -> IndyResult<StorageRecord> {
         let options: RecordOptions = serde_json::from_str(options).to_indy(
             IndyErrorKind::InvalidStructure,
@@ -201,7 +200,7 @@ impl WalletStorage for MySqlStorage {
         .bind(self.wallet_id)
         .bind(&base64::encode(type_))
         .bind(&base64::encode(id))
-        .fetch_one(&mut conn)
+        .fetch_one(&mut *conn)
         .await?;
 
         let value = if let Some(value) = value {
@@ -253,7 +252,6 @@ impl WalletStorage for MySqlStorage {
     ///  * `IndyError::Closed` - Storage is closed
     ///  * `IndyError::ItemAlreadyExists` - Item is already present in database
     ///  * `IOError("IO error during storage operation:...")` - Failed connection or SQL query
-    ///
     async fn add(
         &self,
         type_: &[u8],
@@ -273,8 +271,8 @@ impl WalletStorage for MySqlStorage {
         .bind(&base64::encode(id))
         .bind(&value.to_bytes())
         .bind(&_tags_to_json(tags)?)
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?;
 
         tx.commit().await?;
@@ -296,8 +294,8 @@ impl WalletStorage for MySqlStorage {
         .bind(&value.to_bytes())
         .bind(&base64::encode(type_))
         .bind(&base64::encode(id))
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
 
@@ -343,8 +341,8 @@ impl WalletStorage for MySqlStorage {
         ))
         .bind(&base64::encode(type_))
         .bind(&base64::encode(id))
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
 
@@ -379,8 +377,8 @@ impl WalletStorage for MySqlStorage {
         .bind(&_tags_to_json(tags)?)
         .bind(&base64::encode(type_))
         .bind(&base64::encode(id))
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
 
@@ -426,8 +424,8 @@ impl WalletStorage for MySqlStorage {
         ))
         .bind(&base64::encode(type_))
         .bind(&base64::encode(id))
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
 
@@ -472,7 +470,6 @@ impl WalletStorage for MySqlStorage {
     ///  * `IndyError::Closed` - Storage is closed
     ///  * `IndyError::ItemNotFound` - Item is not found in database
     ///  * `IOError("IO error during storage operation:...")` - Failed connection or SQL query
-    ///
     async fn delete(&self, type_: &[u8], id: &[u8]) -> IndyResult<()> {
         let mut tx = self.write_pool.begin().await?;
 
@@ -485,8 +482,8 @@ impl WalletStorage for MySqlStorage {
         )
         .bind(&base64::encode(type_))
         .bind(&base64::encode(id))
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
 
@@ -516,8 +513,8 @@ impl WalletStorage for MySqlStorage {
             WHERE id = ?
             "#,
         )
-        .bind(&self.wallet_id)
-        .fetch_one(&mut conn)
+        .bind(self.wallet_id)
+        .fetch_one(&mut *conn)
         .await?;
 
         base64::decode(&metadata)
@@ -534,8 +531,8 @@ impl WalletStorage for MySqlStorage {
             "#,
         )
         .bind(base64::encode(metadata))
-        .bind(&self.wallet_id)
-        .execute(&mut tx)
+        .bind(self.wallet_id)
+        .execute(&mut *tx)
         .await?;
 
         tx.commit().await?;
@@ -614,7 +611,7 @@ impl WalletStorage for MySqlStorage {
                 }
             }
 
-            let (total_count,) = query.fetch_one(&mut conn).await?;
+            let (total_count,) = query.fetch_one(&mut *conn).await?;
             Some(total_count as usize)
         } else {
             None
@@ -713,7 +710,6 @@ impl WalletStorageType for MySqlStorageType {
     ///
     ///  * `IndyError::NotFound` - File with the provided id not found
     ///  * `IOError(..)` - Deletion of the file form the file-system failed
-    ///
     async fn delete_storage(
         &self,
         id: &str,
@@ -754,7 +750,7 @@ impl WalletStorageType for MySqlStorageType {
             "#,
         )
         .bind(id)
-        .execute(&mut tx)
+        .execute(&mut *tx)
         .await;
 
         let rows_affected = res?.rows_affected();
@@ -802,7 +798,6 @@ impl WalletStorageType for MySqlStorageType {
     ///  * `IOError("Error occurred while creating wallet file:..)"` - Creation of schema failed
     ///  * `IOError("Error occurred while inserting the keys...")` - Insertion of keys failed
     ///  * `IOError(..)` - Deletion of the file form the file-system failed
-    ///
     async fn create_storage(
         &self,
         id: &str,
@@ -831,11 +826,11 @@ impl WalletStorageType for MySqlStorageType {
                 "Absent credentials json",
             ))?;
 
-        let mut my_sql_connect_options = MySqlConnectOptions::new()
+        let my_sql_connect_options = MySqlConnectOptions::new()
             .host(&config.write_host)
             .username(&credentials.user)
-            .password(&credentials.pass);
-        my_sql_connect_options.log_statements(LevelFilter::Debug);
+            .password(&credentials.pass)
+            .log_statements(LevelFilter::Debug);
 
         let mut pool = MySqlPoolOptions::default()
             .max_connections(1)
@@ -853,7 +848,7 @@ impl WalletStorageType for MySqlStorageType {
             "CREATE DATABASE IF NOT EXISTS `{}`;",
             config.db_name
         ))
-        .execute(&mut con)
+        .execute(&mut *con)
         .await?;
 
         // Replace the previous single use pool
@@ -873,7 +868,7 @@ impl WalletStorageType for MySqlStorageType {
             PRIMARY KEY (`wallet_id`, `type`, `name`)
             );"#,
         )
-        .execute(&mut con)
+        .execute(&mut *con)
         .await?;
 
         sqlx::query(
@@ -885,7 +880,7 @@ impl WalletStorageType for MySqlStorageType {
             PRIMARY KEY (`id`)
             );"#,
         )
-        .execute(&mut con)
+        .execute(&mut *con)
         .await?;
 
         let mut tx = pool.begin().await?;
@@ -898,7 +893,7 @@ impl WalletStorageType for MySqlStorageType {
         )
         .bind(id)
         .bind(base64::encode(metadata))
-        .execute(&mut tx)
+        .execute(&mut *tx)
         .await;
 
         match res {
@@ -943,7 +938,6 @@ impl WalletStorageType for MySqlStorageType {
     ///
     ///  * `IndyError::NotFound` - File with the provided id not found
     ///  * `IOError("IO error during storage operation:...")` - Failed connection or SQL query
-    ///
     async fn open_storage(
         &self,
         id: &str,
@@ -1002,19 +996,28 @@ impl WalletStorageType for MySqlStorageType {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
-    #[allow(unused_imports)]
-    use indy_utils::{assert_kind, environment};
+    use indy_utils::environment;
 
     use super::{super::Tag, *};
 
-    // docker run --name indy-mysql -e MYSQL_ROOT_PASSWORD=pass@word1 -p 3306:3306 -d mysql:latest
+    #[allow(unused_macros)]
+    macro_rules! assert_kind {
+        ($kind:expr, $var:expr) => {
+            match $var {
+                Err(e) => assert_eq!($kind, e.kind()),
+                _ => assert!(false, "Result expected to be error"),
+            }
+        };
+    }
 
     #[async_std::test]
     #[cfg(feature = "benchmark")]
     async fn mysql_storage_sync_send() {
-        use futures::{channel::oneshot, executor::ThreadPool, future::join_all};
         use std::{sync::Arc, time::SystemTime};
+
+        use futures::{channel::oneshot, executor::ThreadPool, future::join_all};
 
         let count = 1000;
         let executor = ThreadPool::new().expect("Failed to new ThreadPool");
@@ -1043,7 +1046,7 @@ mod tests {
             })
             .collect();
 
-        let res = join_all(waiters).await;
+        join_all(waiters).await;
         println!("------------> 1 {:?}", SystemTime::now());
 
         let waiters: Vec<_> = (0..count)
@@ -1070,7 +1073,7 @@ mod tests {
             })
             .collect();
 
-        let res = join_all(waiters).await;
+        join_all(waiters).await;
 
         println!("------------> 3 {:?}", SystemTime::now());
 
@@ -1097,7 +1100,7 @@ mod tests {
             })
             .collect();
 
-        let res = join_all(waiters).await;
+        join_all(waiters).await;
 
         println!("------------> 5 {:?}", SystemTime::now());
     }
@@ -2028,11 +2031,11 @@ mod tests {
     }
 
     fn _metadata() -> Vec<u8> {
-        return vec![
+        vec![
             1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5,
             6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2,
             3, 4, 5, 6, 7, 8,
-        ];
+        ]
     }
 
     fn _type(i: u8) -> Vec<u8> {
@@ -2136,10 +2139,10 @@ mod tests {
     }
 
     fn _tags() -> Vec<Tag> {
-        let mut tags: Vec<Tag> = Vec::new();
-        tags.push(Tag::Encrypted(vec![1, 5, 8], vec![3, 5, 6]));
-        tags.push(Tag::PlainText(vec![1, 5, 8, 1], "Plain value".to_string()));
-        tags
+        vec![
+            Tag::Encrypted(vec![1, 5, 8], vec![3, 5, 6]),
+            Tag::PlainText(vec![1, 5, 8, 1], "Plain value".to_string()),
+        ]
     }
 
     fn _new_tags() -> Vec<Tag> {

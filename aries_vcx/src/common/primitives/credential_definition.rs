@@ -1,70 +1,48 @@
-use aries_vcx_core::errors::error::AriesVcxCoreErrorKind;
-use aries_vcx_core::ledger::base_ledger::{AnoncredsLedgerRead, AnoncredsLedgerWrite};
+use aries_vcx_core::{
+    anoncreds::base_anoncreds::BaseAnonCreds,
+    errors::error::AriesVcxCoreErrorKind,
+    ledger::base_ledger::{AnoncredsLedgerRead, AnoncredsLedgerWrite},
+    wallet::base_wallet::BaseWallet,
+};
 
-use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
-use crate::utils::constants::{CRED_DEF_ID, CRED_DEF_JSON, DEFAULT_SERIALIZE_VERSION};
-use crate::utils::serialization::ObjectWithVersion;
+use crate::{
+    errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult},
+    utils::{constants::DEFAULT_SERIALIZE_VERSION, serialization::ObjectWithVersion},
+};
 
-use crate::global::settings::indy_mocks_enabled;
-use aries_vcx_core::anoncreds::base_anoncreds::BaseAnonCreds;
-use std::fmt;
-use std::sync::Arc;
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Default)]
+#[serde(try_from = "u8")]
+#[repr(u8)]
+pub enum PublicEntityStateType {
+    Built = 0,
+    #[default]
+    Published = 1,
+}
 
-macro_rules! enum_number {
-    ($name:ident { $($variant:ident = $value:expr, )* }) => {
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-        pub enum $name {
-            $($variant = $value,)*
-        }
-
-        impl ::serde::Serialize for $name {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: ::serde::Serializer
-            {
-                // Serialize the enum as a u64.
-                serializer.serialize_u64(*self as u64)
-            }
-        }
-
-        impl<'de> ::serde::Deserialize<'de> for $name {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: ::serde::Deserializer<'de>
-            {
-                struct Visitor;
-
-                impl<'de> ::serde::de::Visitor<'de> for Visitor {
-                    type Value = $name;
-
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                        formatter.write_str("positive integer")
-                    }
-
-                    fn visit_u64<E>(self, value: u64) -> Result<$name, E>
-                        where E: ::serde::de::Error
-                    {
-                        // Rust does not come with a simple way of converting a
-                        // number to an enum, so use a big `match`.
-                        match value {
-                            $( $value => Ok($name::$variant), )*
-                            _ => Err(E::custom(
-                                format!("unknown {} value: {}",
-                                stringify!($name), value))),
-                        }
-                    }
-                }
-
-                // Deserialize the enum from a u64.
-                deserializer.deserialize_u64(Visitor)
-            }
-        }
+impl ::serde::Serialize for PublicEntityStateType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        serializer.serialize_u8(*self as u8)
     }
 }
 
-enum_number!(PublicEntityStateType
-{
-    Built = 0,
-    Published = 1,
-});
+impl TryFrom<u8> for PublicEntityStateType {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(PublicEntityStateType::Built),
+            1 => Ok(PublicEntityStateType::Published),
+            _ => Err(format!(
+                "unknown {} value: {}",
+                stringify!(PublicEntityStateType),
+                value
+            )),
+        }
+    }
+}
 
 #[derive(Clone, Deserialize, Debug, Serialize, PartialEq, Eq, Default)]
 pub struct CredentialDef {
@@ -97,20 +75,11 @@ pub struct RevocationDetails {
     pub max_creds: Option<u32>,
 }
 
-impl Default for PublicEntityStateType {
-    fn default() -> Self {
-        PublicEntityStateType::Published
-    }
-}
-
 async fn _try_get_cred_def_from_ledger(
-    ledger: &Arc<dyn AnoncredsLedgerRead>,
+    ledger: &impl AnoncredsLedgerRead,
     issuer_did: &str,
     cred_def_id: &str,
 ) -> VcxResult<Option<String>> {
-    if indy_mocks_enabled() {
-        return Ok(None);
-    }
     match ledger.get_cred_def(cred_def_id, Some(issuer_did)).await {
         Ok(cred_def) => Ok(Some(cred_def)),
         Err(err) if err.kind() == AriesVcxCoreErrorKind::LedgerItemNotFound => Ok(None),
@@ -125,8 +94,9 @@ async fn _try_get_cred_def_from_ledger(
 }
 impl CredentialDef {
     pub async fn create(
-        ledger_read: &Arc<dyn AnoncredsLedgerRead>,
-        anoncreds: &Arc<dyn BaseAnonCreds>,
+        wallet: &impl BaseWallet,
+        ledger_read: &impl AnoncredsLedgerRead,
+        anoncreds: &impl BaseAnonCreds,
         source_id: String,
         config: CredentialDefConfig,
         support_revocation: bool,
@@ -141,8 +111,11 @@ impl CredentialDef {
             schema_id,
             tag,
         } = config;
-        let schema_json = ledger_read.get_schema(&schema_id, Some(&issuer_did)).await?;
+        let schema_json = ledger_read
+            .get_schema(&schema_id, Some(&issuer_did))
+            .await?;
         let (cred_def_id, cred_def_json) = generate_cred_def(
+            wallet,
             anoncreds,
             &issuer_did,
             &schema_json,
@@ -171,10 +144,15 @@ impl CredentialDef {
         self.support_revocation
     }
 
+    pub fn get_cred_def_json(&self) -> &str {
+        &self.cred_def_json
+    }
+
     pub async fn publish_cred_def(
         self,
-        ledger_read: &Arc<dyn AnoncredsLedgerRead>,
-        ledger_write: &Arc<dyn AnoncredsLedgerWrite>,
+        wallet: &impl BaseWallet,
+        ledger_read: &impl AnoncredsLedgerRead,
+        ledger_write: &impl AnoncredsLedgerWrite,
     ) -> VcxResult<Self> {
         trace!(
             "publish_cred_def >>> issuer_did: {}, cred_def_id: {}",
@@ -182,7 +160,7 @@ impl CredentialDef {
             self.id
         );
         if let Some(ledger_cred_def_json) =
-            _try_get_cred_def_from_ledger(&ledger_read, &self.issuer_did, &self.id).await?
+            _try_get_cred_def_from_ledger(ledger_read, &self.issuer_did, &self.id).await?
         {
             return Err(AriesVcxError::from_msg(
                 AriesVcxErrorKind::CredDefAlreadyCreated,
@@ -193,7 +171,7 @@ impl CredentialDef {
             ));
         }
         ledger_write
-            .publish_cred_def(&self.cred_def_json, &self.issuer_did)
+            .publish_cred_def(wallet, &self.cred_def_json, &self.issuer_did)
             .await?;
         Ok(Self {
             state: PublicEntityStateType::Published,
@@ -243,7 +221,7 @@ impl CredentialDef {
         self.source_id = source_id;
     }
 
-    pub async fn update_state(&mut self, ledger: &Arc<dyn AnoncredsLedgerRead>) -> VcxResult<u32> {
+    pub async fn update_state(&mut self, ledger: &impl AnoncredsLedgerRead) -> VcxResult<u32> {
         if (ledger.get_cred_def(&self.id, None).await).is_ok() {
             self.state = PublicEntityStateType::Published
         }
@@ -256,7 +234,8 @@ impl CredentialDef {
 }
 
 pub async fn generate_cred_def(
-    anoncreds: &Arc<dyn BaseAnonCreds>,
+    wallet: &impl BaseWallet,
+    anoncreds: &impl BaseAnonCreds,
     issuer_did: &str,
     schema_json: &str,
     tag: &str,
@@ -264,21 +243,27 @@ pub async fn generate_cred_def(
     support_revocation: Option<bool>,
 ) -> VcxResult<(String, String)> {
     trace!(
-        "generate_cred_def >>> issuer_did: {}, schema_json: {}, tag: {}, sig_type: {:?}, support_revocation: {:?}",
+        "generate_cred_def >>> issuer_did: {}, schema_json: {}, tag: {}, sig_type: {:?}, \
+         support_revocation: {:?}",
         issuer_did,
         schema_json,
         tag,
         sig_type,
         support_revocation
     );
-    if indy_mocks_enabled() {
-        return Ok((CRED_DEF_ID.to_string(), CRED_DEF_JSON.to_string()));
-    }
 
-    let config_json = json!({"support_revocation": support_revocation.unwrap_or(false)}).to_string();
+    let config_json =
+        json!({"support_revocation": support_revocation.unwrap_or(false)}).to_string();
 
     anoncreds
-        .issuer_create_and_store_credential_def(issuer_did, schema_json, tag, sig_type, &config_json)
+        .issuer_create_and_store_credential_def(
+            wallet,
+            issuer_did,
+            schema_json,
+            tag,
+            sig_type,
+            &config_json,
+        )
         .await
         .map_err(|err| err.into())
 }
@@ -286,33 +271,44 @@ pub async fn generate_cred_def(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 pub mod integration_tests {
-    use aries_vcx_core::ledger::indy::pool::test_utils::get_temp_dir_path;
-    use std::sync::Arc;
+    use aries_vcx_core::ledger::{
+        base_ledger::{AnoncredsLedgerRead, AnoncredsLedgerWrite},
+        indy::pool::test_utils::get_temp_dir_path,
+    };
 
-    use crate::common::primitives::credential_definition::generate_cred_def;
-    use crate::common::primitives::revocation_registry::generate_rev_reg;
-    use crate::common::test_utils::create_and_write_test_schema;
-    use crate::utils::constants::DEFAULT_SCHEMA_ATTRS;
-    use crate::utils::devsetup::SetupProfile;
+    use crate::{
+        common::{
+            primitives::{
+                credential_definition::generate_cred_def, revocation_registry::generate_rev_reg,
+            },
+            test_utils::create_and_write_test_schema,
+        },
+        utils::constants::DEFAULT_SCHEMA_ATTRS,
+    };
 
     #[tokio::test]
     #[ignore]
     async fn test_pool_create_cred_def_real() {
-        SetupProfile::run(|setup| async move {
-            let (schema_id, _) = create_and_write_test_schema(
-                &setup.profile.inject_anoncreds(),
-                &setup.profile.inject_anoncreds_ledger_write(),
+        run_setup!(|setup| async move {
+            let schema = create_and_write_test_schema(
+                &setup.wallet,
+                &setup.anoncreds,
+                &setup.ledger_write,
                 &setup.institution_did,
                 DEFAULT_SCHEMA_ATTRS,
             )
             .await;
 
-            let ledger_read = Arc::clone(&setup.profile).inject_anoncreds_ledger_read();
-            let ledger_write = Arc::clone(&setup.profile).inject_anoncreds_ledger_write();
-            let schema_json = ledger_read.get_schema(&schema_id, None).await.unwrap();
+            let ledger_read = setup.ledger_read;
+            let ledger_write = &setup.ledger_write;
+            let schema_json = ledger_read
+                .get_schema(&schema.schema_id, None)
+                .await
+                .unwrap();
 
             let (cred_def_id, cred_def_json_local) = generate_cred_def(
-                &setup.profile.inject_anoncreds(),
+                &setup.wallet,
+                &setup.anoncreds,
                 &setup.institution_did,
                 &schema_json,
                 "tag_1",
@@ -323,7 +319,7 @@ pub mod integration_tests {
             .unwrap();
 
             ledger_write
-                .publish_cred_def(&cred_def_json_local, &setup.institution_did)
+                .publish_cred_def(&setup.wallet, &cred_def_json_local, &setup.institution_did)
                 .await
                 .unwrap();
 
@@ -343,20 +339,25 @@ pub mod integration_tests {
     #[tokio::test]
     #[ignore]
     async fn test_pool_create_rev_reg_def() {
-        SetupProfile::run(|setup| async move {
-            let (schema_id, _) = create_and_write_test_schema(
-                &setup.profile.inject_anoncreds(),
-                &setup.profile.inject_anoncreds_ledger_write(),
+        run_setup!(|setup| async move {
+            let schema = create_and_write_test_schema(
+                &setup.wallet,
+                &setup.anoncreds,
+                &setup.ledger_write,
                 &setup.institution_did,
                 DEFAULT_SCHEMA_ATTRS,
             )
             .await;
-            let ledger_read = Arc::clone(&setup.profile).inject_anoncreds_ledger_read();
-            let ledger_write = Arc::clone(&setup.profile).inject_anoncreds_ledger_write();
-            let schema_json = ledger_read.get_schema(&schema_id, None).await.unwrap();
+            let ledger_read = &setup.ledger_read;
+            let ledger_write = &setup.ledger_write;
+            let schema_json = ledger_read
+                .get_schema(&schema.schema_id, None)
+                .await
+                .unwrap();
 
             let (cred_def_id, cred_def_json) = generate_cred_def(
-                &setup.profile.inject_anoncreds(),
+                &setup.wallet,
+                &setup.anoncreds,
                 &setup.institution_did,
                 &schema_json,
                 "tag_1",
@@ -366,14 +367,15 @@ pub mod integration_tests {
             .await
             .unwrap();
             ledger_write
-                .publish_cred_def(&cred_def_json, &setup.institution_did)
+                .publish_cred_def(&setup.wallet, &cred_def_json, &setup.institution_did)
                 .await
                 .unwrap();
 
             let path = get_temp_dir_path();
 
             let (rev_reg_def_id, rev_reg_def_json, rev_reg_entry_json) = generate_rev_reg(
-                &setup.profile.inject_anoncreds(),
+                &setup.wallet,
+                &setup.anoncreds,
                 &setup.institution_did,
                 &cred_def_id,
                 path.to_str().unwrap(),
@@ -383,11 +385,20 @@ pub mod integration_tests {
             .await
             .unwrap();
             ledger_write
-                .publish_rev_reg_def(&json!(rev_reg_def_json).to_string(), &setup.institution_did)
+                .publish_rev_reg_def(
+                    &setup.wallet,
+                    &json!(rev_reg_def_json).to_string(),
+                    &setup.institution_did,
+                )
                 .await
                 .unwrap();
             ledger_write
-                .publish_rev_reg_delta(&rev_reg_def_id, &rev_reg_entry_json, &setup.institution_did)
+                .publish_rev_reg_delta(
+                    &setup.wallet,
+                    &rev_reg_def_id,
+                    &rev_reg_entry_json,
+                    &setup.institution_did,
+                )
                 .await
                 .unwrap();
         })

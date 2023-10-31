@@ -1,29 +1,54 @@
 use std::sync::{Arc, Mutex};
 
-use crate::error::*;
-use crate::storage::object_cache::ObjectCache;
-use crate::storage::Storage;
-use aries_vcx::common::primitives::credential_schema::Schema;
-use aries_vcx::core::profile::profile::Profile;
+use aries_vcx::{
+    common::primitives::credential_schema::Schema,
+    utils::devsetup::{DefaultIndyLedgerRead, DefaultIndyLedgerWrite},
+};
+use aries_vcx_core::{
+    anoncreds::credx_anoncreds::IndyCredxAnonCreds, ledger::base_ledger::AnoncredsLedgerRead,
+    wallet::indy::IndySdkWallet,
+};
+
+use crate::{
+    error::*,
+    storage::{object_cache::ObjectCache, Storage},
+};
 
 pub struct ServiceSchemas {
-    profile: Arc<dyn Profile>,
+    ledger_read: Arc<DefaultIndyLedgerRead>,
+    ledger_write: Arc<DefaultIndyLedgerWrite>,
+    anoncreds: IndyCredxAnonCreds,
+    wallet: Arc<IndySdkWallet>,
     issuer_did: String,
     schemas: ObjectCache<Schema>,
 }
 
 impl ServiceSchemas {
-    pub fn new(profile: Arc<dyn Profile>, issuer_did: String) -> Self {
+    pub fn new(
+        ledger_read: Arc<DefaultIndyLedgerRead>,
+        ledger_write: Arc<DefaultIndyLedgerWrite>,
+        anoncreds: IndyCredxAnonCreds,
+        wallet: Arc<IndySdkWallet>,
+        issuer_did: String,
+    ) -> Self {
         Self {
-            profile,
             issuer_did,
             schemas: ObjectCache::new("schemas"),
+            ledger_read,
+            ledger_write,
+            anoncreds,
+            wallet,
         }
     }
 
-    pub async fn create_schema(&self, name: &str, version: &str, attributes: &Vec<String>) -> AgentResult<String> {
+    pub async fn create_schema(
+        &self,
+        name: &str,
+        version: &str,
+        attributes: &Vec<String>,
+    ) -> AgentResult<String> {
         let schema = Schema::create(
-            &self.profile.inject_anoncreds(),
+            &self.anoncreds,
             "",
             &self.issuer_did,
             name,
@@ -37,14 +62,14 @@ impl ServiceSchemas {
     pub async fn publish_schema(&self, thread_id: &str) -> AgentResult<()> {
         let schema = self.schemas.get(thread_id)?;
         let schema = schema
-            .publish(&self.profile.inject_anoncreds_ledger_write(), None)
+            .publish(self.wallet.as_ref(), self.ledger_write.as_ref())
             .await?;
         self.schemas.insert(thread_id, schema)?;
         Ok(())
     }
 
     pub async fn schema_json(&self, thread_id: &str) -> AgentResult<String> {
-        let ledger = Arc::clone(&self.profile).inject_anoncreds_ledger_read();
+        let ledger = self.ledger_read.as_ref();
         Ok(ledger.get_schema(thread_id, None).await?)
     }
 

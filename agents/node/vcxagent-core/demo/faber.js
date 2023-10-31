@@ -13,11 +13,13 @@ require('@hyperledger/node-vcx-wrapper')
 const { getStorageInfoMysql } = require('./wallet-common')
 const sleep = require('sleep-promise')
 const { testTailsUrl, initRustLogger } = require('../src')
+const mkdirp = require('mkdirp')
 
 const tailsDir = '/tmp/tails'
 
-async function runFaber (options) {
-  logger.info(`Starting. Revocation enabled=${options.revocation}`)
+async function runFaber(options) {
+  logger.info(`Starting Faber. Revocation enabled=${options.revocation}`)
+  mkdirp.sync(tailsDir)
   initRustLogger(process.env.RUST_LOG || 'vcx=error')
 
   let faberServer
@@ -47,10 +49,10 @@ async function runFaber (options) {
       await vcxAgent.acceptTaa()
     }
 
-    const schemaId = await vcxAgent.serviceLedgerSchema.createSchema(getSampleSchemaData())
-    await sleep(500)
-    const vcxCredDef = await vcxAgent.serviceLedgerCredDef.createCredentialDefinitionV2(schemaId, getFaberCredDefName(), true, 'tag1')
     const issuerDid = vcxAgent.getInstitutionDid()
+    const schemaId = await vcxAgent.serviceLedgerSchema.createSchema(getSampleSchemaData(), issuerDid)
+    await sleep(500)
+    const vcxCredDef = await vcxAgent.serviceLedgerCredDef.createCredentialDefinitionV2(issuerDid, schemaId, getFaberCredDefName(), true, 'tag1')
     const { revReg, revRegId } = await vcxAgent.serviceLedgerRevReg.createRevocationRegistry(issuerDid, await vcxCredDef.getCredDefId(), 1, tailsDir, 5, testTailsUrl)
 
     await vcxAgent.serviceConnections.inviterConnectionCreateAndAccept(connectionId, (invitationString) => {
@@ -84,8 +86,10 @@ async function runFaber (options) {
     const schemaAttrs = getAliceSchemaAttrs()
     await vcxAgent.serviceCredIssuer.sendOfferAndCredential(issuerCredId, revRegId, connectionId, credDefId, schemaAttrs)
     if (options.revocation === true) {
+      logger.info('Faber is revoking issued credential')
       await vcxAgent.serviceCredIssuer.revokeCredentialLocal(issuerCredId)
-      await revReg.publishRevocations()
+      logger.info('Faber is publishing revocation')
+      await revReg.publishRevocations(issuerDid)
     }
 
     logger.info('#19 Create a Proof object')
@@ -191,7 +195,7 @@ const usage = [
   }
 ]
 
-function areOptionsValid (_options) {
+function areOptionsValid(_options) {
   return true
 }
 

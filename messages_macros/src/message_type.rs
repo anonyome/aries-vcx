@@ -5,8 +5,8 @@ use darling::{
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, DeriveInput, Error, GenericArgument, Path, PathArguments, PathSegment,
-    Result as SynResult, Token, Type, TypePath,
+    punctuated::Punctuated, spanned::Spanned, DeriveInput, Error, GenericArgument, Path,
+    PathArguments, PathSegment, Result as SynResult, Token, Type, TypePath,
 };
 
 /// Matches the input from deriving the macro
@@ -68,9 +68,17 @@ pub fn message_type_impl(input: DeriveInput) -> SynResult<TokenStream> {
     }
 }
 
-fn process_protocol(Protocol { ident, data, protocol }: Protocol) -> TokenStream {
+fn process_protocol(
+    Protocol {
+        ident,
+        data,
+        protocol,
+    }: Protocol,
+) -> TokenStream {
     // The macro only accepts enums
-    let Data::Enum(variants) = data else {unreachable!()};
+    let Data::Enum(variants) = data else {
+        unreachable!()
+    };
 
     // Storage for the try_from_version_parts() function match arms
     let mut try_from_match_arms = Vec::new();
@@ -84,14 +92,16 @@ fn process_protocol(Protocol { ident, data, protocol }: Protocol) -> TokenStream
     for MajorVerVariant { ident, fields } in variants {
         let field = extract_field_type(fields);
 
-        // If the input u8 matches MAJOR, call the try_resolve_version() method of the encapsulated type.
-        // Then wrap it in the enum this is derived on.
-        try_from_match_arms.push(quote! {#field::MAJOR => #field::try_resolve_version(minor).map(Self::#ident)});
+        // If the input u8 matches MAJOR, call the try_resolve_version() method of the encapsulated
+        // type. Then wrap it in the enum this is derived on.
+        try_from_match_arms
+            .push(quote! {#field::MAJOR => #field::try_resolve_version(minor).map(Self::#ident)});
 
         // Match on the enum variant and call the as_version_parts() method.
         as_parts_match_arms.push(quote! {Self::#ident(v) => v.as_version_parts()});
 
-        // Generate an impl with const PROTOCOL set the to the string literal passed in the macro attribute
+        // Generate an impl with const PROTOCOL set the to the string literal passed in the macro
+        // attribute
         field_impls.push(quote! {impl #field { const PROTOCOL: &str = #protocol; }});
     }
 
@@ -125,7 +135,9 @@ fn process_protocol(Protocol { ident, data, protocol }: Protocol) -> TokenStream
 
 fn process_version(Version { ident, data, major }: Version) -> SynResult<TokenStream> {
     // The macro only accepts enums
-    let Data::Enum(variants) = data else {unreachable!()};
+    let Data::Enum(variants) = data else {
+        unreachable!()
+    };
 
     // Storage for the try_resolve_version() function match arms
     let mut try_resolve_match_arms = Vec::new();
@@ -241,7 +253,10 @@ fn make_type_param_err(span: Span) -> Error {
 /// Newtype enums would always have one field, and the
 /// macro is restricted to support just `enum_newtype`.
 fn extract_field_type(mut fields: Fields<Type>) -> Type {
-    fields.fields.pop().expect("only implemented on newtype enums")
+    fields
+        .fields
+        .pop()
+        .expect("only implemented on newtype enums")
 }
 
 /// The variant field type is of the form [`MsgKindType<T>`].
@@ -250,7 +265,9 @@ fn extract_field_target_type(field: Type) -> SynResult<TypePath> {
     let mut span = field.span();
 
     // `MsgKindType<_>` is a TypePath
-    let Type::Path(path) = field else { return Err(make_type_param_err(span)) };
+    let Type::Path(path) = field else {
+        return Err(make_type_param_err(span));
+    };
 
     // Getting the last, and most likely only, segment of the type path.
     let segment = last_path_segment(path)?;
@@ -258,16 +275,24 @@ fn extract_field_target_type(field: Type) -> SynResult<TypePath> {
 
     // Extract the generics from their angle bracketed container.
     // E.g: <T, U, V> -> an iter returning T, U and V
-    let PathArguments::AngleBracketed(args) = segment.arguments else { return Err(make_type_param_err(span)) };
+    let PathArguments::AngleBracketed(args) = segment.arguments else {
+        return Err(make_type_param_err(span));
+    };
     span = args.span();
 
     // This iterates over the generics provided.
     // We, again, expect just one, `T`.
-    let arg = args.args.into_iter().next().ok_or_else(|| make_type_param_err(span))?;
+    let arg = args
+        .args
+        .into_iter()
+        .next()
+        .ok_or_else(|| make_type_param_err(span))?;
     span = arg.span();
 
     // We expect the generic to be a type, particularly a TypePath.
-    let GenericArgument::Type(Type::Path(ty)) = arg else { return Err(make_type_param_err(span)); };
+    let GenericArgument::Type(Type::Path(ty)) = arg else {
+        return Err(make_type_param_err(span));
+    };
 
     // Return `T`
     Ok(ty)

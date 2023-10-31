@@ -6,9 +6,8 @@ use std::fmt::Display;
 
 use error::MigrationResult;
 use log::{error, info};
-use vdrtools::{Locator, WalletHandle};
-
 pub use vdrtools::types::domain::wallet::Record;
+use vdrtools::{Locator, WalletHandle};
 
 use crate::error::MigrationError;
 
@@ -23,7 +22,7 @@ pub async fn migrate_wallet<E>(
 where
     E: Display,
 {
-    info!("Starting wallet migration...");
+    info!("Starting wallet migration");
 
     if src_wallet_handle == dest_wallet_handle {
         error!("Equal wallet handles: {src_wallet_handle:?} {dest_wallet_handle:?}");
@@ -31,7 +30,8 @@ where
     }
 
     info!(
-        "Migrating records from wallet with handle {src_wallet_handle:?} to wallet with handle {dest_wallet_handle:?}"
+        "Migrating records from wallet with handle {src_wallet_handle:?} to wallet with handle \
+         {dest_wallet_handle:?}"
     );
 
     Locator::instance()
@@ -39,7 +39,10 @@ where
         .migrate_records(src_wallet_handle, dest_wallet_handle, migrate_fn)
         .await?;
 
-    info!("Migration from wallet with handle {src_wallet_handle:?} to wallet with handle {dest_wallet_handle:?} finished successfully!");
+    info!(
+        "Completed migration from wallet with handle {src_wallet_handle:?} to wallet with handle \
+         {dest_wallet_handle:?}"
+    );
 
     Ok(())
 }

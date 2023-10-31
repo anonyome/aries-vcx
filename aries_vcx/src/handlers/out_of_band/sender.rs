@@ -1,11 +1,13 @@
+use std::fmt::Display;
+
 use messages::{
     msg_fields::protocols::{
-        cred_issuance::CredentialIssuance,
+        cred_issuance::{v1::CredentialIssuanceV1, CredentialIssuance},
         out_of_band::{
             invitation::{Invitation, InvitationContent, InvitationDecorators, OobService},
             OobGoalCode,
         },
-        present_proof::PresentProof,
+        present_proof::{v1::PresentProofV1, PresentProof},
     },
     msg_types::Protocol,
     AriesMessage,
@@ -26,11 +28,15 @@ pub struct OutOfBandSender {
 impl OutOfBandSender {
     pub fn create() -> Self {
         let id = Uuid::new_v4().to_string();
-        let content = InvitationContent::new(Vec::new());
+        let content = InvitationContent::builder().services(Vec::new()).build();
         let decorators = InvitationDecorators::default();
 
         Self {
-            oob: Invitation::with_decorators(id, content, decorators),
+            oob: Invitation::builder()
+                .id(id)
+                .content(content)
+                .decorators(decorators)
+                .build(),
         }
     }
 
@@ -86,12 +92,15 @@ impl OutOfBandSender {
 
     pub fn append_a2a_message(mut self, msg: AriesMessage) -> VcxResult<Self> {
         let (attach_id, attach) = match msg {
-            a2a_msg @ AriesMessage::PresentProof(PresentProof::RequestPresentation(_)) => {
-                (AttachmentId::PresentationRequest, json!(&a2a_msg).to_string())
-            }
-            a2a_msg @ AriesMessage::CredentialIssuance(CredentialIssuance::OfferCredential(_)) => {
-                (AttachmentId::CredentialOffer, json!(&a2a_msg).to_string())
-            }
+            a2a_msg @ AriesMessage::PresentProof(PresentProof::V1(
+                PresentProofV1::RequestPresentation(_),
+            )) => (
+                AttachmentId::PresentationRequest,
+                json!(&a2a_msg).to_string(),
+            ),
+            a2a_msg @ AriesMessage::CredentialIssuance(CredentialIssuance::V1(
+                CredentialIssuanceV1::OfferCredential(_),
+            )) => (AttachmentId::CredentialOffer, json!(&a2a_msg).to_string()),
             _ => {
                 error!("Appended message type {:?} is not allowed.", msg);
                 return Err(AriesVcxError::from_msg(
@@ -105,7 +114,10 @@ impl OutOfBandSender {
             .content
             .requests_attach
             .get_or_insert(Vec::with_capacity(1))
-            .push(make_attach_from_str!(&attach, attach_id.as_ref().to_string()));
+            .push(make_attach_from_str!(
+                &attach,
+                attach_id.as_ref().to_string()
+            ));
 
         Ok(self)
     }
@@ -114,14 +126,16 @@ impl OutOfBandSender {
         self.oob.clone().into()
     }
 
-    pub fn to_string(&self) -> String {
-        json!(AriesMessage::from(self.oob.clone())).to_string()
-    }
-
     pub fn from_string(oob_data: &str) -> VcxResult<Self> {
         Ok(Self {
             oob: serde_json::from_str(oob_data)?,
         })
+    }
+}
+
+impl Display for OutOfBandSender {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", json!(AriesMessage::from(self.oob.clone())))
     }
 }
 

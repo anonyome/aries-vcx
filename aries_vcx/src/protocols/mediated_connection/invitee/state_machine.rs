@@ -1,36 +1,41 @@
-use std::clone::Clone;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{clone::Clone, collections::HashMap};
 
-use crate::common::signing::decode_signed_connection_response;
-use crate::errors::error::prelude::*;
-use crate::handlers::util::{matches_thread_id, verify_thread_id, AnyInvitation};
-use crate::protocols::mediated_connection::invitee::states::completed::CompletedState;
-use crate::protocols::mediated_connection::invitee::states::initial::InitialState;
-use crate::protocols::mediated_connection::invitee::states::invited::InvitedState;
-use crate::protocols::mediated_connection::invitee::states::requested::RequestedState;
-use crate::protocols::mediated_connection::invitee::states::responded::RespondedState;
-use crate::protocols::mediated_connection::pairwise_info::PairwiseInfo;
-use crate::protocols::SendClosureConnection;
 use aries_vcx_core::wallet::base_wallet::BaseWallet;
 use chrono::Utc;
 use diddoc_legacy::aries::diddoc::AriesDidDoc;
-use messages::decorators::thread::Thread;
-use messages::decorators::timing::Timing;
-use messages::msg_fields::protocols::connection::invitation::Invitation;
-use messages::msg_fields::protocols::connection::problem_report::{
-    ProblemReport, ProblemReportContent, ProblemReportDecorators,
+use messages::{
+    decorators::{thread::Thread, timing::Timing},
+    msg_fields::protocols::{
+        connection::{
+            invitation::InvitationContent,
+            problem_report::{ProblemReport, ProblemReportContent, ProblemReportDecorators},
+            request::{Request, RequestContent, RequestDecorators},
+            response::Response,
+            Connection, ConnectionData,
+        },
+        discover_features::{disclose::Disclose, query::QueryContent, ProtocolDescriptor},
+        notification::ack::{Ack, AckContent, AckDecorators, AckStatus},
+    },
+    AriesMessage,
 };
-use messages::msg_fields::protocols::connection::request::{Request, RequestContent, RequestDecorators};
-use messages::msg_fields::protocols::connection::response::Response;
-use messages::msg_fields::protocols::connection::{Connection, ConnectionData};
-use messages::msg_fields::protocols::discover_features::disclose::Disclose;
-use messages::msg_fields::protocols::discover_features::query::QueryContent;
-use messages::msg_fields::protocols::discover_features::ProtocolDescriptor;
-use messages::msg_fields::protocols::notification::ack::{Ack, AckContent, AckDecorators, AckStatus};
-use messages::AriesMessage;
 use url::Url;
 use uuid::Uuid;
+
+use crate::{
+    common::signing::decode_signed_connection_response,
+    errors::error::prelude::*,
+    handlers::util::{matches_thread_id, verify_thread_id, AnyInvitation},
+    protocols::{
+        mediated_connection::{
+            invitee::states::{
+                completed::CompletedState, initial::InitialState, invited::InvitedState,
+                requested::RequestedState, responded::RespondedState,
+            },
+            pairwise_info::PairwiseInfo,
+        },
+        SendClosureConnection,
+    },
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SmConnectionInvitee {
@@ -60,7 +65,9 @@ pub enum InviteeState {
 
 impl PartialEq for SmConnectionInvitee {
     fn eq(&self, other: &Self) -> bool {
-        self.source_id == other.source_id && self.pairwise_info == other.pairwise_info && self.state == other.state
+        self.source_id == other.source_id
+            && self.pairwise_info == other.pairwise_info
+            && self.state == other.state
     }
 }
 
@@ -86,7 +93,12 @@ impl SmConnectionInvitee {
         }
     }
 
-    pub fn from(source_id: String, thread_id: String, pairwise_info: PairwiseInfo, state: InviteeFullState) -> Self {
+    pub fn from(
+        source_id: String,
+        thread_id: String,
+        pairwise_info: PairwiseInfo,
+        state: InviteeFullState,
+    ) -> Self {
         SmConnectionInvitee {
             source_id,
             thread_id,
@@ -159,7 +171,7 @@ impl SmConnectionInvitee {
     }
 
     pub fn get_protocols(&self) -> Vec<ProtocolDescriptor> {
-        let query = QueryContent::new("*".to_owned());
+        let query = QueryContent::builder().query("*".to_owned()).build();
         query.lookup()
     }
 
@@ -223,34 +235,38 @@ impl SmConnectionInvitee {
                 did_doc.set_id(self.pairwise_info.pw_did.clone());
 
                 let con_data = ConnectionData::new(self.pairwise_info.pw_did.to_string(), did_doc);
-                let content = RequestContent::new(self.source_id.to_string(), con_data);
+                let content = RequestContent::builder()
+                    .label(self.source_id.to_string())
+                    .connection(con_data)
+                    .build();
 
-                let mut decorators = RequestDecorators::default();
-                let mut timing = Timing::default();
-                timing.out_time = Some(Utc::now());
-                decorators.timing = Some(timing);
+                let decorators = RequestDecorators::builder()
+                    .timing(Timing::builder().out_time(Utc::now()).build());
 
-                let (thread_id, thread) = match &state.invitation {
-                    AnyInvitation::Con(Invitation::Public(_)) => {
-                        let mut thread = Thread::new(id.clone());
-                        thread.pthid = Some(self.thread_id.clone());
-
-                        (id.clone(), thread)
-                    }
-                    AnyInvitation::Con(Invitation::Pairwise(_)) | AnyInvitation::Con(Invitation::PairwiseDID(_)) => {
-                        let thread = Thread::new(self.thread_id.clone());
-                        (self.thread_id.clone(), thread)
-                    }
-                    AnyInvitation::Oob(invite) => {
-                        let mut thread = Thread::new(id.clone());
-                        thread.pthid = Some(invite.id.clone());
-                        (id.clone(), thread)
-                    }
+                let thread = match &state.invitation {
+                    AnyInvitation::Oob(invite) => Thread::builder()
+                        .thid(id.clone())
+                        .pthid(invite.id.clone())
+                        .build(),
+                    AnyInvitation::Con(invite) => match invite.content {
+                        InvitationContent::Public(_) => Thread::builder()
+                            .thid(id.clone())
+                            .pthid(self.thread_id.clone())
+                            .build(),
+                        InvitationContent::Pairwise(_) | InvitationContent::PairwiseDID(_) => {
+                            Thread::builder().thid(self.thread_id.clone()).build()
+                        }
+                    },
                 };
 
-                decorators.thread = Some(thread);
+                let thread_id = thread.thid.clone();
+                let decorators = decorators.thread(thread).build();
 
-                let request = Request::with_decorators(id, content, decorators);
+                let request = Request::builder()
+                    .id(id)
+                    .content(content)
+                    .decorators(decorators)
+                    .build();
 
                 Ok((request, thread_id))
             }
@@ -264,13 +280,17 @@ impl SmConnectionInvitee {
     fn build_connection_ack_msg(&self) -> VcxResult<Ack> {
         match &self.state {
             InviteeFullState::Responded(_) => {
-                let content = AckContent::new(AckStatus::Ok);
-                let mut decorators = AckDecorators::new(Thread::new(self.thread_id.to_owned()));
-                let mut timing = Timing::default();
-                timing.out_time = Some(Utc::now());
-                decorators.timing = Some(timing);
+                let content = AckContent::builder().status(AckStatus::Ok).build();
+                let decorators = AckDecorators::builder()
+                    .thread(Thread::builder().thid(self.thread_id.to_owned()).build())
+                    .timing(Timing::builder().out_time(Utc::now()).build())
+                    .build();
 
-                Ok(Ack::with_decorators(Uuid::new_v4().to_string(), content, decorators))
+                Ok(Ack::builder()
+                    .id(Uuid::new_v4().to_string())
+                    .content(content)
+                    .decorators(decorators)
+                    .build())
             }
             _ => Err(AriesVcxError::from_msg(
                 AriesVcxErrorKind::NotReady,
@@ -283,9 +303,7 @@ impl SmConnectionInvitee {
         let Self { state, .. } = self;
 
         let thread_id = match &invitation {
-            AnyInvitation::Con(Invitation::Public(i)) => i.id.clone(),
-            AnyInvitation::Con(Invitation::Pairwise(i)) => i.id.clone(),
-            AnyInvitation::Con(Invitation::PairwiseDID(i)) => i.id.clone(),
+            AnyInvitation::Con(i) => i.id.clone(),
             AnyInvitation::Oob(i) => i.id.clone(),
         };
 
@@ -304,7 +322,10 @@ impl SmConnectionInvitee {
             s => {
                 return Err(AriesVcxError::from_msg(
                     AriesVcxErrorKind::InvalidState,
-                    format!("Cannot handle inviation: not in Initial state, current state: {:?}", s),
+                    format!(
+                        "Cannot handle inviation: not in Initial state, current state: {:?}",
+                        s
+                    ),
                 ));
             }
         };
@@ -319,7 +340,7 @@ impl SmConnectionInvitee {
         self,
         routing_keys: Vec<String>,
         service_endpoint: Url,
-        send_message: SendClosureConnection,
+        send_message: SendClosureConnection<'_>,
     ) -> VcxResult<Self> {
         let (state, thread_id) = match self.state {
             InviteeFullState::Invited(ref state) => {
@@ -327,8 +348,14 @@ impl SmConnectionInvitee {
                     AriesVcxErrorKind::InvalidState,
                     "Missing did doc",
                 ))?;
-                let (request, thread_id) = self.build_connection_request_msg(routing_keys, service_endpoint)?;
-                send_message(request.clone().into(), self.pairwise_info.pw_vk.clone(), ddo.clone()).await?;
+                let (request, thread_id) =
+                    self.build_connection_request_msg(routing_keys, service_endpoint)?;
+                send_message(
+                    request.clone().into(),
+                    self.pairwise_info.pw_vk.clone(),
+                    ddo.clone(),
+                )
+                .await?;
                 (
                     InviteeFullState::Requested((state.clone(), request, ddo).into()),
                     thread_id,
@@ -345,26 +372,28 @@ impl SmConnectionInvitee {
 
     pub async fn handle_connection_response(
         self,
-        wallet: &Arc<dyn BaseWallet>,
+        wallet: &impl BaseWallet,
         response: Response,
-        send_message: SendClosureConnection,
+        send_message: SendClosureConnection<'_>,
     ) -> VcxResult<Self> {
         verify_thread_id(&self.get_thread_id(), &response.clone().into())?;
 
         let state = match self.state {
             InviteeFullState::Requested(state) => {
-                let remote_vk: String =
-                    state
-                        .did_doc
-                        .recipient_keys()?
-                        .get(0)
-                        .cloned()
-                        .ok_or(AriesVcxError::from_msg(
-                            AriesVcxErrorKind::InvalidState,
-                            "Cannot handle response: remote verkey not found",
-                        ))?;
+                let remote_vk: String = state.did_doc.recipient_keys()?.get(0).cloned().ok_or(
+                    AriesVcxError::from_msg(
+                        AriesVcxErrorKind::InvalidState,
+                        "Cannot handle response: remote verkey not found",
+                    ),
+                )?;
 
-                match decode_signed_connection_response(wallet, response.content.clone(), &remote_vk).await {
+                match decode_signed_connection_response(
+                    wallet,
+                    response.content.clone(),
+                    &remote_vk,
+                )
+                .await
+                {
                     Ok(con_data) => {
                         let thread_id = state
                             .request
@@ -377,22 +406,29 @@ impl SmConnectionInvitee {
                         if !matches_thread_id!(response, thread_id) {
                             return Err(AriesVcxError::from_msg(
                                 AriesVcxErrorKind::InvalidJson,
-                                format!("Cannot handle response: thread id does not match: {:?}", thread_id),
+                                format!(
+                                    "Cannot handle response: thread id does not match: {:?}",
+                                    thread_id
+                                ),
                             ));
                         }
                         InviteeFullState::Responded((state, con_data).into())
                     }
                     Err(err) => {
-                        let mut content = ProblemReportContent::default();
-                        content.explain = Some(err.to_string());
+                        let content = ProblemReportContent::builder()
+                            .explain(err.to_string())
+                            .build();
 
-                        let mut decorators = ProblemReportDecorators::new(Thread::new(self.thread_id.to_owned()));
-                        let mut timing = Timing::default();
-                        timing.out_time = Some(Utc::now());
-                        decorators.timing = Some(timing);
+                        let decorators = ProblemReportDecorators::builder()
+                            .thread(Thread::builder().thid(self.thread_id.to_owned()).build())
+                            .timing(Timing::builder().out_time(Utc::now()).build())
+                            .build();
 
-                        let problem_report =
-                            ProblemReport::with_decorators(Uuid::new_v4().to_string(), content, decorators);
+                        let problem_report: ProblemReport = ProblemReport::builder()
+                            .id(Uuid::new_v4().to_string())
+                            .content(content)
+                            .decorators(decorators)
+                            .build();
 
                         send_message(
                             problem_report.clone().into(),
@@ -420,7 +456,7 @@ impl SmConnectionInvitee {
         Ok(Self { state, ..self })
     }
 
-    pub async fn handle_send_ack(self, send_message: SendClosureConnection) -> VcxResult<Self> {
+    pub async fn handle_send_ack(self, send_message: SendClosureConnection<'_>) -> VcxResult<Self> {
         let state = match self.state {
             InviteeFullState::Responded(ref state) => {
                 let sender_vk = self.pairwise_info().pw_vk.clone();
@@ -435,8 +471,12 @@ impl SmConnectionInvitee {
 
     pub fn handle_problem_report(self, _problem_report: ProblemReport) -> VcxResult<Self> {
         let state = match self.state {
-            InviteeFullState::Requested(_state) => InviteeFullState::Initial(InitialState::new(None, None)),
-            InviteeFullState::Invited(_state) => InviteeFullState::Initial(InitialState::new(None, None)),
+            InviteeFullState::Requested(_state) => {
+                InviteeFullState::Initial(InitialState::new(None, None))
+            }
+            InviteeFullState::Invited(_state) => {
+                InviteeFullState::Initial(InitialState::new(None, None))
+            }
             _ => self.state.clone(),
         };
         Ok(Self { state, ..self })
@@ -466,8 +506,9 @@ impl SmConnectionInvitee {
 //     pub mod invitee {
 
 //         use aries_vcx_core::wallet::base_wallet::BaseWallet;
-//         use messages::diddoc::aries::diddoc::test_utils::{_did_doc_inlined_recipient_keys, _service_endpoint};
-//         use messages::protocols::connection::response::{Response, SignedResponse};
+//         use messages::diddoc::aries::diddoc::test_utils::{_did_doc_inlined_recipient_keys,
+// _service_endpoint};         use messages::protocols::connection::response::{Response,
+// SignedResponse};
 
 //         use crate::common::signing::sign_connection_response;
 //         use crate::common::test_utils::mock_profile;
@@ -479,8 +520,9 @@ impl SmConnectionInvitee {
 //         }
 
 //         pub async fn invitee_sm() -> SmConnectionInvitee {
-//             let pairwise_info = PairwiseInfo::create(&mock_profile().inject_wallet()).await.unwrap();
-//             SmConnectionInvitee::new(&source_id(), pairwise_info, _did_doc_inlined_recipient_keys())
+//             let pairwise_info =
+// PairwiseInfo::create(&mock_profile().inject_wallet()).await.unwrap();
+// SmConnectionInvitee::new(&source_id(), pairwise_info, _did_doc_inlined_recipient_keys())
 //         }
 
 //         impl SmConnectionInvitee {
@@ -518,8 +560,8 @@ impl SmConnectionInvitee {
 //             }
 //         }
 
-//         async fn _response(wallet: &Arc<dyn BaseWallet>, key: &str, thread_id: &str) -> SignedResponse {
-//             sign_connection_response(
+//         async fn _response(wallet: &Arc<dyn BaseWallet>, key: &str, thread_id: &str) ->
+// SignedResponse {             sign_connection_response(
 //                 wallet,
 //                 key,
 //                 Response::default()
@@ -574,8 +616,8 @@ impl SmConnectionInvitee {
 //                 invitee = invitee
 //                     .handle_invitation(Invitation::Pairwise(msg_invitation.clone()))
 //                     .unwrap();
-//                 let routing_keys: Vec<String> = vec!["ABCD000000QYfNL9XkaJdrQejfztN4XqdsiV4ct30000".to_string()];
-//                 let service_endpoint = String::from("https://example.org");
+//                 let routing_keys: Vec<String> =
+// vec!["ABCD000000QYfNL9XkaJdrQejfztN4XqdsiV4ct30000".to_string()];                 let service_endpoint = String::from("https://example.org");
 //                 let (msg, _) = invitee
 //                     .build_connection_request_msg(routing_keys.clone(), service_endpoint.clone())
 //                     .unwrap();
@@ -605,8 +647,8 @@ impl SmConnectionInvitee {
 //                 invitee = invitee
 //                     .handle_connection_response(
 //                         &mock_profile().inject_wallet(),
-//                         _response(&mock_profile().inject_wallet(), &recipient_key, &msg_request.id.0).await,
-//                         _send_message(),
+//                         _response(&mock_profile().inject_wallet(), &recipient_key,
+// &msg_request.id.0).await,                         _send_message(),
 //                     )
 //                     .await
 //                     .unwrap();
@@ -736,7 +778,8 @@ impl SmConnectionInvitee {
 
 //                 let mut did_exchange_sm = invitee_sm().await.to_invitee_invited_state();
 
-//                 did_exchange_sm = did_exchange_sm.handle_problem_report(_problem_report()).unwrap();
+//                 did_exchange_sm =
+// did_exchange_sm.handle_problem_report(_problem_report()).unwrap();
 
 //                 assert_match!(InviteeFullState::Initial(_), did_exchange_sm.state);
 //             }
@@ -757,7 +800,8 @@ impl SmConnectionInvitee {
 //                     )
 //                     .await
 //                     .unwrap();
-//                 did_exchange_sm = did_exchange_sm.handle_send_ack(_send_message()).await.unwrap();
+//                 did_exchange_sm =
+// did_exchange_sm.handle_send_ack(_send_message()).await.unwrap();
 
 //                 assert_match!(InviteeFullState::Completed(_), did_exchange_sm.state);
 //             }
@@ -782,10 +826,11 @@ impl SmConnectionInvitee {
 //                 signed_response.connection_sig.signature = String::from("other");
 
 //                 did_exchange_sm = did_exchange_sm
-//                     .handle_connection_response(&mock_profile().inject_wallet(), signed_response, _send_message())
-//                     .await
+//                     .handle_connection_response(&mock_profile().inject_wallet(), signed_response,
+// _send_message())                     .await
 //                     .unwrap();
-//                 did_exchange_sm = did_exchange_sm.handle_send_ack(_send_message()).await.unwrap();
+//                 did_exchange_sm =
+// did_exchange_sm.handle_send_ack(_send_message()).await.unwrap();
 
 //                 assert_match!(InviteeFullState::Initial(_), did_exchange_sm.state);
 //             }
@@ -796,7 +841,8 @@ impl SmConnectionInvitee {
 
 //                 let mut did_exchange_sm = invitee_sm().await.to_invitee_requested_state().await;
 
-//                 did_exchange_sm = did_exchange_sm.handle_problem_report(_problem_report()).unwrap();
+//                 did_exchange_sm =
+// did_exchange_sm.handle_problem_report(_problem_report()).unwrap();
 
 //                 assert_match!(InviteeFullState::Initial(_), did_exchange_sm.state);
 //             }
@@ -827,9 +873,9 @@ impl SmConnectionInvitee {
 //                 assert!(did_exchange_sm.get_remote_protocols().is_some());
 
 //                 // Problem Report
-//                 did_exchange_sm = did_exchange_sm.handle_problem_report(_problem_report()).unwrap();
-//                 assert_match!(InviteeFullState::Completed(_), did_exchange_sm.state);
-//             }
+//                 did_exchange_sm =
+// did_exchange_sm.handle_problem_report(_problem_report()).unwrap();
+// assert_match!(InviteeFullState::Completed(_), did_exchange_sm.state);             }
 //         }
 
 //         mod find_message_to_handle {
@@ -847,11 +893,11 @@ impl SmConnectionInvitee {
 //                 {
 //                     let messages = map!(
 //                         "key_1".to_string() => A2AMessage::ConnectionRequest(_request()),
-//                         "key_2".to_string() => A2AMessage::ConnectionResponse(_signed_response()),
-//                         "key_3".to_string() => A2AMessage::ConnectionProblemReport(_problem_report()),
-//                         "key_4".to_string() => A2AMessage::Ping(_ping()),
-//                         "key_5".to_string() => A2AMessage::Ack(_ack())
-//                     );
+//                         "key_2".to_string() =>
+// A2AMessage::ConnectionResponse(_signed_response()),                         "key_3".to_string()
+// => A2AMessage::ConnectionProblemReport(_problem_report()),
+// "key_4".to_string() => A2AMessage::Ping(_ping()),                         "key_5".to_string() =>
+// A2AMessage::Ack(_ack())                     );
 
 //                     assert!(connection.find_message_to_update_state(messages).is_none());
 //                 }
@@ -871,23 +917,23 @@ impl SmConnectionInvitee {
 //                         "key_3".to_string() => A2AMessage::ConnectionResponse(_signed_response())
 //                     );
 
-//                     let (uid, message) = connection.find_message_to_update_state(messages).unwrap();
-//                     assert_eq!("key_3", uid);
-//                     assert_match!(A2AMessage::ConnectionResponse(_), message);
-//                 }
+//                     let (uid, message) =
+// connection.find_message_to_update_state(messages).unwrap();
+// assert_eq!("key_3", uid);                     assert_match!(A2AMessage::ConnectionResponse(_),
+// message);                 }
 
 //                 // Connection Problem Report
 //                 {
 //                     let messages = map!(
 //                         "key_1".to_string() => A2AMessage::Ping(_ping()),
 //                         "key_2".to_string() => A2AMessage::Ack(_ack()),
-//                         "key_3".to_string() => A2AMessage::ConnectionProblemReport(_problem_report())
-//                     );
+//                         "key_3".to_string() =>
+// A2AMessage::ConnectionProblemReport(_problem_report())                     );
 
-//                     let (uid, message) = connection.find_message_to_update_state(messages).unwrap();
-//                     assert_eq!("key_3", uid);
-//                     assert_match!(A2AMessage::ConnectionProblemReport(_), message);
-//                 }
+//                     let (uid, message) =
+// connection.find_message_to_update_state(messages).unwrap();
+// assert_eq!("key_3", uid);
+// assert_match!(A2AMessage::ConnectionProblemReport(_), message);                 }
 
 //                 // No messages
 //                 {

@@ -117,19 +117,26 @@ export enum VCXCode {
   UNIMPLEMENTED_FEATURE = 1117,
   LEDGER_ITEM_NOT_FOUND = 1118,
 }
+export enum MediatedConnectionStateType {
+  Initial = 0,
+  Invited = 1,
+  Responded = 3,
+  Requested = 2,
+  Finished = 4,
+}
+
 export enum ConnectionStateType {
   Initial = 0,
   Invited = 1,
   Requested = 2,
-  Responded = 3,
   Finished = 4,
 }
 
 export enum HolderStateType {
-  Initial= 0,
-  ProposalSent = 1,
+  Initial = 0,
+  ProposalSet = 1,
   OfferReceived = 2,
-  RequestSent = 3,
+  RequestSet = 3,
   Finished = 4,
   Failed = 5,
 }
@@ -138,9 +145,8 @@ export enum IssuerStateType {
   Initial = 0,
   ProposalReceived = 1,
   OfferSet = 2,
-  OfferSent = 3,
   RequestReceived = 4,
-  CredentialSent = 5,
+  CredentialSet = 5,
   Finished = 6,
   Failed = 7,
 }
@@ -162,7 +168,7 @@ export enum VerifierStateType {
   PresentationProposalReceived = 2,
   PresentationRequestSent = 3,
   Finished = 4,
-  Failed = 5
+  Failed = 5,
 }
 
 export interface ISerializedData<T> {

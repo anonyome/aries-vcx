@@ -1,31 +1,21 @@
 use aries_vcx_core::ledger::base_ledger::AnoncredsLedgerRead;
-use std::sync::Arc;
+use messages::msg_fields::protocols::cred_issuance::v1::offer_credential::OfferCredentialV1;
 
-use crate::errors::error::prelude::*;
-use crate::handlers::util::get_attach_as_string;
-use crate::protocols::issuance::holder::state_machine::parse_cred_def_id_from_cred_offer;
-use crate::protocols::issuance::holder::states::request_sent::RequestSentState;
-use crate::protocols::issuance::is_cred_def_revokable;
-use messages::msg_fields::protocols::cred_issuance::offer_credential::OfferCredential;
+use crate::{
+    errors::error::prelude::*,
+    handlers::util::get_attach_as_string,
+    protocols::issuance::{
+        holder::state_machine::parse_cred_def_id_from_cred_offer, is_cred_def_revokable,
+    },
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OfferReceivedState {
-    pub offer: OfferCredential,
-}
-
-impl From<(OfferReceivedState, String, String)> for RequestSentState {
-    fn from((_state, req_meta, cred_def_json): (OfferReceivedState, String, String)) -> Self {
-        trace!("SM is now in RequestSent state");
-        trace!("cred_def_json={:?}", cred_def_json);
-        RequestSentState {
-            req_meta,
-            cred_def_json,
-        }
-    }
+    pub offer: OfferCredentialV1,
 }
 
 impl OfferReceivedState {
-    pub fn new(offer: OfferCredential) -> Self {
+    pub fn new(offer: OfferCredentialV1) -> Self {
         OfferReceivedState { offer }
     }
 
@@ -45,7 +35,7 @@ impl OfferReceivedState {
         Ok(serde_json::Value::Object(new_map).to_string())
     }
 
-    pub async fn is_revokable(&self, ledger: &Arc<dyn AnoncredsLedgerRead>) -> VcxResult<bool> {
+    pub async fn is_revokable(&self, ledger: &impl AnoncredsLedgerRead) -> VcxResult<bool> {
         let offer = self.get_attachment()?;
 
         let cred_def_id = parse_cred_def_id_from_cred_offer(&offer).map_err(|err| {

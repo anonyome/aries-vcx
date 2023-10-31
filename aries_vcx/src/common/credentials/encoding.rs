@@ -1,6 +1,9 @@
-use crate::errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult};
-use crate::utils::openssl::encode;
 use std::collections::HashMap;
+
+use crate::{
+    errors::error::{AriesVcxError, AriesVcxErrorKind, VcxResult},
+    utils::openssl::encode,
+};
 
 pub fn encode_attributes(attributes: &str) -> VcxResult<String> {
     let mut dictionary = HashMap::new();
@@ -13,17 +16,21 @@ pub fn encode_attributes(attributes: &str) -> VcxResult<String> {
 
                     // old style input such as {"address2":["101 Wilson Lane"]}
                     serde_json::Value::Array(array_type) => {
-                        let attrib_value: &str = match array_type.get(0).and_then(serde_json::Value::as_str) {
-                            Some(x) => x,
-                            None => {
-                                return Err(AriesVcxError::from_msg(
-                                    AriesVcxErrorKind::InvalidAttributesStructure,
-                                    "Attribute value not found",
-                                ));
-                            }
-                        };
+                        let attrib_value: &str =
+                            match array_type.get(0).and_then(serde_json::Value::as_str) {
+                                Some(x) => x,
+                                None => {
+                                    return Err(AriesVcxError::from_msg(
+                                        AriesVcxErrorKind::InvalidAttributesStructure,
+                                        "Attribute value not found",
+                                    ));
+                                }
+                            };
 
-                        warn!("Old attribute format detected. See vcx_issuer_create_credential api for additional information.");
+                        warn!(
+                            "Old attribute format detected. See vcx_issuer_create_credential api \
+                             for additional information."
+                        );
                         attrib_value
                     }
                     _ => {
@@ -75,7 +82,10 @@ pub fn encode_attributes(attributes: &str) -> VcxResult<String> {
                             .as_str()
                             .ok_or(AriesVcxError::from_msg(
                                 AriesVcxErrorKind::InvalidAttributesStructure,
-                                format!("Failed to convert attribute name {:?} to string", cred_value),
+                                format!(
+                                    "Failed to convert attribute name {:?} to string",
+                                    cred_value
+                                ),
                             ))?
                             .to_string();
                         dictionary.insert(name, attrib_values);
@@ -106,7 +116,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_with_several_attributes_success() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         let expected = json!({
             "address2": {
@@ -145,7 +155,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_with_one_attribute_success() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         let expected = json!({
             "address2": {
@@ -168,7 +178,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_with_aries_format_several_attributes_success() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         let expected = json!({
             "address2": {
@@ -209,7 +219,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_with_new_format_several_attributes_success() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         let expected = json!({
             "address2": {
@@ -249,7 +259,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_with_new_format_one_attribute_success() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         let expected = json!({
             "address2": {
@@ -272,7 +282,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_with_mixed_format_several_attributes_success() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         //        for reference....expectation is encode_attributes returns this:
 
@@ -314,7 +324,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_bad_format_returns_error() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         static BAD_TEST_CREDENTIAL_DATA: &str = r#"{"format doesnt make sense"}"#;
 
@@ -323,7 +333,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_old_format_empty_array_error() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         static BAD_TEST_CREDENTIAL_DATA: &str = r#"{"address2":[]}"#;
 
@@ -332,7 +342,7 @@ pub mod unit_tests {
 
     #[test]
     fn test_encode_empty_field() {
-        let _setup = SetupDefaults::init();
+        let _setup = SetupMocks::init();
 
         let expected = json!({
             "empty_field": {

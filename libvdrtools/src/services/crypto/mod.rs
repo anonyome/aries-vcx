@@ -3,25 +3,24 @@ mod ed25519;
 use std::{collections::HashMap, str};
 
 use async_std::sync::RwLock;
+use ed25519::ED25519CryptoType;
 use hex::FromHex;
 use indy_api_types::errors::prelude::*;
-
 use indy_utils::crypto::{
     base64, chacha20poly1305_ietf, chacha20poly1305_ietf::gen_nonce_and_encrypt_detached,
     ed25519_box, ed25519_sign,
 };
-
-use crate::utils::crypto::base58::{FromBase58, ToBase58};
 
 use crate::{
     domain::crypto::{
         did::{Did, DidValue, MyDidInfo, TheirDid, TheirDidInfo},
         key::{Key, KeyInfo},
     },
-    utils::crypto::verkey_builder::{build_full_verkey, split_verkey, verkey_get_cryptoname},
+    utils::crypto::{
+        base58::{DecodeBase58, ToBase58},
+        verkey_builder::{build_full_verkey, split_verkey, verkey_get_cryptoname},
+    },
 };
-
-use ed25519::ED25519CryptoType;
 
 const DEFAULT_CRYPTO_TYPE: &str = "ed25519";
 
@@ -97,8 +96,7 @@ impl CryptoService {
 
         let crypto_type_name = key_info
             .crypto_type
-            .as_ref()
-            .map(String::as_str)
+            .as_deref()
             .unwrap_or(DEFAULT_CRYPTO_TYPE);
 
         let crypto_types = self.crypto_types.read().await;
@@ -132,8 +130,7 @@ impl CryptoService {
 
         let crypto_type_name = my_did_info
             .crypto_type
-            .as_ref()
-            .map(String::as_str)
+            .as_deref()
             .unwrap_or(DEFAULT_CRYPTO_TYPE);
 
         let crypto_types = self.crypto_types.read().await;
@@ -189,11 +186,11 @@ impl CryptoService {
         trace!("create_their_did > their_did_info {:?}", their_did_info);
 
         // Check did is correct Base58
-        let _ = self.validate_did(&their_did_info.did)?;
+        self.validate_did(&their_did_info.did)?;
 
         let verkey = build_full_verkey(
             &their_did_info.did.to_unqualified().0,
-            their_did_info.verkey.as_ref().map(String::as_str),
+            their_did_info.verkey.as_deref(),
         )?;
 
         self.validate_key(&verkey).await?;
@@ -225,7 +222,7 @@ impl CryptoService {
         })?;
 
         let my_sk = ed25519_sign::SecretKey::from_slice(
-            &my_key.signkey.as_str().from_base58()?.as_slice(),
+            my_key.signkey.as_str().decode_base58()?.as_slice(),
         )?;
 
         let signature = crypto_type.sign(&my_sk, doc)?[..].to_vec();
@@ -262,8 +259,8 @@ impl CryptoService {
             )
         })?;
 
-        let their_vk = ed25519_sign::PublicKey::from_slice(&their_vk.from_base58()?)?;
-        let signature = ed25519_sign::Signature::from_slice(&signature)?;
+        let their_vk = ed25519_sign::PublicKey::from_slice(&their_vk.decode_base58()?)?;
+        let signature = ed25519_sign::Signature::from_slice(signature)?;
 
         let valid = crypto_type.verify(&their_vk, msg, &signature)?;
 
@@ -312,10 +309,11 @@ impl CryptoService {
             )
         })?;
 
-        let my_sk =
-            ed25519_sign::SecretKey::from_slice(my_key.signkey.as_str().from_base58()?.as_slice())?;
+        let my_sk = ed25519_sign::SecretKey::from_slice(
+            my_key.signkey.as_str().decode_base58()?.as_slice(),
+        )?;
 
-        let their_vk = ed25519_sign::PublicKey::from_slice(their_vk.from_base58()?.as_slice())?;
+        let their_vk = ed25519_sign::PublicKey::from_slice(their_vk.decode_base58()?.as_slice())?;
         let nonce = crypto_type.gen_nonce();
 
         let encrypted_doc = crypto_type.crypto_box(&my_sk, &their_vk, doc, &nonce)?;
@@ -367,11 +365,12 @@ impl CryptoService {
             )
         })?;
 
-        let my_sk = ed25519_sign::SecretKey::from_slice(&my_key.signkey.from_base58()?.as_slice())?;
-        let their_vk = ed25519_sign::PublicKey::from_slice(their_vk.from_base58()?.as_slice())?;
-        let nonce = ed25519_box::Nonce::from_slice(&nonce)?;
+        let my_sk =
+            ed25519_sign::SecretKey::from_slice(my_key.signkey.decode_base58()?.as_slice())?;
+        let their_vk = ed25519_sign::PublicKey::from_slice(their_vk.decode_base58()?.as_slice())?;
+        let nonce = ed25519_box::Nonce::from_slice(nonce)?;
 
-        let decrypted_doc = crypto_type.crypto_box_open(&my_sk, &their_vk, &doc, &nonce)?;
+        let decrypted_doc = crypto_type.crypto_box_open(&my_sk, &their_vk, doc, &nonce)?;
 
         let res = Ok(decrypted_doc);
         trace!("crypto_box_open < {:?}", res);
@@ -394,7 +393,7 @@ impl CryptoService {
             )
         })?;
 
-        let their_vk = ed25519_sign::PublicKey::from_slice(their_vk.from_base58()?.as_slice())?;
+        let their_vk = ed25519_sign::PublicKey::from_slice(their_vk.decode_base58()?.as_slice())?;
         let encrypted_doc = crypto_type.crypto_box_seal(&their_vk, doc)?;
 
         let res = Ok(encrypted_doc);
@@ -423,10 +422,11 @@ impl CryptoService {
             )
         })?;
 
-        let my_vk = ed25519_sign::PublicKey::from_slice(my_vk.from_base58()?.as_slice())?;
+        let my_vk = ed25519_sign::PublicKey::from_slice(my_vk.decode_base58()?.as_slice())?;
 
-        let my_sk =
-            ed25519_sign::SecretKey::from_slice(my_key.signkey.as_str().from_base58()?.as_slice())?;
+        let my_sk = ed25519_sign::SecretKey::from_slice(
+            my_key.signkey.as_str().decode_base58()?.as_slice(),
+        )?;
 
         let decrypted_doc = crypto_type.crypto_box_seal_open(&my_vk, &my_sk, doc)?;
 
@@ -453,7 +453,7 @@ impl CryptoService {
             seed.as_bytes().to_vec()
         } else if seed.ends_with('=') {
             // is base64 string
-            let decoded = base64::decode(&seed).to_indy(
+            let decoded = base64::decode(seed).to_indy(
                 IndyErrorKind::InvalidStructure,
                 "Can't deserialize Seed from Base64 string",
             )?;
@@ -463,8 +463,8 @@ impl CryptoService {
                 return Err(err_msg(
                     IndyErrorKind::InvalidStructure,
                     format!(
-                        "Trying to use invalid base64 encoded `seed`. \
-                                   The number of bytes must be {} ",
+                        "Trying to use invalid base64 encoded `seed`. The number of bytes must be \
+                         {} ",
                         ed25519_sign::SEEDBYTES
                     ),
                 ));
@@ -476,8 +476,8 @@ impl CryptoService {
             return Err(err_msg(
                 IndyErrorKind::InvalidStructure,
                 format!(
-                    "Trying to use invalid `seed`. It can be either \
-                               {} bytes string or base64 string or {} bytes HEX string",
+                    "Trying to use invalid `seed`. It can be either {} bytes string or base64 \
+                     string or {} bytes HEX string",
                     ed25519_sign::SEEDBYTES,
                     ed25519_sign::SEEDBYTES * 2
                 ),
@@ -508,10 +508,10 @@ impl CryptoService {
             )
         })?;
 
-        if vk.starts_with('~') {
-            let _ = vk[1..].from_base58()?; // TODO: proper validate abbreviated verkey
+        if let Some(vk) = vk.strip_prefix('~') {
+            let _ = vk.decode_base58()?; // TODO: proper validate abbreviated verkey
         } else {
-            let vk = ed25519_sign::PublicKey::from_slice(vk.from_base58()?.as_slice())?;
+            let vk = ed25519_sign::PublicKey::from_slice(vk.decode_base58()?.as_slice())?;
             crypto_type.validate_key(&vk)?;
         };
 
@@ -530,13 +530,6 @@ impl CryptoService {
         res
     }
 
-    pub(crate) fn validate_opt_did(&self, did: Option<&DidValue>) -> IndyResult<()> {
-        match did {
-            Some(did) => Ok(self.validate_did(did)?),
-            None => Ok(()),
-        }
-    }
-
     pub(crate) fn encrypt_plaintext(
         &self,
         plaintext: Vec<u8>,
@@ -545,7 +538,7 @@ impl CryptoService {
     ) -> (String, String, String) {
         //encrypt message with aad
         let (ciphertext, iv, tag) =
-            gen_nonce_and_encrypt_detached(plaintext.as_slice(), aad.as_bytes(), &cek);
+            gen_nonce_and_encrypt_detached(plaintext.as_slice(), aad.as_bytes(), cek);
 
         //base64 url encode data
         let iv_encoded = base64::encode_urlsafe(&iv[..]);
@@ -555,7 +548,7 @@ impl CryptoService {
         (ciphertext_encoded, iv_encoded, tag_encoded)
     }
 
-    /* ciphertext helper functions*/
+    /* ciphertext helper functions */
     pub(crate) fn decrypt_ciphertext(
         &self,
         ciphertext: &str,
@@ -633,10 +626,10 @@ impl CryptoService {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::crypto::did::MyDidInfo;
     use indy_utils::crypto::chacha20poly1305_ietf::gen_key;
 
     use super::*;
+    use crate::domain::crypto::did::MyDidInfo;
 
     #[async_std::test]
     async fn create_my_did_with_works_for_empty_info() {
@@ -884,7 +877,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(false, valid);
+        assert!(!valid);
     }
 
     #[async_std::test]
@@ -1058,8 +1051,8 @@ mod tests {
     async fn test_encrypt_plaintext_and_decrypt_ciphertext_works() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "Hello World".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = gen_key();
 
@@ -1077,8 +1070,8 @@ mod tests {
     async fn test_encrypt_plaintext_decrypt_ciphertext_empty_string_works() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = gen_key();
 
@@ -1096,8 +1089,8 @@ mod tests {
     async fn test_encrypt_plaintext_decrypt_ciphertext_bad_iv_fails() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "Hello World".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = gen_key();
 
@@ -1116,8 +1109,8 @@ mod tests {
     async fn test_encrypt_plaintext_decrypt_ciphertext_bad_ciphertext_fails() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "Hello World".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = gen_key();
 
@@ -1135,8 +1128,8 @@ mod tests {
     async fn test_encrypt_plaintext_and_decrypt_ciphertext_wrong_cek_fails() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "Hello World".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = chacha20poly1305_ietf::gen_key();
 
@@ -1155,8 +1148,8 @@ mod tests {
     async fn test_encrypt_plaintext_and_decrypt_ciphertext_bad_tag_fails() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "Hello World".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = gen_key();
 
@@ -1173,8 +1166,8 @@ mod tests {
     async fn test_encrypt_plaintext_and_decrypt_ciphertext_bad_aad_fails() {
         let service: CryptoService = CryptoService::new();
         let plaintext = "Hello World".as_bytes().to_vec();
-        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and alg
-        // Which the receiver MUST then check before decryption
+        // AAD allows the sender to tie extra (protocol) data to the encryption. Example JWE enc and
+        // alg Which the receiver MUST then check before decryption
         let aad = "some protocol data input to the encryption";
         let cek = gen_key();
 

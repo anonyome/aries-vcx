@@ -12,10 +12,13 @@ const { extractProofRequestAttachement } = require('../src/utils/proofs')
 const assert = require('assert')
 const { getStorageInfoMysql } = require('./wallet-common')
 const { initRustLogger } = require('../src')
+const mkdirp = require('mkdirp')
 
-const mapRevRegIdToTailsFile = (_revRegId) => '/tmp/tails'
+const tailsDir = '/tmp/tails'
+const mapRevRegIdToTailsFile = (_revRegId) => tailsDir
 
 async function getInvitationString (fetchInviteUrl) {
+  mkdirp.sync(tailsDir)
   let invitationString
   if (fetchInviteUrl) {
     const fetchInviteAttemptThreshold = 30
@@ -41,7 +44,7 @@ async function getInvitationString (fetchInviteUrl) {
 }
 
 async function runAlice (options) {
-  logger.info('Starting.')
+  logger.info('Starting alice.')
 
   initRustLogger(process.env.RUST_LOG || 'vcx=error')
   const agentName = `alice-${uuid.v4()}`

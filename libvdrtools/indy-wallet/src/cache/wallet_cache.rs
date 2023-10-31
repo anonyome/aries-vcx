@@ -1,5 +1,17 @@
+use std::{
+    collections::{HashMap, HashSet},
+    iter::FromIterator,
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex, RwLock,
+    },
+};
+
+use indy_api_types::domain::wallet::{CacheConfig, CachingAlgorithm};
+
 use crate::{
-    cache::{cache::Cache, lru::LruCache},
+    cache::{lru::LruCache, Cache},
     storage::{
         StorageRecord, Tag,
         Tag::{Encrypted, PlainText},
@@ -8,15 +20,6 @@ use crate::{
     },
     wallet::EncryptedValue,
     RecordOptions,
-};
-use indy_api_types::domain::wallet::{CacheConfig, CachingAlgorithm};
-use std::{
-    collections::{HashMap, HashSet},
-    iter::FromIterator,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Mutex, RwLock,
-    },
 };
 
 #[derive(PartialEq, Eq, Hash)]
@@ -40,7 +43,9 @@ impl WalletCache {
         match config {
             Some(cache_config) if cache_config.size > 0 && !cache_config.entities.is_empty() => {
                 let cache = match cache_config.algorithm {
-                    CachingAlgorithm::LRU => LruCache::new(cache_config.size),
+                    CachingAlgorithm::LRU => {
+                        LruCache::new(NonZeroUsize::new(cache_config.size).unwrap())
+                    }
                 };
                 WalletCache {
                     cache: Some(Mutex::new(Box::new(cache))),

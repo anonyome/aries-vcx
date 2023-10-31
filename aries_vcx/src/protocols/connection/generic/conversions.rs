@@ -6,12 +6,10 @@ use crate::{
         invitee::states::{
             completed::Completed as InviteeCompleted, initial::Initial as InviteeInitial,
             invited::Invited as InviteeInvited, requested::Requested as InviteeRequested,
-            responded::Responded as InviteeResponded,
         },
         inviter::states::{
             completed::Completed as InviterCompleted, initial::Initial as InviterInitial,
             invited::Invited as InviterInvited, requested::Requested as InviterRequested,
-            responded::Responded as InviterResponded,
         },
         Connection,
     },
@@ -86,7 +84,8 @@ macro_rules! try_from_vague_to_concrete {
     };
 }
 
-// ---------------------------- From Concrete State to Vague State implementations ----------------------------
+// ---------------------------- From Concrete State to Vague State implementations
+// ----------------------------
 impl<I, S> From<Connection<I, S>> for GenericConnection
 where
     GenericState: From<(I, S)>,
@@ -107,16 +106,15 @@ from_concrete_to_vague!(Invitee, InviteeState, Invitee, GenericState);
 from_concrete_to_vague!(InviterInitial, Initial, InviterState);
 from_concrete_to_vague!(InviterInvited, Invited, InviterState);
 from_concrete_to_vague!(InviterRequested, Requested, InviterState);
-from_concrete_to_vague!(InviterResponded, Responded, InviterState);
 from_concrete_to_vague!(InviterCompleted, Completed, InviterState);
 
 from_concrete_to_vague!(InviteeInitial, Initial, InviteeState);
 from_concrete_to_vague!(InviteeInvited, Invited, InviteeState);
 from_concrete_to_vague!(InviteeRequested, Requested, InviteeState);
-from_concrete_to_vague!(InviteeResponded, Responded, InviteeState);
 from_concrete_to_vague!(InviteeCompleted, Completed, InviteeState);
 
-// ---------------------------- Try From Vague State to Concrete State implementations ----------------------------
+// ---------------------------- Try From Vague State to Concrete State implementations
+// ----------------------------
 impl<I, S> TryFrom<GenericConnection> for Connection<I, S>
 where
     (I, S): TryFrom<GenericState, Error = AriesVcxError>,
@@ -125,7 +123,8 @@ where
 
     fn try_from(value: GenericConnection) -> Result<Self, Self::Error> {
         let (initiation_type, state) = TryFrom::try_from(value.state)?;
-        let con = Connection::from_parts(value.source_id, value.pairwise_info, initiation_type, state);
+        let con =
+            Connection::from_parts(value.source_id, value.pairwise_info, initiation_type, state);
         Ok(con)
     }
 }
@@ -136,11 +135,9 @@ try_from_vague_to_concrete!(InviteeState, Invitee, Inviter, Invitee);
 try_from_vague_to_concrete!(InviterState, Initial, InviterInitial);
 try_from_vague_to_concrete!(InviterState, Invited, InviterInvited);
 try_from_vague_to_concrete!(InviterState, Requested, InviterRequested);
-try_from_vague_to_concrete!(InviterState, Responded, InviterResponded);
 try_from_vague_to_concrete!(InviterState, Completed, InviterCompleted);
 
 try_from_vague_to_concrete!(InviteeState, Initial, InviteeInitial);
 try_from_vague_to_concrete!(InviteeState, Invited, InviteeInvited);
 try_from_vague_to_concrete!(InviteeState, Requested, InviteeRequested);
-try_from_vague_to_concrete!(InviteeState, Responded, InviteeResponded);
 try_from_vague_to_concrete!(InviteeState, Completed, InviteeCompleted);

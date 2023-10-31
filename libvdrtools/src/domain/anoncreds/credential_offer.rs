@@ -2,8 +2,6 @@ use ursa::cl::{CredentialKeyCorrectnessProof, Nonce};
 
 use super::{credential_definition::CredentialDefinitionId, schema::SchemaId};
 
-use indy_api_types::validation::Validatable;
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CredentialOffer {
     pub schema_id: SchemaId,
@@ -28,13 +26,5 @@ impl CredentialOffer {
             key_correctness_proof: self.key_correctness_proof,
             nonce: self.nonce,
         }
-    }
-}
-
-impl Validatable for CredentialOffer {
-    fn validate(&self) -> Result<(), String> {
-        self.schema_id.validate()?;
-        self.cred_def_id.validate()?;
-        Ok(())
     }
 }
