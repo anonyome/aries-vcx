@@ -41,7 +41,7 @@ use crate::utils::test_agent::{
 pub mod utils;
 
 fn assert_key_agreement(a: DidDocument, b: DidDocument) {
-    log::warn!("comparing did doc a: {}, b: {}", a, b);
+    log::info!("comparing did doc a: {}, b: {}", a, b);
     let a_key = resolve_base58_key_agreement(&a).unwrap();
     let b_key = resolve_base58_key_agreement(&b).unwrap();
     assert_eq!(a_key, b_key);
@@ -134,7 +134,7 @@ async fn did_exchange_test() -> Result<(), Box<dyn Error>> {
     );
 
     let (responders_peer_did, _our_verkey) =
-        create_peer_did_4(&agent_invitee.wallet, dummy_url.clone(), vec![]).await?;
+        create_peer_did_4(&agent_inviter.wallet, dummy_url.clone(), vec![]).await?;
     let responders_did_document = responders_peer_did.resolve_did_doc()?;
     info!("Responder prepares did document: {responders_did_document}");
 
@@ -202,7 +202,144 @@ async fn did_exchange_test() -> Result<(), Box<dyn Error>> {
     let requesters_peer_did = requesters_peer_did.resolve_did_doc()?;
     let expected_sender_vk = resolve_base58_key_agreement(&requesters_peer_did)?;
     let unpacked =
-        EncryptionEnvelope::auth_unpack(&agent_invitee.wallet, m.0, &expected_sender_vk).await?;
+        EncryptionEnvelope::auth_unpack(&agent_inviter.wallet, m.0, &expected_sender_vk).await?;
+
+    info!("Unpacked message: {:?}", unpacked);
+
+    Ok(())
+}
+
+/// Similar test to above, but using two did:peer's "pairwise"
+#[tokio::test]
+#[ignore]
+async fn pairwise_did_exchange_test() -> Result<(), Box<dyn Error>> {
+    let setup = SetupPoolDirectory::init().await;
+    let dummy_url: Url = "http://dummyurl.org".parse().unwrap();
+    let agent_inviter = create_test_agent(setup.genesis_file_path.clone()).await;
+    let agent_invitee = create_test_agent(setup.genesis_file_path.clone()).await;
+
+    let resolver_registry = Arc::new(
+        ResolverRegistry::new().register_resolver::<_>("peer".into(), PeerDidResolver::new()),
+    );
+
+    let (inviters_peer_did, invitation_key) =
+        create_peer_did_4(&agent_inviter.wallet, dummy_url.clone(), vec![]).await?;
+    info!(
+        "Inviter prepares peer DID for usage in invitation and DIDExchange {}",
+        inviters_peer_did
+    );
+
+    let invitation = Invitation::builder()
+        .id("test_invite_id".to_owned())
+        .content(
+            InvitationContent::builder()
+                .services(vec![OobService::Did(inviters_peer_did.to_string())])
+                .build(),
+        )
+        .build();
+    info!(
+        "Inviter prepares invitation and passes to invitee {}",
+        invitation
+    );
+
+    let (requesters_peer_did, _our_verkey) =
+        create_peer_did_4(&agent_invitee.wallet, dummy_url.clone(), vec![]).await?;
+    let did_inviter: Did = invitation_get_first_did_service(&invitation)?;
+    info!(
+        "Invitee resolves Inviter's DID from invitation {} (as a first DID service found in the \
+         invitation)",
+        did_inviter
+    );
+
+    let TransitionResult {
+        state: requester,
+        output: request,
+    } = DidExchangeRequester::<RequestSent>::construct_request(
+        resolver_registry.clone(),
+        Some(invitation.id),
+        &did_inviter,
+        &requesters_peer_did,
+    )
+    .await
+    .unwrap();
+    info!(
+        "Invitee processes invitation, builds up request {}",
+        &request
+    );
+
+    let (responders_peer_did, _our_verkey) =
+        create_peer_did_4(&agent_inviter.wallet, dummy_url.clone(), vec![]).await?;
+    let responders_did_document = responders_peer_did.resolve_did_doc()?;
+    info!("Responder prepares did document: {responders_did_document}");
+
+    let TransitionResult {
+        output: response,
+        state: responder,
+    } = DidExchangeResponder::<ResponseSent>::receive_request(
+        &agent_inviter.wallet,
+        resolver_registry.clone(),
+        request,
+        &responders_peer_did,
+        Some(invitation_key),
+    )
+    .await
+    .unwrap();
+
+    info!(
+        "Inviter processes request, builds up response using the original peer invitation DID (no \
+         rotation) {}",
+        &response
+    );
+
+    let TransitionResult {
+        state: requester,
+        output: complete,
+    } = requester
+        .receive_response(response, resolver_registry)
+        .await
+        .unwrap();
+
+    let responder = responder.receive_complete(complete).unwrap();
+
+    info!("Asserting did document of requester");
+    assert_key_agreement(
+        requester.our_did_doc().clone(),
+        responder.their_did_doc().clone(),
+    );
+    info!("Asserting did document of responder");
+    assert_key_agreement(
+        responder.our_did_doc().clone(),
+        requester.their_did_doc().clone(),
+    );
+
+    info!(
+        "Requesters did document (requesters view): {}",
+        requester.our_did_doc()
+    );
+    info!(
+        "Responders did document (requesters view): {}",
+        requester.their_did_doc()
+    );
+
+    let data = "Hello world";
+    let service = requester
+        .their_did_doc()
+        .get_service_of_type(&ServiceType::DIDCommV1)?;
+    let m = EncryptionEnvelope::create(
+        &agent_invitee.wallet,
+        data.as_bytes(),
+        requester.our_did_doc(),
+        requester.their_did_doc(),
+        service.id(),
+    )
+    .await?;
+
+    info!("Encrypted message: {:?}", m);
+
+    let requesters_peer_did = requesters_peer_did.resolve_did_doc()?;
+    let expected_sender_vk = resolve_base58_key_agreement(&requesters_peer_did)?;
+    let unpacked =
+        EncryptionEnvelope::auth_unpack(&agent_inviter.wallet, m.0, &expected_sender_vk).await?;
 
     info!("Unpacked message: {:?}", unpacked);
 

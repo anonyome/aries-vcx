@@ -28,7 +28,7 @@ impl DidExchangeRequester<RequestSent> {
         their_did: &Did,
         our_peer_did: &PeerDid<Numalgo4>,
     ) -> Result<TransitionResult<Self, Request>, AriesVcxError> {
-        info!(
+        debug!(
             "DidExchangeRequester<RequestSent>::construct_request >> their_did: {}, our_peer_did: \
              {}",
             their_did, our_peer_did
@@ -40,7 +40,7 @@ impl DidExchangeRequester<RequestSent> {
         let our_did_document = our_peer_did.resolve_did_doc()?;
         let request = construct_request(invitation_id.clone(), our_peer_did.to_string());
 
-        info!(
+        debug!(
             "DidExchangeRequester<RequestSent>::construct_request << prepared request: {}",
             request
         );
@@ -64,7 +64,7 @@ impl DidExchangeRequester<RequestSent> {
         TransitionResult<DidExchangeRequester<Completed>, CompleteMessage>,
         TransitionError<Self>,
     > {
-        info!(
+        debug!(
             "DidExchangeRequester<RequestSent>::receive_response >> response: {:?}",
             response
         );
@@ -78,13 +78,13 @@ impl DidExchangeRequester<RequestSent> {
             });
         }
         let did_document = if let Some(ddo) = response.content.did_doc {
-            info!(
+            debug!(
                 "DidExchangeRequester<RequestSent>::receive_response >> the Response message \
                  contained attached ddo"
             );
             attachment_to_diddoc(ddo).map_err(to_transition_error(self.clone()))?
         } else {
-            info!(
+            debug!(
                 "DidExchangeRequester<RequestSent>::receive_response >> the Response message \
                  contains pairwise DID, resolving to DID Document"
             );
@@ -98,7 +98,7 @@ impl DidExchangeRequester<RequestSent> {
         };
 
         let complete_message = construct_didexchange_complete(self.state.request_id.clone());
-        info!(
+        debug!(
             "DidExchangeRequester<RequestSent>::receive_response << complete_message: {}",
             complete_message
         );

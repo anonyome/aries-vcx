@@ -29,7 +29,7 @@ impl DidExchangeResponder<ResponseSent> {
         our_peer_did: &PeerDid<Numalgo4>,
         invitation_key: Option<Key>,
     ) -> Result<TransitionResult<DidExchangeResponder<ResponseSent>, Response>, AriesVcxError> {
-        info!(
+        debug!(
             "DidExchangeResponder<ResponseSent>::receive_request >> request: {}, our_peer_did: \
              {}, invitation_key: {:?}",
             request, our_peer_did, invitation_key
@@ -55,7 +55,7 @@ impl DidExchangeResponder<ResponseSent> {
             }
         };
         let response = construct_response(request.id.clone(), &our_did_document, ddo_attachment);
-        info!(
+        debug!(
             "DidExchangeResponder<ResponseSent>::receive_request << prepared response: {}",
             response
         );

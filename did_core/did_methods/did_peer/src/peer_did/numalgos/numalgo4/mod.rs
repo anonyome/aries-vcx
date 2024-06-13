@@ -102,7 +102,12 @@ impl PeerDid<Numalgo4> {
         // without first 2 bytes
         let peer4_did_doc: &[u8] = &diddoc_with_multibase_prefix[2..];
         let encoded_document: DidPeer4ConstructionDidDocument =
-            serde_json::from_slice(peer4_did_doc).unwrap();
+            serde_json::from_slice(peer4_did_doc).map_err(|e| {
+                DidPeerError::GeneralError(format!(
+                    "Failed to decode the encoded did doc: {}",
+                    e
+                ))
+            })?;
         Ok(encoded_document)
     }
 
